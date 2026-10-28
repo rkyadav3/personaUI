@@ -1,0 +1,40 @@
+<%- include('../partials/admin-head') %>
+<div class="bar">
+  <h1>File manager</h1>
+  <div class="btns">
+    <form class="search" method="get"><input type="search" name="q" value="<%= q %>" placeholder="Search names and contents"></form>
+    <a class="btn primary" href="/admin/files/new<%= folderId ? '?folder=' + folderId : '' %>">Add files</a>
+  </div>
+</div>
+<nav class="crumbs"><a href="/admin/files">All files</a>
+  <% crumbs.forEach(c => { %> / <a href="/admin/files?folder=<%= c.id %>"><%= c.name %></a><% }) %>
+  <% if (q) { %> / search results for “<%= q %>”<% } %></nav>
+
+<table class="table">
+  <thead><tr><th>Name</th><th>Topic</th><th>Status</th><th>Size</th><th></th></tr></thead>
+  <tbody>
+  <% if (!q) folders.forEach(f => { %>
+    <tr><td><a class="strong" href="/admin/files?folder=<%= f.id %>">&#128193; <%= f.name %></a></td><td></td><td></td><td></td>
+      <td class="acts">
+        <form method="post" action="/admin/folders/<%= f.id %>/rename" class="inline"><input name="name" value="<%= f.name %>"><button class="link">Rename</button></form>
+        <form method="post" action="/admin/folders/<%= f.id %>/delete" onsubmit="return confirm('Delete this folder and everything inside?')"><button class="link danger">Delete</button></form>
+      </td></tr>
+  <% }) %>
+  <% files.forEach(f => { const t = topics.find(x => x.id === f.topic_id); %>
+    <tr><td><a href="/admin/files/<%= f.id %>"><%= f.name %></a></td>
+      <td><%= t ? t.name : '' %></td>
+      <td><span class="pill <%= f.status %>"><%= f.status %></span></td>
+      <td><%= f.size > 1048576 ? (f.size/1048576).toFixed(1)+' MB' : Math.ceil(f.size/1024)+' KB' %></td>
+      <td class="acts">
+        <a href="/admin/files/<%= f.id %>">Open</a>
+        <a href="/admin/files/<%= f.id %>/download">Download</a>
+        <form method="post" action="/admin/files/<%= f.id %>/move" class="inline">
+          <select name="folder" style="margin:0;max-width:150px"><option value="">Top level</option>
+            <% allFolders.forEach(a => { %><option value="<%= a.id %>" <%= a.id === f.folder_id ? 'selected' : '' %>><%= a.path %></option><% }) %></select>
+          <button class="link">Move</button></form>
+        <form method="post" action="/admin/files/<%= f.id %>/delete" onsubmit="return confirm('Delete this file?')"><button class="link danger">Delete</button></form></td></tr>
+  <% }) %>
+  <% if ((q || !folders.length) && !files.length) { %><tr><td colspan="5" class="muted"><%= q ? 'No files match your search.' : 'This folder is empty.' %> <a href="/admin/files/new">Add files</a></td></tr><% } %>
+  </tbody>
+</table>
+<%- include('../partials/admin-foot') %>

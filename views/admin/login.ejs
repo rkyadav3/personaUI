@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in</title><link rel="stylesheet" href="/css/admin.css"></head>
+<body class="login"><form method="post" action="/admin/login" class="card login-card">
+<h1>Studio</h1>
+<% if (error) { %><p class="err"><%= error %></p><% } %>
+<label>Username<input name="username" autocomplete="username" required></label>
+<label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+<button class="btn primary">Sign in</button></form></body></html>

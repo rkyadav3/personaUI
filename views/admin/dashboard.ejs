@@ -1,0 +1,18 @@
+<%- include('../partials/admin-head') %>
+<h1>Overview</h1>
+<div class="stats">
+  <div class="stat"><b><%= files.n %></b> files <small><%= (files.bytes/1048576).toFixed(1) %> MB stored</small></div>
+  <div class="stat"><b><%= posts.n %></b> posts <small><%= posts.drafts || 0 %> drafts</small></div>
+  <div class="stat"><b><%= topics.length %></b> research topics</div>
+</div>
+<div class="row">
+  <section class="card"><h2>Start something</h2>
+    <p><a class="btn primary" href="/admin/posts/new">Write a post</a> <a class="btn" href="/admin/files/new">Add files</a> <a class="btn" href="/admin/files">File manager</a> <a class="btn" href="/admin/topics">New topic</a></p>
+    <p class="muted">The persona only answers from published files and published posts. Drafts stay private.</p>
+  </section>
+  <section class="card"><h2>Recently changed files</h2>
+    <% if (!recent.length) { %><p class="muted">Nothing uploaded yet. Add your first research file.</p><% } %>
+    <ul class="plain"><% recent.forEach(f => { %><li><a href="/admin/files/<%= f.id %>"><%= f.name %></a></li><% }) %></ul>
+  </section>
+</div>
+<%- include('../partials/admin-foot') %>

@@ -1,0 +1,16 @@
+{
+  "name": "persona-portfolio",
+  "version": "0.1.0",
+  "engines": { "node": ">=22.5" },
+  "description": "Portfolio with a talking persona + admin dashboard (MVC: Express, EJS, SQLite)",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "dev": "node --watch server.js", "seed": "node scripts/seed.js" },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "multer": "^2.0.2"
+  }
+}

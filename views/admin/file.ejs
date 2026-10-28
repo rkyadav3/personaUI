@@ -1,0 +1,26 @@
+<%- include('../partials/admin-head') %>
+<nav class="crumbs"><a href="/admin/files">All files</a>
+  <% crumbs.forEach(c => { %> / <a href="/admin/files?folder=<%= c.id %>"><%= c.name %></a><% }) %> / <%= file.name %></nav>
+<div class="bar"><h1><input id="fname" class="title" value="<%= file.name %>"></h1>
+  <div class="btns">
+    <select id="ftopic"><option value="">No topic</option>
+      <% topics.forEach(t => { %><option value="<%= t.id %>" <%= t.id === file.topic_id ? 'selected' : '' %>><%= t.name %></option><% }) %></select>
+    <a class="btn" href="/admin/files/<%= file.id %>/download">Download</a>
+    <% if (editable) { %><button class="btn" id="saveDraft">Save as draft</button><button class="btn primary" id="savePub">Save and publish</button><% } else { %><button class="btn primary" id="savePub">Save details</button><% } %>
+    <span id="state" class="muted"></span></div></div>
+<% if (editable) { %>
+  <textarea id="ftext" class="code"><%= file.text_content %></textarea>
+<% } else { %>
+  <p class="card muted">This file type can't be edited here and isn't searchable by the persona yet. Rename it, assign a topic, or download it.</p>
+<% } %>
+<script>
+const id = <%= file.id %>;
+async function save(status){
+  const body = { name: fname.value, topic_id: ftopic.value, status, text: window.ftext ? ftext.value : undefined };
+  const r = await fetch('/admin/files/'+id+'/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  state.textContent = r.ok ? (status==='draft'?'Saved as draft':'Published') : 'Save failed';
+}
+if (window.saveDraft) saveDraft.onclick = () => save('draft');
+savePub.onclick = () => save('published');
+</script>
+<%- include('../partials/admin-foot') %>
