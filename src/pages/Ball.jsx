@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import 'open-glass-ui/styles.css';
+import { Glass, GlassSystemProvider } from 'open-glass-ui';
+import { Link, useParams } from 'react-router-dom';
+import BackgroundLayer from '../components/BackgroundLayer.jsx';
+import { api } from '../lib/api.js';
 
 const N = 1500;
 const VOWEL = { a: 1, o: 1, u: 0.75, e: 0.65, i: 0.55 };
@@ -13,6 +17,15 @@ export default function Ball() {
   const S = useRef({ mode: 'idle', energy: 0, impulse: 0, t: 0, light: 0 });   // how "alive" the ball is
   const [caption, setCaption] = useState(''), [sources, setSources] = useState([]), [busy, setBusy] = useState(true);
   const busyRef = useRef(true);
+  const [site, setSite] = useState({ imageUrl: null, bg: null });   // the owner's background image and look
+  useEffect(() => {
+    fetch(`/api/site${slug ? `?slug=${encodeURIComponent(slug)}` : ''}`).then(r => r.json())
+      .then(d => { setSite(d); S.current.hidden = d.bg ? d.bg.ball === false : false; }, () => {});
+  }, [slug]);
+  const [acct, setAcct] = useState({ user: null, mode: 'open' });   // drives the Create account / Sign in links
+  useEffect(() => {
+    Promise.all([api('auth.me'), api('auth.config')]).then(([m, c]) => setAcct({ user: m.user, mode: c.mode }), () => {});
+  }, []);
   const lock = v => { busyRef.current = v; setBusy(v); };
 
   const kick = v => { S.current.impulse = Math.max(S.current.impulse, v); };
@@ -37,6 +50,7 @@ export default function Ball() {
     addEventListener('resize', resize); resize();
 
     function frame(now) {
+      if (S.current.hidden) { ctx.clearRect(0, 0, W, H); last = now; raf = requestAnimationFrame(frame); return; }   // owner turned the ball off
       const s = S.current, dt = Math.min(0.05, (now - last) / 1000); last = now; s.t += dt;
       // energy chases the impulse, and the impulse fades like a voice trailing off
       s.energy += (s.impulse - s.energy) * 0.28; s.impulse *= 0.88;
@@ -124,16 +138,27 @@ export default function Ball() {
   }
 
   return (
+    <GlassSystemProvider renderer="auto" theme={{ appearance: 'dark' }}>
     <div className="ball" ref={root}>
-      <canvas ref={cv} aria-hidden="true" />
+      <BackgroundLayer imageUrl={site.imageUrl} bg={site.bg} />
+      <canvas ref={cv} aria-hidden="true" style={{ opacity: site.bg ? site.bg.ballOpacity / 100 : 1 }} />
+      <Glass as="nav" material="regular" className="ball-nav" aria-label="Account">
+        {acct.user ? <Link to="/admin">Dashboard</Link> : <>
+          <Link to="/admin">Sign in</Link>
+          {acct.mode !== 'closed' && <Link to="/admin?tab=register" className="cta">Create account</Link>}
+        </>}
+      </Glass>
       <div className="ui">
         <p className="caption" aria-live="polite">{caption}</p>
         <p className={`sources${sources.length ? ' on' : ''}`}>{sources.length ? `From my notes: ${sources.join(' · ')}` : ''}</p>
+        <Glass as="div" material="regular" className="ball-form">
         <form onSubmit={submit} autoComplete="off">
           <input ref={input} maxLength={500} placeholder="Ask me anything about my research" aria-label="Your question" enterKeyHint="send" onInput={onInput} onBlur={onBlur} />
           <button disabled={busy} aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M13 6l6 6-6 6" /></svg></button>
         </form>
+        </Glass>
       </div>
     </div>
+    </GlassSystemProvider>
   );
 }

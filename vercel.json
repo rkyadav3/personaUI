@@ -1,34 +1,35 @@
 {
-"devCommand": "vite",
-"buildCommand": "vite build",
-"outputDirectory": "dist",
-"functions": {
-"api/chat.js": {
-"maxDuration": 30
-},
-"api/admin.js": {
-"maxDuration": 60
-}
-},
-"rewrites": [
-{
-"source": "/((?!api/).*)",
-"destination": "/index.html"
-}
-],
-"headers": [
-{
-"source": "/(.*)",
-"headers": [
-{
-"key": "X-Content-Type-Options",
-"value": "nosniff"
-},
-{
-"key": "Referrer-Policy",
-"value": "no-referrer"
-}
-]
-}
-]
+  "devCommand": "vite",
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/site.js": { "maxDuration": 10 },
+    "api/chat.js": {
+      "maxDuration": 30
+    },
+    "api/admin.js": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        }
+      ]
+    }
+  ]
 }

@@ -11,7 +11,8 @@ export default function Login() {
   const { data: cfg } = useOp('auth.config');
   const mode = cfg?.mode || 'open';
   const canRegister = mode !== 'closed';
-  const [tab, setTab] = useState(params.get('invite') ? 'register' : 'login');
+  const [want, setTab] = useState(params.get('invite') || params.get('tab') === 'register' ? 'register' : 'login');
+  const tab = canRegister ? want : 'login';
   const [f, setF] = useState({ name: '', email: '', password: '', confirm: '', invite: params.get('invite') || '' });
   const [err, setErr] = useState(''), [busy, setBusy] = useState(false);
   const set = k => e => setF({ ...f, [k]: e.target.value });

@@ -1,14 +1,14 @@
 // One serverless function for the whole admin. The browser POSTs { op, args } and gets JSON back.
 import { env } from '../server/config.js';
 import * as auth from '../server/auth.js';
-import * as store from '../server/store.js';
 import * as indexer from '../server/indexer.js';
 import * as invites from '../server/invites.js';
 import { model } from '../server/embed.js';
 import { search } from '../server/search.js';
+import * as profile from '../server/profile.js';
+import * as site from '../server/site.js';
 import * as store from '../server/store.js';
 import { scoped } from '../server/tenant.js';
-
 
 class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 const needAdmin = ({ user }) => { if (!user.isAdmin) throw new HttpError(403, 'This page is for admins. Add your email to ADMIN_EMAILS.'); };
@@ -37,6 +37,23 @@ const OPS = {
     const recent = [...files].sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || '')).slice(0, 8);
     return { counts, recent };
   },
+
+  // profile (AI registration)
+  'profile.get': ({ db }) => profile.getProfile(db),
+  'profile.extract': ({ db }, a) => profile.extract(db, a.text),
+  'profile.confirm': ({ db }, a) => profile.confirmProfile(db, a),
+  'profile.save': ({ db }, a) => profile.saveProfile(db, a),
+  'profile.visibility': async ({ db }, a) => { await profile.setVisibility(db, a.visibility); return { ok: true }; },
+  'profile.status': async ({ db }, a) => { await profile.setStatus(db, a.status); return { ok: true }; },
+  'contributions.save': ({ db }, a) => profile.saveContribution(db, a),
+  'contributions.delete': async ({ db }, a) => { await profile.deleteContribution(db, a.id); return { ok: true }; },
+  'offerings.save': ({ db }, a) => profile.saveOffering(db, a),
+  'offerings.delete': async ({ db }, a) => { await profile.deleteOffering(db, a.id); return { ok: true }; },
+
+  // site look (background image)
+  'site.get': ({ db }) => site.getSettings(db),
+  'site.sign': ({ db }, a) => site.signBackground(db, a),
+  'site.save': ({ db }, a) => site.saveSettings(db, a),
 
   // folders
   'folders.all': ({ db }) => store.allFolders(db),
