@@ -6,6 +6,8 @@
   "outputDirectory": "dist",
   "functions": {
     "api/site.js": { "maxDuration": 10 },
+    "api/home.js": { "maxDuration": 15 },
+    "api/track.js": { "maxDuration": 10 },
     "api/chat.js": { "maxDuration": 30 },
     "api/admin.js": { "maxDuration": 60 },
     "api/profile.js": { "maxDuration": 60 }

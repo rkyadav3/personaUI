@@ -152,7 +152,8 @@ export default function Ball() {
       <BackgroundLayer imageUrl={site.imageUrl} bg={site.bg} />
       <canvas ref={cv} aria-hidden="true" style={{ opacity: site.bg ? site.bg.ballOpacity / 100 : 1 }} />
       <Glass as="nav" material="regular" className="ball-nav" aria-label="Account">
-        {site.hasProfile && site.handle && <Link to={`/p/${site.handle}`}>{site.name ? `About ${site.name.split(' ')[0]}` : 'About'}</Link>}
+        <Link to="/">All members</Link>
+        {site.hasProfile && site.handle && <Link to={`/p/${site.handle}`}>{site.name ? `${site.name.split(' ')[0]}'s profile` : 'Profile'}</Link>}
         {user ? <Link to="/admin">Dashboard</Link> : <>
           <Link to="/admin">Sign in</Link>
           {site.mode !== 'closed' && <Link to="/admin?tab=register" className="cta">Create account</Link>}

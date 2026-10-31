@@ -240,6 +240,9 @@ export async function saveOffering(db, a) {
 export const deleteOffering = (db, id) => run(db.from('offerings').delete().eq('id', id));
 
 // ---------------------------------------------------------------- public view
+/** Public counters for an offering. Ratings are an average and a count only; who voted is never exposed. */
+export const offerStats = o => ({ views: o.views || 0, clicks: o.clicks || 0, ratingCount: o.rating_count || 0, ratingAvg: o.rating_count ? Math.round((o.rating_sum / o.rating_count) * 10) / 10 : 0 });
+
 /** Pure: builds exactly what visitors may see. Hidden or inactive things never leave the server. */
 export function buildPublic(profile, contributions) {
   const v = normalizeVisibility(profile.visibility), c = profile.contact || {};
@@ -247,6 +250,7 @@ export function buildPublic(profile, contributions) {
   for (const k of ['email', 'phone', 'location', 'other']) if (v.contact[k] && c[k]) contact[k] = c[k];
   return {
     name: profile.name,
+    views: profile.views || 0,
     designation: v.designation ? profile.designation : null,
     education: v.education ? profile.education : [],
     experience: v.experience ? profile.experience : null,
@@ -256,7 +260,7 @@ export function buildPublic(profile, contributions) {
     contributions: v.contributions
       ? contributions.filter(k => k.enabled && k.visible).map(k => ({
         category: k.category, subtype: k.subtype, description: k.description, intent: k.intent,
-        offerings: (k.offerings || []).filter(o => o.active).map(o => ({ title: o.title, description: o.description, pricing: o.pricing, price: o.price, currency: o.currency, details: o.details })),
+        offerings: (k.offerings || []).filter(o => o.active).map(o => ({ id: o.id, title: o.title, description: o.description, pricing: o.pricing, price: o.price, currency: o.currency, details: o.details, createdAt: o.created_at || null, ...offerStats(o) })),
       }))
       : [],
   };
@@ -274,7 +278,7 @@ export async function publicProfile(slug) {
   return buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) })));
 }
 
-const safeUrl = u => { try { const x = new URL(String(u || '')); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : null; } catch { return null; } };
+export const safeUrl = u => { try { const x = new URL(String(u || '')); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : null; } catch { return null; } };
 
 /** What the persona page (/u/<slug>) shows beside the chat: the person's name, whether a public profile exists, and every
  *  offering they have published. Built from buildPublic, so hidden, disabled or inactive things never appear here either. */

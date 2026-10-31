@@ -2,7 +2,8 @@ import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './lib/auth.jsx';
 const Layout = lazy(() => import('./components/Layout.jsx'));
-import Ball from './pages/Ball.jsx';
+import Home from './pages/Home.jsx';
+const Ball = lazy(() => import('./pages/Ball.jsx'));
 const Overview = lazy(() => import('./pages/Overview.jsx'));
 const FileManager = lazy(() => import('./pages/FileManager.jsx'));
 const AddFiles = lazy(() => import('./pages/AddFiles.jsx'));
@@ -19,7 +20,7 @@ export default function App() {
   return (
     <Suspense fallback={null}>
     <Routes>
-      <Route path="/" element={<Ball />} />
+      <Route path="/" element={<Home />} />
       <Route path="/u/:slug" element={<Ball />} />
       <Route path="/register" element={<Navigate to="/admin?tab=register" replace />} />
       <Route path="/login" element={<Navigate to="/admin" replace />} />

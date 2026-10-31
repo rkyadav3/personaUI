@@ -19,11 +19,13 @@ The Streamlit admin and the static chat page are now one React app (Vite) with t
 | pypdf / python-docx | `unpdf` / `mammoth` |
 
 ## Routes
-- `/` and `/u/:slug`: the public ball. `/` answers for `DEFAULT_SLUG`; `/u/:slug` for that user.
+- `/`: the members' **home page** (see below). Anyone can browse; nobody can join without an invite.
+- `/p/:slug`: a member's **profile**, with **Open persona** and **Talk to me**.
+- `/u/:slug`: that member's **persona** (the dotted ball you chat with).
 - `/admin`: sign in / create account, then the admin pages. Invite links look like `/admin?invite=CODE`.
 
 ## Setup
-1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql` (adds users, invite codes, `owner_id`, and owner-scoped search). If your project already has those tables, compare first.
+1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql` (adds users, invite codes, `owner_id`, and owner-scoped search). If your project already has those tables, compare first.
 2. **Env vars:** copy `.env.example` to `.env.local` (local) or add them in Vercel. `SESSION_SECRET` is new: any long random string.
 3. **Run locally:** `npm install`, `npm i -g vercel`, then `npm run dev` (first run asks you to log in and link a Vercel project; put your variables in `.env.local`). `npm run dev:web` runs only the UI and proxies `/api` to a `vercel dev` on port 3000.
 4. **Deploy:** import the repo in Vercel (framework: Vite). Root directory is the repo root. Add the env vars. Deploy.
@@ -60,3 +62,18 @@ Cover images for books are a URL for now (no image upload yet).
 - The browser shrinks the picture to 2200 px, re-encodes it (removing hidden photo data such as GPS), then uploads it straight to storage with a one-time token. The server checks the path belongs to the user, deletes the old image when you replace it, and clamps every setting to a safe range.
 - Visitors read `/api/site?slug=...`, which returns only the image URL and the look.
 - UI: the settings page and the public page use [open-glass-ui](https://github.com/moekoelueker/open-glass-ui) (`npm i open-glass-ui`, MIT, no runtime dependencies). The rest of the admin keeps its existing styling.
+
+## Members' home page (`/`)
+A private platform: set `REGISTRATION_MODE=invite` (now the default in `.env.example`) so an account needs a code from **Admin → Invites**. Visitors browse without an account.
+
+- **Navbar:** site name (`SITE_NAME`), Sign in / Dashboard, and "I have an invite".
+- **Rails under the navbar:** Top rated, Most viewed, In demand, Latest. A rail with nothing in it is hidden, so a new platform just shows Latest. The category chips and the search box re-rank the rails and filter the cards instantly (`shared/ranking.js`).
+- **Member cards:** one for every *published* profile (draft profiles and hidden sections never appear; everything goes through `buildPublic`). A card opens `/p/:slug`, never the persona. The card's picture is the member's persona background if they set one.
+- **Profile:** **Open persona** goes to `/u/:slug`. **Talk to me** shows the email and phone the member chose to publish; if they published none, it points to their persona instead.
+- **Data:** `api/home.js` (one cached read) and `api/track.js` (counters). Run `supabase/home.sql` once.
+
+How the numbers work:
+- **Most viewed:** an offering counts once a visitor has had it mostly on screen for a second. Once per browser session, and a member's own visits never count.
+- **Top rated:** visitors rate 1 to 5 stars on the profile; one vote per visitor per offering (stored as a salted hash, never an IP). Ranking uses a Bayesian average, so one 5-star vote does not beat forty 4.8s. Members cannot rate their own offerings.
+- **In demand:** clicks on Buy / Open / Enquire. This measures interest, **not confirmed sales**, because purchases happen on the member's own link. Real sales counts need a payment provider (for example Razorpay or Stripe webhooks) and would replace this rail's counter.
+- The abuse limits in `api/track.js` live in memory per warm serverless instance. For stronger protection, add Vercel's firewall rate limiting.

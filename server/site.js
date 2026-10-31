@@ -6,7 +6,7 @@ import { env } from './config.js';
 import { raw, run } from './supabase.js';
 
 const EXT = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' };
-const publicUrl = path => `${process.env.SUPABASE_URL}/storage/v1/object/public/${BG_BUCKET}/${path}`;
+export const publicUrl = path => `${process.env.SUPABASE_URL}/storage/v1/object/public/${BG_BUCKET}/${path}`;
 const row = async db => (await run(db.from('site_settings').select('*').limit(1)))[0] || null;
 const view = r => ({ imageUrl: r?.bg_path ? publicUrl(r.bg_path) : null, bg: normalizeBg(r?.bg) });
 
