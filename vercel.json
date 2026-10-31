@@ -1,15 +1,13 @@
 {
+  "installCommand": "npm install --include=dev",
   "devCommand": "vite",
-  "buildCommand": "vite build",
+  "buildCommand": "npx vite build",
   "outputDirectory": "dist",
   "functions": {
     "api/site.js": { "maxDuration": 10 },
-    "api/chat.js": {
-      "maxDuration": 30
-    },
-    "api/admin.js": {
-      "maxDuration": 60
-    }
+    "api/chat.js": { "maxDuration": 30 },
+    "api/admin.js": { "maxDuration": 60 },
+    "api/profile.js": { "maxDuration": 60 }
   },
   "rewrites": [
     {
@@ -21,14 +19,8 @@
     {
       "source": "/(.*)",
       "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "no-referrer"
-        }
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "no-referrer" }
       ]
     }
   ]
