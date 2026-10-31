@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import 'open-glass-ui/styles.css';
 import { Glass, GlassSystemProvider } from 'open-glass-ui';
 import { Link, useParams } from 'react-router-dom';
+import Offers from '../components/Offers.jsx';
 import BackgroundLayer from '../components/BackgroundLayer.jsx';
 import { api } from '../lib/api.js';
 
-const N = 1500;
+const N_DESKTOP = 1100, N_MOBILE = 650;   // fewer dots on phones: smoother and cooler
 const VOWEL = { a: 1, o: 1, u: 0.75, e: 0.65, i: 0.55 };
 const amp = c => { const l = c.toLowerCase(); if (VOWEL[l]) return VOWEL[l]; if ('bmp'.includes(l)) return 0.2; return /[a-z]/.test(l) ? 0.42 : 0.1; };
 const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -17,14 +18,15 @@ export default function Ball() {
   const S = useRef({ mode: 'idle', energy: 0, impulse: 0, t: 0, light: 0 });   // how "alive" the ball is
   const [caption, setCaption] = useState(''), [sources, setSources] = useState([]), [busy, setBusy] = useState(true);
   const busyRef = useRef(true);
-  const [site, setSite] = useState({ imageUrl: null, bg: null });   // the owner's background image and look
+  const [site, setSite] = useState({ imageUrl: null, bg: null, offers: [], hasProfile: false, handle: null, name: null, contact: null, mode: 'open' });   // the owner's background image and look
   useEffect(() => {
     fetch(`/api/site${slug ? `?slug=${encodeURIComponent(slug)}` : ''}`).then(r => r.json())
-      .then(d => { setSite(d); S.current.hidden = d.bg ? d.bg.ball === false : false; }, () => {});
+      .then(d => { setSite(s => ({ ...s, ...d, offers: d.offers || [] })); S.current.hidden = d.bg ? d.bg.ball === false : false; }, () => {});
   }, [slug]);
-  const [acct, setAcct] = useState({ user: null, mode: 'open' });   // drives the Create account / Sign in links
-  useEffect(() => {
-    Promise.all([api('auth.me'), api('auth.config')]).then(([m, c]) => setAcct({ user: m.user, mode: c.mode }), () => {});
+  const [user, setUser] = useState(null), [open, setOpen] = useState(false);   // drives Sign in / Dashboard; open = offers panel
+  useEffect(() => {   // not needed to draw the page, so it waits a moment instead of competing with it
+    const t = setTimeout(() => api('auth.me').then(m => setUser(m.user), () => {}), 900);
+    return () => clearTimeout(t);
   }, []);
   const lock = v => { busyRef.current = v; setBusy(v); };
 
@@ -34,6 +36,7 @@ export default function Ball() {
   useEffect(() => {
     document.documentElement.classList.add('ball-lock');
     const canvas = cv.current, ctx = canvas.getContext('2d');
+    const N = matchMedia('(max-width: 700px)').matches ? N_MOBILE : N_DESKTOP;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const css = n => getComputedStyle(root.current).getPropertyValue(n).trim();
     const DIM = hex(css('--dot')), GLOW = hex(css('--glow'));
@@ -43,14 +46,15 @@ export default function Ball() {
     });
     let W, H, dpr, R, cx, cy, raf, last = performance.now();
     const resize = () => {
-      dpr = Math.min(devicePixelRatio || 1, 2);
+      dpr = Math.min(devicePixelRatio || 1, 1.5);
       W = canvas.width = innerWidth * dpr; H = canvas.height = innerHeight * dpr;
       R = Math.max(90 * dpr, Math.min(W * 0.30, H * 0.25)); cx = W / 2; cy = H * 0.38;
     };
     addEventListener('resize', resize); resize();
 
     function frame(now) {
-      if (S.current.hidden) { ctx.clearRect(0, 0, W, H); last = now; raf = requestAnimationFrame(frame); return; }   // owner turned the ball off
+      // nothing to draw in a background tab, or when the owner turned the ball off
+      if (document.hidden || S.current.hidden) { if (S.current.hidden) ctx.clearRect(0, 0, W, H); last = now; raf = requestAnimationFrame(frame); return; }
       const s = S.current, dt = Math.min(0.05, (now - last) / 1000); last = now; s.t += dt;
       // energy chases the impulse, and the impulse fades like a voice trailing off
       s.energy += (s.impulse - s.energy) * 0.28; s.impulse *= 0.88;
@@ -123,6 +127,11 @@ export default function Ball() {
   }
   const onBlur = () => { if (S.current.mode === 'listening') S.current.mode = 'idle'; };
 
+  function ask(o) {   // put the question in the box so the visitor can send it (or change it) straight away
+    setOpen(false);
+    if (input.current) { input.current.value = `Tell me more about "${o.title}"`; input.current.focus(); onInput(); }
+  }
+
   async function submit(e) {
     e.preventDefault();
     const q = input.current.value.trim();
@@ -143,11 +152,18 @@ export default function Ball() {
       <BackgroundLayer imageUrl={site.imageUrl} bg={site.bg} />
       <canvas ref={cv} aria-hidden="true" style={{ opacity: site.bg ? site.bg.ballOpacity / 100 : 1 }} />
       <Glass as="nav" material="regular" className="ball-nav" aria-label="Account">
-        {acct.user ? <Link to="/admin">Dashboard</Link> : <>
+        {site.hasProfile && site.handle && <Link to={`/p/${site.handle}`}>{site.name ? `About ${site.name.split(' ')[0]}` : 'About'}</Link>}
+        {user ? <Link to="/admin">Dashboard</Link> : <>
           <Link to="/admin">Sign in</Link>
-          {acct.mode !== 'closed' && <Link to="/admin?tab=register" className="cta">Create account</Link>}
+          {site.mode !== 'closed' && <Link to="/admin?tab=register" className="cta">Create account</Link>}
         </>}
       </Glass>
+      {site.offers.length > 0 && !open && (
+        <button className="offers-fab" onClick={() => setOpen(true)} aria-haspopup="dialog">
+          <span>What {site.name ? site.name.split(' ')[0] : 'I'} offer{site.name ? 's' : ''}</span><b>{site.offers.length}</b>
+        </button>
+      )}
+      {open && <Offers name={site.name} offers={site.offers} contact={site.contact} onAsk={ask} onClose={() => setOpen(false)} />}
       <div className="ui">
         <p className="caption" aria-live="polite">{caption}</p>
         <p className={`sources${sources.length ? ' on' : ''}`}>{sources.length ? `From my notes: ${sources.join(' · ')}` : ''}</p>

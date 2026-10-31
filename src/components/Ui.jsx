@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import { Badge, Button, Progress as GlassProgress, Stat } from 'open-glass-ui';
 
-export const Pill = ({ status }) => <span className={`pill ${status === 'used up' ? 'used' : status}`}>{status}</span>;
+const TONE = { published: 'positive', active: 'positive', draft: 'warning', expired: 'warning', revoked: 'warning', used: 'warning', 'used up': 'warning' };
+export const Pill = ({ status }) => <Badge tone={TONE[status] || 'neutral'}>{status}</Badge>;
 
 /** items: [{ n, label, sub }] */
 export const Stats = ({ items }) => (
   <div className="stats">
-    {items.map(i => <div className="stat" key={i.label}><b>{i.n}</b>{i.label}{i.sub && <small>{i.sub}</small>}</div>)}
+    {items.map(i => <Stat key={i.label} className="stat-glass" label={i.label} value={i.n} change={i.sub} />)}
   </div>
 );
 
@@ -28,7 +30,7 @@ export function Crumbs({ parts }) {
 
 export const Notice = ({ kind = 'info', children }) => children ? <div className={`notice ${kind}`} role={kind === 'error' ? 'alert' : 'status'}>{children}</div> : null;
 
-export const Progress = ({ value }) => <div className="progress"><i style={{ width: `${Math.round(Math.min(1, value) * 100)}%` }} /></div>;
+export const Progress = ({ value, label = 'Progress' }) => <GlassProgress label={label} value={Math.round(Math.min(1, value) * 100)} max={100} />;
 
 /** Small confirm popover (replaces Streamlit's st.popover): click, read the warning, confirm. */
 export function Confirm({ label, warn, confirmLabel = 'Yes, delete', onConfirm, className = 'btn danger' }) {
@@ -42,11 +44,11 @@ export function Confirm({ label, warn, confirmLabel = 'Yes, delete', onConfirm, 
   }, [open]);
   return (
     <span className="pop" ref={ref}>
-      <button className={className} onClick={() => setOpen(o => !o)} aria-expanded={open}>{label}</button>
+      <Button variant={className.includes('danger') ? 'danger' : 'secondary'} size="small" onClick={() => setOpen(o => !o)} aria-expanded={open}>{label}</Button>
       {open && (
         <div className="box">
           <span className="muted">{warn}</span>
-          <button className="btn danger" onClick={async () => { setOpen(false); await onConfirm(); }}>{confirmLabel}</button>
+          <Button variant="danger" size="small" onClick={async () => { setOpen(false); await onConfirm(); }}>{confirmLabel}</Button>
         </div>
       )}
     </span>

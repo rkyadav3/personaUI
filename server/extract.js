@@ -1,6 +1,4 @@
 // Get plain text out of uploaded files.
-import mammoth from 'mammoth';
-import { extractText as pdfText, getDocumentProxy } from 'unpdf';
 import { htmlToText } from './chunker.js';
 
 export const TEXT_EXT = new Set(['.txt', '.md', '.markdown', '.csv', '.tsv', '.json', '.xml', '.html', '.htm', '.tex', '.js', '.py', '.r', '.yaml', '.yml', '.log', '.bib']);
@@ -17,9 +15,11 @@ export async function extractText(name, buf) {
       t = Buffer.from(buf).toString('utf-8');
       if (ext === '.html' || ext === '.htm') t = t.replace(/<(script|style)[\s\S]*?<\/\1>|<[^>]+>/gi, ' ');
     } else if (ext === '.pdf') {
+      const { extractText: pdfText, getDocumentProxy } = await import('unpdf');   // loaded on demand: keeps every other request fast
       const pdf = await getDocumentProxy(new Uint8Array(buf));
       t = (await pdfText(pdf, { mergePages: true })).text;
     } else if (ext === '.docx') {
+      const mammoth = (await import('mammoth')).default;
       t = htmlToText((await mammoth.convertToHtml({ buffer: Buffer.from(buf) })).value);   // Heading styles become "# " lines
     } else return '';
     return t.slice(0, MAX_CHARS);

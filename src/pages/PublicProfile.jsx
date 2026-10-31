@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import GlassShell from '../components/GlassShell.jsx';
 
 const money = o => (o.pricing === 'paid' ? (o.price != null ? `${o.currency || ''} ${o.price}`.trim() : 'Paid') : o.pricing === 'free' ? 'Free' : '');
 
 export default function PublicProfile() {
+  return <GlassShell><Profile /></GlassShell>;
+}
+
+function Profile() {
   const { slug } = useParams();
   const [p, setP] = useState(undefined);
   useEffect(() => {
@@ -14,6 +19,7 @@ export default function PublicProfile() {
   const x = p.experience, yrs = x?.total_years;
   return (
     <main className="pp">
+      <nav className="pp-nav"><Link className="btn primary" to={`/u/${slug}`}>Chat with {p.name?.split(' ')[0] || 'me'}</Link></nav>
       <header>
         <h1>{p.name}</h1>
         {p.designation && <p className="role">{p.designation}</p>}

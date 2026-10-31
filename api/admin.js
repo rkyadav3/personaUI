@@ -1,10 +1,11 @@
 // One serverless function for the whole admin. The browser POSTs { op, args } and gets JSON back.
 import { env } from '../server/config.js';
 import * as auth from '../server/auth.js';
-import * as indexer from '../server/indexer.js';
-import * as invites from '../server/invites.js';
-import { model } from '../server/embed.js';
-import { search } from '../server/search.js';
+// Heavy modules are loaded on demand so common requests (sign-in, overview, profile) start fast.
+const indexer = new Proxy({}, { get: (_, k) => async (...a) => (await import('../server/indexer.js'))[k](...a) });
+const invites = new Proxy({}, { get: (_, k) => async (...a) => (await import('../server/invites.js'))[k](...a) });
+const model = async () => (await import('../server/embed.js')).model();
+const search = async (...a) => (await import('../server/search.js')).search(...a);
 import * as profile from '../server/profile.js';
 import * as site from '../server/site.js';
 import * as store from '../server/store.js';
@@ -100,7 +101,7 @@ const OPS = {
   'index.rebuild': async ({ db }) => { await indexer.rebuildAll(db); return { ok: true }; },
   'index.test': ({ db }, a) => search(db, a.q),
   'index.log': ({ db }) => store.chatLog(db),
-  'index.settings': async () => ({ model: model(), minSimilarity: env('MIN_SIMILARITY', 0.6), minKeywordRank: env('MIN_KEYWORD_RANK', 0.2) }),
+  'index.settings': async () => ({ model: await model(), minSimilarity: env('MIN_SIMILARITY', 0.6), minKeywordRank: env('MIN_KEYWORD_RANK', 0.2) }),
 
   // invites (admin only)
   'invites.list': async ctx => { needAdmin(ctx); const [codes, users] = await Promise.all([invites.listInvites(), invites.listUsers()]); return { codes, users }; },

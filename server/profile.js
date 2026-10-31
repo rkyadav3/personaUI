@@ -273,3 +273,26 @@ export async function publicProfile(slug) {
   const [cs, os] = await Promise.all([run(db.from('contributions').select('*').eq('owner_id', u.id).order('id')), run(db.from('offerings').select('*').eq('owner_id', u.id).order('id'))]);
   return buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) })));
 }
+
+const safeUrl = u => { try { const x = new URL(String(u || '')); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : null; } catch { return null; } };
+
+/** What the persona page (/u/<slug>) shows beside the chat: the person's name, whether a public profile exists, and every
+ *  offering they have published. Built from buildPublic, so hidden, disabled or inactive things never appear here either. */
+export async function publicOffers(slug) {
+  slug = String(slug || process.env.DEFAULT_SLUG || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (!slug) return null;
+  const db = raw();
+  const [u] = await run(db.from('users').select('id,slug').eq('slug', slug).limit(1));
+  if (!u) return null;
+  const [p] = await run(db.from('profiles').select('*').eq('owner_id', u.id).eq('status', 'published').limit(1));
+  if (!p) return { handle: u.slug, name: null, hasProfile: false, contact: null, offers: [] };
+  const [cs, os] = await Promise.all([run(db.from('contributions').select('*').eq('owner_id', u.id).order('id')), run(db.from('offerings').select('*').eq('owner_id', u.id).order('id'))]);
+  const pub = buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) })));
+  const offers = [];
+  for (const k of pub.contributions) for (const o of k.offerings) {
+    const { buy_link, cover_image, ...details } = o.details || {};
+    offers.push({ category: k.category, subtype: k.subtype, title: o.title, description: o.description, pricing: o.pricing, price: o.price, currency: o.currency,
+      link: safeUrl(buy_link), image: safeUrl(cover_image), details });
+  }
+  return { handle: u.slug, name: pub.name, hasProfile: true, contact: pub.contact ? { email: pub.contact.email || null, phone: pub.contact.phone || null } : null, offers: offers.slice(0, 40) };
+}
