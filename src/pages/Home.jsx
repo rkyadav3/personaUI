@@ -67,7 +67,7 @@ function Page() {
         <nav aria-label="Account">
           {user ? <Link to="/admin">Dashboard</Link> : <>
             <Link to="/admin">Sign in</Link>
-            {mode !== 'closed' && <Link to="/admin?tab=register" className="cta">{mode === 'invite' ? 'I have an invite' : 'Create account'}</Link>}
+            {mode !== 'closed' && <Link to="/invite" className="cta">I have an invite</Link>}
           </>}
         </nav>
       </Glass>

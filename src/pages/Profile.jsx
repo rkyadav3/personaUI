@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 import { VISIBILITY_DEFAULTS } from '../../shared/profileSchema.js';
 import { api } from '../lib/api.js';
 import { QUESTIONS, emptyDraft, mergeDraft, missing } from '../lib/draft.js';
@@ -33,13 +33,55 @@ function Onboarding({ onDone }) {
   if (!res) {
     return (
       <>
-        <h1>Introduce yourself</h1>
-        <p className="muted">Write in any format you like: a paragraph, a few notes, a mix of personal and professional details. We'll organise it into a profile for you to check before anything is saved or published.</p>
+        <div className="head" style={{ marginBottom: 6 }}>
+          <div>
+            <h1>Create Your AI Persona Profile</h1>
+            <p className="muted" style={{ margin: 0 }}>
+              Introduce yourself in your own words, and our model will extract and organize your knowledge base.
+            </p>
+          </div>
+        </div>
+
+        <div className="ux-step-cards">
+          <div className="ux-step-card">
+            <div className="ux-step-num">1</div>
+            <h5>Write or Paste Bio</h5>
+            <p>Paste notes, your resume summary, or write in conversational plain text.</p>
+          </div>
+          <div className="ux-step-card">
+            <div className="ux-step-num">2</div>
+            <h5>AI Structured Extraction</h5>
+            <p>Our model organizes your background, education, and skills into clean categories.</p>
+          </div>
+          <div className="ux-step-card">
+            <div className="ux-step-num">3</div>
+            <h5>Review & Publish</h5>
+            <p>Fine-tune privacy settings and publish your unified public portfolio & chatbot.</p>
+          </div>
+        </div>
+
         <section className="card">
-          <textarea rows={11} style={{ fontFamily: 'inherit', fontSize: '1rem' }} aria-label="About you" placeholder={PLACEHOLDER} value={text} onChange={e => setText(e.target.value)} maxLength={6000} />
-          <div className="row" style={{ marginTop: 10 }}>
-            <button className="btn primary" disabled={busy || text.trim().length < 20} onClick={() => run(text, false)}>{busy ? 'Reading what you wrote…' : 'Build my profile'}</button>
-            <span className="muted">{text.length} / 6000</span>
+          <label className="f">
+            <strong>About You & Background</strong>
+            <textarea
+              rows={10}
+              style={{ fontFamily: 'inherit', fontSize: '1rem', marginTop: 4 }}
+              aria-label="About you"
+              placeholder={PLACEHOLDER}
+              value={text}
+              onChange={e => setText(e.target.value)}
+              maxLength={6000}
+            />
+          </label>
+          <div className="row" style={{ marginTop: 12, justifyContent: 'space-between' }}>
+            <button
+              className="btn primary"
+              disabled={busy || text.trim().length < 20}
+              onClick={() => run(text, false)}
+            >
+              {busy ? 'Extracting your details with AI…' : '✨ Build my profile'}
+            </button>
+            <span className="muted" style={{ fontSize: '.85rem' }}>{text.length} / 6000 characters</span>
           </div>
           <Notice kind="error">{err}</Notice>
         </section>
@@ -99,33 +141,120 @@ function Manager({ data, reload }) {
 
   return (
     <>
-      <div className="head">
-        <h1>Profile</h1>
+      <div className="head" style={{ marginBottom: 8 }}>
+        <div>
+          <h1>Profile & Offerings Hub</h1>
+          <p className="muted" style={{ margin: 0 }}>
+            Manage your personal identity, bio, public visibility controls, and paid/free contributions.
+          </p>
+        </div>
         <div className="row">
           <Pill status={p.status} />
-          {slug && p.status === 'published' && <a className="btn" href={`/p/${slug}`} target="_blank" rel="noreferrer">View public profile</a>}
-          <button className="btn" onClick={guard(async () => { await api('profile.status', { status: p.status === 'published' ? 'draft' : 'published' }); reload(); })}>{p.status === 'published' ? 'Unpublish' : 'Publish'}</button>
+          {slug && p.status === 'published' && (
+            <a className="btn" href={`/p/${slug}`} target="_blank" rel="noreferrer">
+              View Public Page ↗
+            </a>
+          )}
+          <button
+            className="btn"
+            onClick={guard(async () => {
+              await api('profile.status', { status: p.status === 'published' ? 'draft' : 'published' });
+              reload();
+            })}
+          >
+            {p.status === 'published' ? 'Unpublish' : 'Publish'}
+          </button>
         </div>
       </div>
-      <div className="tabs" role="tablist">
-        {[['profile', 'Details'], ['visibility', 'Visibility'], ['contrib', 'Contributions & offerings']].map(([k, l]) => <button key={k} role="tab" className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+
+      <div className="ux-guide-banner">
+        <div className="ux-guide-icon">👤</div>
+        <div className="ux-guide-content">
+          <h4>Grounding Your Persona AI</h4>
+          <p>
+            Your bio, education, and experience serve as the permanent knowledge baseline for your AI Persona.
+            Whenever visitors chat with you, answers are strictly aligned with what you publish here.
+          </p>
+        </div>
       </div>
+
+      {/* Unified Tab Navigation */}
+      <div className="page-tabs-wrap" role="tablist">
+        {[
+          ['profile', '👤 Bio & Background', null],
+          ['visibility', '👁️ Privacy & Visibility', null],
+          ['contrib', '💎 Contributions & Store', contributions?.length || 0],
+        ].map(([k, l, count]) => (
+          <button
+            key={k}
+            role="tab"
+            className={`page-tab-btn ${tab === k ? 'active' : ''}`}
+            onClick={() => setTab(k)}
+          >
+            <span>{l}</span>
+            {count !== null && <span className="page-tab-badge">{count}</span>}
+          </button>
+        ))}
+      </div>
+
       <Notice kind={msg?.kind}>{msg?.t}</Notice>
 
       {tab === 'profile' && (
         <>
           <DraftEditor draft={draft} onChange={setDraft} withContributions={false} />
-          <button className="btn primary" onClick={guard(async () => { await api('profile.save', { draft: draft.profile, purpose: draft.purpose.description }); reload(); flash('success', 'Saved.'); })}>Save changes</button>
+          <div style={{ marginTop: 14 }}>
+            <button
+              className="btn primary"
+              onClick={guard(async () => {
+                await api('profile.save', { draft: draft.profile, purpose: draft.purpose.description });
+                reload();
+                flash('success', 'Profile details saved successfully.');
+              })}
+            >
+              Save Profile Changes
+            </button>
+          </div>
         </>
       )}
+
       {tab === 'visibility' && (
         <section className="card">
-          <h3>What visitors can see</h3>
+          <h3>Public Persona Visibility</h3>
+          <p className="muted" style={{ marginBottom: 14 }}>
+            Choose which sections are visible to people visiting your profile and chatting with your Persona.
+            Unchecked contact fields remain strictly private.
+          </p>
           <VisibilityEditor value={vis} onChange={setVis} />
-          <button className="btn primary" style={{ marginTop: 10 }} onClick={guard(async () => { await api('profile.visibility', { visibility: vis }); reload(); flash('success', 'Saved.'); })}>Save visibility</button>
+          <div style={{ marginTop: 18 }}>
+            <button
+              className="btn primary"
+              onClick={guard(async () => {
+                await api('profile.visibility', { visibility: vis });
+                reload();
+                flash('success', 'Visibility preferences saved.');
+              })}
+            >
+              Save Visibility
+            </button>
+          </div>
         </section>
       )}
-      {tab === 'contrib' && <Contributions items={contributions} reload={reload} />}
+
+      {tab === 'contrib' && (
+        <>
+          <div className="ux-guide-banner" style={{ background: '#fdf4ff', borderColor: '#f0abfc' }}>
+            <div className="ux-guide-icon">🛍️</div>
+            <div className="ux-guide-content">
+              <h4 style={{ color: '#86198f' }}>Knowledge Services & Recommended Items</h4>
+              <p style={{ color: '#701a75' }}>
+                Items listed here appear directly in your Public Profile's "Explore & Buy" and "Featured Products" shelf,
+                complete with shopping cart and details modals.
+              </p>
+            </div>
+          </div>
+          <Contributions items={contributions} reload={reload} />
+        </>
+      )}
     </>
   );
 }

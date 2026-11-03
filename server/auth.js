@@ -20,30 +20,35 @@ const secretKey = () => {
 const now = () => new Date();
 const parse = ts => (ts ? new Date(ts) : null);
 
-/** open = anyone, invite = needs a code, closed = no sign-ups. */
+/** open = anyone, invite = needs a code, closed = no sign-ups. Default is invite. */
 export function registrationMode() {
-  if (['0', 'false', 'no', 'off'].includes(String(env('ALLOW_REGISTRATION', 'true')).trim().toLowerCase())) return 'closed';
-  const m = String(env('REGISTRATION_MODE', 'open')).trim().toLowerCase();
-  return ['open', 'invite', 'closed'].includes(m) ? m : 'open';
+  if (['0', 'false', 'no', 'off', 'closed'].includes(String(env('ALLOW_REGISTRATION', 'true')).trim().toLowerCase())) return 'closed';
+  const m = String(env('REGISTRATION_MODE', 'invite')).trim().toLowerCase();
+  return ['open', 'invite', 'closed'].includes(m) ? m : 'invite';
 }
-export const isAdminEmail = email =>
-  String(env('ADMIN_EMAILS', '')).split(',').map(e => e.trim().toLowerCase()).filter(Boolean).includes((email || '').toLowerCase());
+export const isAdminEmail = email => {
+  const adminList = String(env('ADMIN_EMAILS', '')).split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  const superList = String(env('SUPERADMIN_EMAILS', '')).split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  const all = [...new Set([...adminList, ...superList])];
+  return all.includes((email || '').toLowerCase());
+};
 
 export const normCode = code => String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-async function checkInvite(code) {
+export async function checkInvite(code) {
   code = normCode(code);
-  if (!code) return { error: 'Enter your invite code.' };
+  if (!code) return { error: 'An invite link or code is required to register.' };
   const [r] = await run(raw().from('invite_codes').select('*').eq('code', code));
-  const bad = "That invite code isn't valid.";
-  if (!r) return { error: bad };
+  if (!r) return { error: "That invite link or code isn't valid." };
+  if (r.revoked) return { error: 'This invite link has been revoked.' };
   const exp = parse(r.expires_at);
-  if (r.revoked || (exp && exp < now()) || (r.uses || 0) >= (r.max_uses || 1)) return { error: bad };
+  if (exp && exp < now()) return { error: 'This invite link has expired.' };
+  if ((r.uses || 0) >= (r.max_uses || 1)) return { error: 'This invite link has already reached its maximum uses.' };
   return { row: r };
 }
 
 /** Only succeeds if `uses` is still what we read, so two people can't both take the last use. */
-async function consumeInvite(r) {
+export async function consumeInvite(r) {
   const rows = await run(raw().from('invite_codes').update({ uses: (r.uses || 0) + 1 }).eq('id', r.id).eq('uses', r.uses || 0).select());
   return rows.length > 0;
 }
@@ -51,19 +56,33 @@ async function consumeInvite(r) {
 const slugFor = email =>
   `${(email.split('@')[0].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || 'user')}-${randomBytes(2).toString('hex')}`;
 
-const publicUser = u => ({ id: String(u.id), email: u.email, name: u.name || null, slug: u.slug || null, isAdmin: isAdminEmail(u.email) });
+export const publicUser = u => ({
+  id: String(u.id),
+  email: u.email,
+  name: u.name || null,
+  slug: u.slug || null,
+  isAdmin: isAdminEmail(u.email),
+  isSuperAdmin: isAdminEmail(u.email)
+});
 
 export async function register({ name, email, password = '', confirm, invite }) {
   email = (email || '').trim().toLowerCase();
   const mode = registrationMode();
-  if (mode === 'closed') return { error: 'Registration is closed.' };
+  if (mode === 'closed') return { error: 'Registration is currently closed.' };
+  if (mode === 'invite' || !invite) {
+    if (!invite) return { error: 'Registration is by invitation only. Please use the invite link provided by the administrator.' };
+  }
   if (!EMAIL_RE.test(email)) return { error: 'Enter a valid email address.' };
   if (password.length < 8) return { error: 'Use at least 8 characters for your password.' };
   if (Buffer.byteLength(password) > 72) return { error: 'Your password is too long (72 characters max).' };
   if (password !== confirm) return { error: "The passwords don't match." };
   const db = raw();
   let inv = null;
-  if (mode === 'invite') { const c = await checkInvite(invite); if (c.error) return { error: c.error }; inv = c.row; }
+  if (invite || mode === 'invite') {
+    const c = await checkInvite(invite);
+    if (c.error) return { error: c.error };
+    inv = c.row;
+  }
   if ((await run(db.from('users').select('id').eq('email', email))).length) return { error: 'An account with that email already exists. Sign in instead.' };
   let row;
   try {
@@ -85,7 +104,13 @@ export async function login({ email, password = '' }) {
   const [u] = await run(db.from('users').select('*').eq('email', email));
   if (!u) { bcrypt.compareSync(password.slice(0, 72), DUMMY); return { error: 'Wrong email or password.' }; }
   const locked = parse(u.locked_until);
-  if (locked && locked > now()) return { error: `Too many attempts. Try again in ${Math.floor((locked - now()) / 60000) + 1} minutes.` };
+  if (locked && locked > now()) {
+    const mins = Math.floor((locked - now()) / 60000) + 1;
+    if (mins > 60 * 24) {
+      return { error: 'This account has been suspended by a Super Admin. Please contact support.' };
+    }
+    return { error: `Too many attempts. Try again in ${mins} minutes.` };
+  }
   if (!bcrypt.compareSync(password.slice(0, 72), u.password_hash)) {
     const fails = (u.failed_attempts || 0) + 1;
     const upd = fails >= MAX_FAILS
@@ -113,6 +138,9 @@ export async function sessionUser(req) {
   try {
     const { payload } = await jwtVerify(m[1], secretKey());
     const [u] = await run(raw().from('users').select('*').eq('id', payload.sub));   // re-read so deleted users lose access at once
-    return u ? publicUser(u) : null;
+    if (!u) return null;
+    const locked = parse(u.locked_until);
+    if (locked && locked > now()) return null;
+    return publicUser(u);
   } catch { return null; }
 }

@@ -29,6 +29,7 @@ const PUBLIC = {
     if (r.user) await auth.startSession(res, r.user);
     return r;
   },
+  'invites.validate': async ({ code }) => invites.validateInvite(code),
 };
 
 // Signed-in ops. `db` is the tenant-scoped client; `s` is the store module bound to it.
@@ -107,6 +108,29 @@ const OPS = {
   'invites.list': async ctx => { needAdmin(ctx); const [codes, users] = await Promise.all([invites.listInvites(), invites.listUsers()]); return { codes, users }; },
   'invites.create': async (ctx, a) => { needAdmin(ctx); return { code: await invites.createInvite(ctx.user.id, a) }; },
   'invites.revoke': async (ctx, a) => { needAdmin(ctx); await invites.revokeInvite(a.id); return { ok: true }; },
+
+  // superadmin user management (admin only)
+  'users.list': async ctx => {
+    needAdmin(ctx);
+    const [users, codes] = await Promise.all([invites.listUsersDetailed(), invites.listInvites()]);
+    return { users, codes };
+  },
+  'users.update': async (ctx, a) => {
+    needAdmin(ctx);
+    return invites.updateUser(a.id, a);
+  },
+  'users.setLock': async (ctx, a) => {
+    needAdmin(ctx);
+    return invites.setUserLock(a.id, a.locked, ctx.user.id);
+  },
+  'users.resetPassword': async (ctx, a) => {
+    needAdmin(ctx);
+    return invites.resetUserPassword(a.id, a.password);
+  },
+  'users.delete': async (ctx, a) => {
+    needAdmin(ctx);
+    return invites.deleteUser(a.id, ctx.user.id);
+  },
 };
 
 export default async function handler(req, res) {

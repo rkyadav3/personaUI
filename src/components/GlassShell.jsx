@@ -5,7 +5,7 @@ import Backdrop from './Backdrop.jsx';
 /** One provider + wallpaper for every admin-style page (layout, login, public profile). */
 export default function GlassShell({ children }) {
   return (
-    <GlassSystemProvider renderer="auto" theme={{ appearance: 'dark', theme: { preset: 'teal' } }}>
+    <GlassSystemProvider renderer="auto" theme={{ appearance: 'light', theme: { preset: 'purple' } }}>
       <Backdrop />
       {children}
     </GlassSystemProvider>
