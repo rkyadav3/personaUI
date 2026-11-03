@@ -134,8 +134,10 @@ export default function FileManager({ defaultTab = 'browse' }) {
   const setTab = tab => setParams(p => { const n = Object.fromEntries(p); n.tab = tab; return n; });
 
   const [searchQuery, setSearchQuery] = useState('');
-  const { data: folders = [], reload: reloadFolders } = useFolders();
-  const { data: topics = [] } = useTopics();
+  const { data: foldersData, reload: reloadFolders } = useFolders();
+  const folders = foldersData ?? [];
+  const { data: topicsData } = useTopics();
+  const topics = topicsData ?? [];
   const { data: files, reload: reloadFiles, error } = useOp('files.list', { folderId: folder, q: searchQuery.trim() }, [folder, searchQuery]);
 
   const reload = () => { reloadFiles(); reloadFolders(); };

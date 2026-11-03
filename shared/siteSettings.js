@@ -11,7 +11,7 @@ export const BG_DEFAULTS = {
 };
 export const BG_LIMITS = { x: [0, 100], y: [0, 100], zoom: [1, 3], blur: [0, 24], brightness: [30, 140], dim: [0, 85], ballOpacity: [20, 100] };
 
-const clamp = (v, [lo, hi], fallback) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback; };
+const clamp = (v, [lo, hi], fallback) => { const n = v == null || v === '' ? NaN : Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback; };
 
 /** Whatever comes in (database, browser), what comes out is always safe to render and store. */
 export function normalizeBg(input) {

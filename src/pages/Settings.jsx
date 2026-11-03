@@ -75,7 +75,7 @@ export default function Settings() {
       </div>
 
       <div className="settings-stage">
-        <GlassSystemProvider renderer="auto" theme={{ appearance: 'light', theme: { preset: 'purple' } }}>
+        <GlassSystemProvider renderer="auto" theme={{ appearance: 'light', theme: { preset: 'violet' } }}>
           <aside className="settings-panel" aria-label="Background controls">
             <h2 style={{ marginBottom: 4 }}>🖼️ Background Image</h2>
             <p className="hint" style={{ marginBottom: 12 }}>

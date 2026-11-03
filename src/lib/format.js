@@ -3,6 +3,7 @@ export const fmtDate = ts => (ts || '').slice(0, 16).replace('T', ' ');
 
 /** [{id, path: "a / b"}] sorted by path, for folder dropdowns. */
 export function folderPaths(folders) {
+  folders = folders || [];
   const by = new Map(folders.map(f => [f.id, f]));
   const path = f => { const parts = []; for (let cur = f; cur; cur = by.get(cur.parent_id)) parts.push(cur.name); return parts.reverse().join(' / '); };
   return folders.map(f => ({ id: f.id, path: path(f) })).sort((a, b) => a.path.toLowerCase().localeCompare(b.path.toLowerCase()));
@@ -10,6 +11,7 @@ export function folderPaths(folders) {
 
 /** Root-to-leaf list of folders ending at `id`. */
 export function breadcrumbs(folders, id) {
+  folders = folders || [];
   const by = new Map(folders.map(f => [f.id, f]));
   const trail = [];
   for (let cur = by.get(id); cur; cur = by.get(cur.parent_id)) trail.unshift(cur);

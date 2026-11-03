@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Glass } from 'open-glass-ui';
+import 'open-glass-ui/styles.css';
+import { Glass, GlassSystemProvider } from 'open-glass-ui';
 import { CATEGORIES } from '../../shared/profileSchema.js';
 import { buildRails } from '../../shared/ranking.js';
-import GlassShell from '../components/GlassShell.jsx';
 import { money } from '../components/Offers.jsx';
 import { Stars } from '../components/Stars.jsx';
 import { Notice } from '../components/Ui.jsx';
@@ -13,7 +13,11 @@ import { ago, compact, gradient, initials } from '../lib/ui.js';
 /** The private platform's front door: browse members and see what is newest, best rated and most opened.
  *  Visitors do not need an account. Clicking anything opens the member's PROFILE; the persona is one click further. */
 export default function Home() {
-  return <GlassShell><Page /></GlassShell>;
+  return (
+    <GlassSystemProvider renderer="auto" theme={{ appearance: 'dark' }}>
+      <Page />
+    </GlassSystemProvider>
+  );
 }
 
 // What each rail shows under a card, and how it is titled. Order = order on the page. Empty rails are hidden.

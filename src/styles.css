@@ -17,6 +17,7 @@
   color-scheme: light;
 }
 * { box-sizing: border-box; }
+html { height: 100%; }
 body { margin: 0; font-family: 'Figtree', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
 h1, h2, h3 { font-family: 'Newsreader', Georgia, serif; color: var(--text); letter-spacing: -0.01em; margin: 0 0 .5rem; }
 h1 { font-size: 2.2rem; } h2 { font-size: 1.5rem; } h3 { font-size: 1.2rem; }
@@ -307,6 +308,8 @@ details.exp summary { cursor: pointer; font-weight: 500; }
    ========================================================================== */
 .home {
   min-height: 100vh;
+  position: relative;
+  isolation: isolate;
   background:
     radial-gradient(ellipse 90% 50% at 10% -10%, rgba(99,102,241,0.35) 0%, transparent 60%),
     radial-gradient(ellipse 70% 50% at 90% 0%, rgba(168,85,247,0.25) 0%, transparent 55%),
