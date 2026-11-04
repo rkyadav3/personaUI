@@ -3,21 +3,24 @@
 // The one public write (submitEnquiry) checks everything again on the server and files the row under the profile's owner.
 import { createHash } from 'node:crypto';
 import { ENQUIRY_STATUS } from '../shared/enquiryTypes.js';
-import { normalizeEnquiry, normalizeUpdate, shapeEngage, updateProblem } from '../shared/engage.js';
+import { normalizeEnquiry, normalizeEventForm, normalizeUpdate, shapeEngage, updateProblem } from '../shared/engage.js';
 import { normalizePortfolio } from '../shared/portfolio.js';
 import { raw, run } from './supabase.js';
 
 const MAX_UPDATES = 300, MAX_PER_HOUR = 5;
 const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
 
-/** A missing table means supabase/engage.sql has not been run yet; say so instead of a raw database error. */
-const friendly = e => (/relation .*(updates|enquiries)|does not exist|schema cache/i.test(e.message) ? new Error('The database is missing the updates and enquiries tables. Run supabase/engage.sql in the Supabase SQL editor, then try again.') : e);
+/** Point owners to the required migration instead of exposing a raw schema error. */
+const friendly = e => /rsvp|updates_kind_check/i.test(e.message)
+  ? new Error('Event setup is missing. Run supabase/events-commerce.sql after supabase/engage.sql in the Supabase SQL editor, then try again.')
+  : /relation .*(updates|enquiries)|does not exist|schema cache/i.test(e.message)
+    ? new Error('The database is missing the updates and enquiries tables. Run supabase/engage.sql, then supabase/events-commerce.sql in the Supabase SQL editor, then try again.') : e;
 const guard = fn => async (...a) => { try { return await fn(...a); } catch (e) { throw friendly(e); } };
 
 // ------------------------------------------------------------------ updates & schedule (admin)
 const updateView = r => ({
   id: r.id, kind: r.kind, title: r.title, body: r.body, startsAt: r.starts_at, endsAt: r.ends_at, location: r.location,
-  url: r.url, linkLabel: r.link_label, status: r.status, pinned: r.pinned, createdAt: r.created_at, updatedAt: r.updated_at,
+  url: r.url, linkLabel: r.link_label, status: r.status, pinned: r.pinned, createdAt: r.created_at, updatedAt: r.updated_at, rsvp: r.kind === 'event' ? normalizeEventForm(r.rsvp) : undefined,
 });
 
 export const listUpdates = guard(async db => (await run(db.from('updates').select('*').order('created_at', { ascending: false }))).map(updateView));
@@ -25,7 +28,7 @@ export const listUpdates = guard(async db => (await run(db.from('updates').selec
 export const saveUpdate = guard(async (db, a) => {
   const v = normalizeUpdate(a), problem = updateProblem(v);
   if (problem) throw new Error(problem);
-  const row = { kind: v.kind, title: v.title, body: v.body, starts_at: v.startsAt, ends_at: v.endsAt, location: v.location, url: v.url, link_label: v.linkLabel, status: v.status, pinned: v.pinned, updated_at: new Date().toISOString() };
+  const row = { kind: v.kind, title: v.title, body: v.body, starts_at: v.startsAt, ends_at: v.endsAt, location: v.location, url: v.url, link_label: v.linkLabel, status: v.status, pinned: v.pinned, ...(v.kind === 'event' ? { rsvp: v.rsvp } : {}), updated_at: new Date().toISOString() };
   if (a.id) { await run(db.from('updates').update(row).eq('id', a.id)); return { id: a.id }; }
   const { count } = await run(db.from('updates').select('id', { count: 'exact' }).limit(1), true);
   if ((count || 0) >= MAX_UPDATES) throw new Error(`You have ${MAX_UPDATES} posts already. Delete old ones to add more.`);

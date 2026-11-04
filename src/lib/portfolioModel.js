@@ -32,7 +32,9 @@ export function resolveSite(data, slug, heroOverride) {
     if ((page.placement || {})[k.category] === 'hidden') continue;
     for (const o of k.offerings || []) {
       const item = { kind: 'offering', id: o.id, title: o.title, summary: o.description || '', icon: CAT_ICON[k.category] || 'spark', status: k.subtype || SINGULAR[k.category] || k.category,
-        price: fmtPrice(o, cur), image: o.image || '', url: o.link || '', linkLabel: o.pricing === 'paid' ? 'Buy / book' : 'Open', ratingAvg: o.ratingAvg || 0, ratingCount: o.ratingCount || 0 };
+        price: fmtPrice(o, cur), pricing: o.pricing, amount: o.pricing === 'free' ? 0 : o.price, currency: String(o.currency || cur).toUpperCase(), accessReady: o.accessReady,
+        checkout: ['free', 'paid'].includes(o.pricing) ? { kind: 'offering', id: String(o.id) } : null,
+        image: o.image || '', url: o.link || '', linkLabel: o.pricing === 'paid' ? 'Buy / book' : 'Open', ratingAvg: o.ratingAvg || 0, ratingCount: o.ratingCount || 0 };
       offerOptions.push({ id: o.id, title: o.title });   // the contact form lets a visitor pick one of these
       if (k.category === 'Talk Shows') talkOffers.push(item); else offers.push(item);
     }
@@ -42,7 +44,7 @@ export function resolveSite(data, slug, heroOverride) {
   const projects = p.projects.map(x => ({ ...x, techList: split(x.tech) }));
   const featured = projects.find(x => x.featured) || projects[0] || null;
   const others = featured ? projects.filter(x => x !== featured) : [];
-  const products = [...p.products.map(x => ({ kind: 'product', ...x })), ...offers];
+  const products = [...p.products.map(({ deliveryUrl, ...x }) => ({ kind: 'product', ...x, accessReady: x.accessReady ?? !!deliveryUrl, price: x.pricing === 'unspecified' ? x.price : fmtPrice({ pricing: x.pricing, price: x.amount, currency: x.currency }, cur), checkout: ['free', 'paid'].includes(x.pricing) ? { kind: 'product', id: x.id } : null })), ...offers, ...talkOffers];
   const exp = data.experience || null;
   const experience = p.experience.length ? p.experience : (exp?.employers || []).map(e => ({ role: e.role, company: e.company, period: e.duration, summary: '' }));
   const experienceNote = p.experience.length ? '' : (exp?.description || '');
@@ -62,7 +64,7 @@ export function resolveSite(data, slug, heroOverride) {
   ];
   const socials = [...p.socials];
   if (email && !socials.some(s => s.kind === 'email')) socials.push({ kind: 'email', url: `mailto:${email}` });
-  const updates = data.updates || [], schedule = data.schedule || [], enquiry = p.enquiry;
+  const updates = data.updates || [], schedule = data.schedule || [], events = data.events || [], enquiry = p.enquiry;
   const ctaUrl = p.cta.url || (enquiry.enabled ? `/p/${slug}/contact` : email ? `mailto:${email}` : `/u/${slug}`);   // the form beats a bare mailto
   const about = data.purpose || '';
   const aboutBody = p.about.body || about;
@@ -72,7 +74,7 @@ export function resolveSite(data, slug, heroOverride) {
   if (products.length) pages.push({ key: 'products' });
   if (experience.length || education.length || experienceNote) pages.push({ key: 'experience' });
   if (talks.length) pages.push({ key: 'talks' });
-  if (updates.length || schedule.length) pages.push({ key: 'updates' });
+  if (updates.length || schedule.length || events.length) pages.push({ key: 'updates' });
   if (aboutBody || skills.length || contact || socials.length) pages.push({ key: 'about' });
   if (enquiry.enabled) pages.push({ key: 'contact' });
 
@@ -88,11 +90,11 @@ export function resolveSite(data, slug, heroOverride) {
     intro: p.intro.url ? { label: p.intro.label || 'Watch Introduction', url: p.intro.url, video: true } : { label: p.intro.label || 'Chat with my AI', url: `/u/${slug}`, video: false },
     projects, featured, others,
     projectsKicker: p.projectsKicker || 'Featured work', projectsTitle: p.projectsTitle || 'Selected Projects',
-    products, productsKicker: p.productsKicker || 'Products & initiatives', productsTitle: p.productsTitle || 'Ideas to Impact',
+    products, productsKicker: p.productsKicker || 'Free & paid offerings', productsTitle: p.productsTitle || 'Shop',
     experience, experienceNote, education, talks, talksTitle: label('talks'), experienceTitle: label('experience'),
     aboutTitle: p.about.title || `About ${me || 'me'}`, aboutBody, skills, expertise, contact,
     footerNote: p.footerNote,
-    updates, schedule, updatesTitle: label('updates') === PAGE_LABELS.updates ? 'Updates & Schedule' : label('updates'),
+    updates, schedule, events, updatesTitle: label('updates') === PAGE_LABELS.updates ? 'Updates & Schedule' : label('updates'),
     enquiry, offerOptions, contactTitle: enquiry.title || `Contact ${me || 'me'}`, owner: name,
   };
 }

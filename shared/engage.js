@@ -3,7 +3,16 @@
 import { cleanUrl } from './portfolio.js';
 import { CONTACT_METHODS, ENQUIRY_TYPES, MEETING_MODES, SCHEDULING_TYPES, TIME_SLOTS } from './enquiryTypes.js';
 
-export const UPDATE_KINDS = { update: 'Upcoming update', schedule: 'Schedule' };
+export const UPDATE_KINDS = { update: 'Upcoming update', schedule: 'Schedule', event: 'Event' };
+
+export function normalizeEventForm(input = {}) {
+  const seen = new Set();
+  const questions = (Array.isArray(input?.questions) ? input.questions : []).slice(0, 6).map((q, i) => ({
+    id: /^[a-zA-Z0-9_-]{1,40}$/.test(q?.id || '') ? q.id : `question-${i + 1}`,
+    label: txt(q?.label, 100), required: q?.required === true,
+  })).filter(q => q.label && !seen.has(q.id) && seen.add(q.id));
+  return { enabled: input?.enabled !== false, showAttendees: input?.showAttendees !== false, requirePhone: input?.requirePhone === true, questions };
+}
 
 const txt = (v, n) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
 const long = (v, n) => (typeof v === 'string' ? v.replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, n) : '');
@@ -20,16 +29,17 @@ export function iso(v) {
 /** What an admin may post. Title is checked by `updateProblem`. */
 export function normalizeUpdate(i) {
   i = i && typeof i === 'object' ? i : {};
-  const kind = i.kind === 'schedule' ? 'schedule' : 'update';
+  const kind = Object.hasOwn(UPDATE_KINDS, i.kind) ? i.kind : 'update';
   const startsAt = iso(i.startsAt), endsAt = iso(i.endsAt);
   return {
     kind, title: txt(i.title, 120), body: long(i.body, 2000),
-    startsAt, endsAt: kind === 'schedule' && startsAt && endsAt && endsAt >= startsAt ? endsAt : null,
+    startsAt, endsAt: kind !== 'update' && startsAt && endsAt && endsAt >= startsAt ? endsAt : null,
     location: txt(i.location, 160), url: cleanUrl(i.url), linkLabel: txt(i.linkLabel, 24),
     status: i.status === 'published' ? 'published' : 'draft', pinned: kind === 'update' && i.pinned === true,
+    rsvp: kind === 'event' ? normalizeEventForm(i.rsvp) : { enabled: false, showAttendees: false, requirePhone: false, questions: [] },
   };
 }
-export const updateProblem = v => (!v.title ? 'Give it a title.' : v.kind === 'schedule' && !v.startsAt ? 'A schedule item needs a start date and time.' : '');
+export const updateProblem = v => (!v.title ? 'Give it a title.' : v.kind !== 'update' && !v.startsAt ? 'An event or schedule item needs a start date and time.' : '');
 
 const END_PAD = 3 * 3600e3;   // an event without an end time counts as running for 3 hours
 const endMs = x => (x.endsAt ? new Date(x.endsAt).getTime() : new Date(x.startsAt).getTime() + END_PAD);
@@ -49,13 +59,16 @@ export function shapeEngage(rows, now = Date.now()) {
   const view = r => ({
     id: r.id, kind: r.kind, title: r.title, body: r.body || '', startsAt: r.starts_at || null, endsAt: r.ends_at || null,
     location: r.location || '', url: cleanUrl(r.url), linkLabel: r.link_label || '', pinned: !!r.pinned, createdAt: r.created_at || null,
+    rsvp: r.kind === 'event' ? normalizeEventForm(r.rsvp) : undefined,
   });
   const updates = pub.filter(r => r.kind === 'update').map(view)
     .sort((a, b) => (b.pinned - a.pinned) || String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 30);
   const floor = new Date(now - 60 * 86400e3).toISOString();
   const schedule = pub.filter(r => r.kind === 'schedule' && r.starts_at && r.starts_at >= floor).map(view)
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).slice(0, 60);
-  return { updates, schedule };
+  const events = pub.filter(r => r.kind === 'event' && r.starts_at && r.starts_at >= floor).map(view)
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).slice(0, 60);
+  return { updates, schedule, events };
 }
 
 /** The enquiry form. Returns { ok, value, errors }; the browser shows `errors` next to the fields, the server refuses on them. */

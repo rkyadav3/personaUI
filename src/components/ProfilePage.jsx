@@ -4,7 +4,11 @@ import PersonaBall, { amp } from './PersonaBall.jsx';
 import BackgroundLayer from './BackgroundLayer.jsx';
 import LiquidGlass, { GlassProvider } from './LiquidGlass.jsx';
 import { ACCENTS, FONT_STACK, normalizePage } from '../../shared/pageSettings.js';
-import { cartable, fmtPrice } from '../lib/money.js';
+import { fmtPrice } from '../lib/money.js';
+import { resolveSite } from '../lib/portfolioModel.js';
+import Shop from './commerce/Shop.jsx';
+import CheckoutDialog from './commerce/CheckoutDialog.jsx';
+import Events from './portfolio/Events.jsx';
 import { track } from '../lib/track.js';
 import '../styles/profilePage.css';
 
@@ -28,13 +32,6 @@ function StarInput({ mine, onRate, disabled }) {
     </span>
   );
 }
-function useSeen(ref, enabled, fire) {   // counts a "view" once the card has been mostly on screen for a second
-  useEffect(() => {
-    if (!enabled || !ref.current || !('IntersectionObserver' in window)) return undefined;
-    let t; const io = new IntersectionObserver(([e]) => { clearTimeout(t); if (e.isIntersecting) t = setTimeout(() => { fire(); io.disconnect(); }, 1000); }, { threshold: 0.6 });
-    io.observe(ref.current); return () => { clearTimeout(t); io.disconnect(); };
-  }, [enabled]); // eslint-disable-line react-hooks/exhaustive-deps
-}
 
 function Thumb({ o, i }) {
   return o.image
@@ -42,25 +39,10 @@ function Thumb({ o, i }) {
     : <span className="pp-tile" style={{ background: TILE[i % TILE.length] }} aria-hidden="true">{ICON[o.category] || '✨'}</span>;
 }
 
-function ProductCard({ o, i, cur, cart, preview, onAdd, onOpen }) {
-  const ref = useRef(null);
-  useSeen(ref, !preview, () => track({ kind: 'view', id: o.id }));
-  const price = fmtPrice(o, cur);
-  return (
-    <article className="pp-prod" ref={ref}>
-      <button className="pp-prod-img" onClick={() => onOpen(o)} aria-label={`Details: ${o.title}`}><Thumb o={o} i={i} /><span className="pp-badge">{o.badge}</span></button>
-      <h4>{o.title}</h4>
-      <p>{o.description || ' '}</p>
-      <div className="pp-prod-foot">
-        <strong>{price}</strong>
-        {cart && cartable(o) ? <button className="pp-link" onClick={() => onAdd(o)}>🛒 Add to Cart</button> : <button className="pp-link" onClick={() => onOpen(o)}>◈ View Details</button>}
-      </div>
-    </article>
-  );
-}
 
 export default function ProfilePage({ data, slug, user, preview = false, heroOverride }) {
   const page = useMemo(() => normalizePage(data.page), [data.page]);
+  const shop = useMemo(() => resolveSite(data, slug), [data, slug]);
   const cur = page.currency, T = page.theme;
   const accent = page.accentHex ? [page.accentHex, `color-mix(in srgb, ${page.accentHex} 55%, #ffffff)`] : (ACCENTS[page.accent] || ACCENTS.violet);
   const dark = T.bg === 'color' && luminance(T.bgColor) < 0.45;      // a dark colour flips the text and glass to light-on-dark
@@ -69,16 +51,15 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
   const name = data.name || '', me = first(name);
 
   // ---- offerings, split by where the owner wants them
-  const { store, side, all } = useMemo(() => {
-    const store = [], side = [], all = [];
+  const side = useMemo(() => {
+    const side = [];
     for (const k of data.contributions || []) {
       const where = page.placement[k.category] || 'side';
       if (where === 'hidden') continue;
       const items = k.offerings.map(o => ({ ...o, category: k.category, subtype: k.subtype, badge: k.subtype || SINGULAR[k.category] || k.category }));
-      all.push(...items);
-      if (where === 'store') store.push(...items); else side.push({ ...k, items });
+      if (where !== 'store') side.push({ ...k, items });
     }
-    return { store, side, all };
+    return side;
   }, [data.contributions, page.placement]);
 
   // ---- smart defaults from the real profile (empty setting = use these)
@@ -86,7 +67,7 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
   const subtitle = page.subtitle || `Get answers about ${exp.length ? exp.slice(0, 3).join(', ').toLowerCase() : 'my work'}, what I offer, or browse what I share.`;
   const chips = page.chips.length ? page.chips : [
     { label: 'About me', prompt: 'Tell me about yourself and your work' },
-    ...(store.length ? [{ label: "What's in the store?", prompt: "What's in your store?" }] : []),
+    ...(shop.products.length ? [{ label: "What's in the store?", prompt: "What's in your store?" }] : []),
     ...(data.contributions?.some(k => k.category === 'Books' && k.offerings.length) ? [{ label: 'Recommend a book', prompt: 'Which of your books should I start with?' }] : []),
     ...(exp[0] ? [{ label: 'Advice', prompt: `Can you give me advice on ${exp[0]}?` }] : []),
   ];
@@ -129,17 +110,6 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
   }
   const ask = o => { setOpen(null); setInput(`Tell me about "${o.title}"`); window.scrollTo?.({ top: 0, behavior: 'smooth' }); setTimeout(() => inputRef.current?.focus(), 300); };
 
-  // ---- cart (kept in this browser; money changes hands on each seller link, see the drawer)
-  const ck = `pp-cart:${slug}`;
-  const [cart, setCart] = useState(() => (preview ? [] : lsGet(ck, []))), [cartOpen, setCartOpen] = useState(false);
-  useEffect(() => { if (!preview) lsSet(ck, cart); }, [cart]); // eslint-disable-line react-hooks/exhaustive-deps
-  const cartIds = useMemo(() => new Set(all.map(o => o.id)), [all]);
-  const lines = cart.filter(l => cartIds.has(l.id)).map(l => ({ ...l, o: all.find(o => o.id === l.id) }));
-  const count = lines.reduce((s, l) => s + l.n, 0);
-  const totals = lines.reduce((m, l) => { const c = l.o.currency || cur; m[c] = (m[c] || 0) + l.o.price * l.n; return m; }, {});
-  const add = o => { setCart(c => c.some(l => l.id === o.id) ? c.map(l => l.id === o.id ? { ...l, n: l.n + 1 } : l) : [...c, { id: o.id, n: 1 }]); setCartOpen(true); setOpen(null); };
-  const bump = (id, d) => setCart(c => c.map(l => l.id === id ? { ...l, n: l.n + d } : l).filter(l => l.n > 0));
-
   // ---- ratings
   const [rt, setRt] = useState({}), [note, setNote] = useState('');
   const flash = t => { setNote(t); setTimeout(() => setNote(''), 3500); };
@@ -152,13 +122,11 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
   const click = o => { if (!preview) track({ kind: 'click', id: o.id }); };
 
   // ---- contact, details, filters
-  const [talk, setTalk] = useState(false), [open, setOpen] = useState(null), [filter, setFilter] = useState('All'), [showAll, setShowAll] = useState(false);
+  const [talk, setTalk] = useState(false), [open, setOpen] = useState(null), [buying, setBuying] = useState(null);
+  const openCheckout = o => { const item = shop.products.find(p => p.kind === 'offering' && String(p.id) === String(o.id)); if (item?.checkout) { setOpen(null); setBuying(item); } };
   const mail = (o, subject) => data.contact?.email ? `mailto:${data.contact.email}?subject=${encodeURIComponent(subject || `Interested in: ${o.title}`)}` : data.contact?.phone ? `tel:${data.contact.phone.replace(/[^\d+]/g, '')}` : null;
   useEffect(() => { if (!open) return undefined; const k = e => e.key === 'Escape' && setOpen(null); window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [open]);
 
-  const badges = [...new Set(store.map(o => o.badge))];
-  const shown = (filter === 'All' ? store : store.filter(o => o.badge === filter));
-  const visible = showAll ? shown : shown.slice(0, page.storeLimit);
   const tagline = page.tagline || data.designation, about = page.about || data.purpose;
   const sec = page.sections;
 
@@ -173,8 +141,9 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
           <small>{v.count ? `${v.avg.toFixed(1)} (${v.count})` : 'No ratings yet'}</small>
         </div>
         <div className="pp-offer-act">
-          {o.link && <a className="pp-btn small" href={o.link} target="_blank" rel="noopener noreferrer nofollow" onClick={() => click(o)}>{o.pricing === 'paid' ? 'Buy / book' : 'Open'}</a>}
-          {!o.link && mail(o) && <a className="pp-btn small" href={mail(o)} onClick={() => click(o)}>Enquire</a>}
+          {['free', 'paid'].includes(o.pricing) ? <button className="pp-btn small" disabled={o.accessReady === false && !preview} onClick={() => openCheckout(o)}>{o.pricing === 'free' ? 'Get free' : 'Buy now'}</button>
+            : o.link ? <a className="pp-btn small" href={o.link} target="_blank" rel="noopener noreferrer nofollow" onClick={() => click(o)}>Open</a>
+              : mail(o) && <a className="pp-btn small" href={mail(o)} onClick={() => click(o)}>Enquire</a>}
           <button className="pp-btn small ghost" onClick={() => ask(o)}>Ask about this</button>
         </div>
       </div>
@@ -190,7 +159,6 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
         {T.bg === 'image' && data.bgImage && <><BackgroundLayer imageUrl={data.bgImage} bg={{ ...data.bg, dim: 0, parallax: false }} /><div className="pp-wash" style={{ background: `rgba(${dark ? '10,10,20' : '255,255,255'},${T.wash / 100})` }} /></>}
       </div>
       <div className="pp-top">
-        {page.cart && store.some(cartable) && <button className="pp-icon" onClick={() => setCartOpen(true)} aria-label={`Cart, ${count} items`}>🛒{count > 0 && <b>{count}</b>}</button>}
         {user ? <Link className="pp-icon" to="/admin" aria-label="Dashboard">👤</Link> : null}
       </div>
       {note && <div className="pp-toast" role="status">{note}</div>}
@@ -220,12 +188,15 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
             </div>
           </LiquidGlass>
 
-          {sec.store && store.length > 0 && (
+          {shop.events.length > 0 && <LiquidGlass className="pp-store" id="events" radius={rad}>
+            <header><div><h2>Events</h2><p>Tell {me || 'the owner'} whether you are coming.</p></div></header>
+            <Events events={shop.events} slug={slug} owner={name} preview={preview} />
+          </LiquidGlass>}
+
+          {sec.store && shop.products.length > 0 && (
             <LiquidGlass className="pp-store" id="store" radius={rad} refract>
-              <header><span className="pp-hex">⬡</span><div><h2>{page.storeTitle}</h2><p>{page.storeSubtitle || `${store.length} ${store.length === 1 ? 'item' : 'items'} from ${name || 'me'}, ready to use or order.`}</p></div></header>
-              {badges.length > 1 && <div className="pp-filter">{['All', ...badges].map(b => <button key={b} className={filter === b ? 'on' : ''} onClick={() => setFilter(b)}>{b}</button>)}</div>}
-              <div className="pp-products">{visible.map((p, i) => <ProductCard key={p.id} o={p} i={i} cur={cur} cart={page.cart} preview={preview} onAdd={add} onOpen={setOpen} />)}</div>
-              {shown.length > page.storeLimit && <button className="pp-more" onClick={() => setShowAll(s => !s)}>{showAll ? 'Show less' : `Show all ${shown.length}`}</button>}
+              <header><span className="pp-hex">⬡</span><div><h2>{page.storeTitle}</h2><p>{page.storeSubtitle || `${shop.products.length} free and paid offerings from ${name || 'me'}.`}</p></div></header>
+              <Shop items={shop.products} slug={slug} owner={name} preview={preview} />
             </LiquidGlass>
           )}
         </section>
@@ -277,40 +248,16 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
             {Object.entries(o.details || {}).map(([k, v]) => <div className="pp-meta" key={k}><b>{k.replace(/_/g, ' ')}</b> {v}</div>)}
             <div className="pp-rate big"><Stars avg={ov.avg} count={ov.count} /><small>{ov.count ? `${ov.avg.toFixed(1)} (${ov.count})` : 'No ratings yet'}</small><StarInput mine={ov.mine} onRate={n => rate(o, n)} /></div>
             <div className="pp-offer-act">
-              {page.cart && cartable(o) && <button className="pp-btn" onClick={() => add(o)}>🛒 Add to Cart</button>}
-              {o.link && <a className="pp-btn" href={o.link} target="_blank" rel="noopener noreferrer nofollow" onClick={() => click(o)}>{o.pricing === 'paid' ? 'Buy / book' : 'Open'} ↗</a>}
-              {!o.link && mail(o) && <a className="pp-btn" href={mail(o)} onClick={() => click(o)}>Enquire</a>}
+              {['free', 'paid'].includes(o.pricing) ? <button className="pp-btn" onClick={() => openCheckout(o)}>{o.pricing === 'free' ? 'Get free' : 'Buy now'}</button>
+                : o.link ? <a className="pp-btn" href={o.link} target="_blank" rel="noopener noreferrer nofollow" onClick={() => click(o)}>Open ↗</a>
+                  : mail(o) && <a className="pp-btn" href={mail(o)} onClick={() => click(o)}>Enquire</a>}
               <button className="pp-btn ghost" onClick={() => ask(o)}>Ask about this</button>
             </div>
           </LiquidGlass>
         </div>
       )}
 
-      {cartOpen && (
-        <div className="pp-modal right" onClick={() => setCartOpen(false)}>
-          <LiquidGlass as="aside" className="pp-drawer" radius={0} refract onClick={e => e.stopPropagation()} aria-label="Cart">
-            <header><h3>Cart ({count})</h3><button className="pp-x" onClick={() => setCartOpen(false)} aria-label="Close cart">✕</button></header>
-            <div className="pp-lines">
-              {!lines.length && <p className="pp-empty">Your cart is empty.</p>}
-              {lines.map(l => (
-                <div className="pp-line" key={l.id}>
-                  <div className="pp-line-img"><Thumb o={l.o} i={0} /></div>
-                  <div><strong>{l.o.title}</strong><small>{fmtPrice(l.o, cur)} each</small>
-                    {l.o.link ? <a href={l.o.link} target="_blank" rel="noopener noreferrer nofollow" onClick={() => click(l.o)}>Buy this item ↗</a> : mail(l.o) ? <a href={mail(l.o)} onClick={() => click(l.o)}>Enquire to buy</a> : null}</div>
-                  <span className="pp-qty"><button onClick={() => bump(l.id, -1)} aria-label="Fewer">−</button>{l.n}<button onClick={() => bump(l.id, 1)} aria-label="More">+</button></span>
-                </div>
-              ))}
-            </div>
-            {lines.length > 0 && (
-              <footer>
-                {Object.entries(totals).map(([c, v]) => <div className="pp-total" key={c}><span>Subtotal</span><b>{fmtPrice({ pricing: 'paid', price: v, currency: c }, cur)}</b></div>)}
-                <p>Each item is paid for on {first(name) || 'the seller'}'s own link, so there is no single checkout. Use “Buy this item” for each one, or send everything in one message.</p>
-                {data.contact?.email && <a className="pp-btn block" href={`mailto:${data.contact.email}?subject=${encodeURIComponent('Order enquiry')}&body=${encodeURIComponent(lines.map(l => `${l.n} × ${l.o.title}`).join('\n'))}`}>Send my list by email</a>}
-              </footer>
-            )}
-          </LiquidGlass>
-        </div>
-      )}
+      {buying && <CheckoutDialog item={buying} slug={slug} owner={name} preview={preview} onClose={() => setBuying(null)} />}
     </div>
     </GlassProvider>
   );

@@ -9,6 +9,7 @@ import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { prepareImage } from '../lib/image.js';
 import { uploadToSigned } from '../lib/storage.js';
+import { CHECKOUT_CURRENCIES } from '../../shared/commerce.js';
 
 const W = 1320;   // the page is drawn at this width and scaled down into the preview column
 
@@ -120,7 +121,7 @@ export default function PortfolioEditor() {
 
           {tab === 'hero' && <>
             <section className="card"><h3>Photo</h3>
-              <p className="hint">Best: a portrait with a plain or transparent background (PNG/WebP). Without one, a monogram of your initials is shown.</p>
+              <p className="hint">Your photo fills the circle. Use zoom and position to adjust the crop. Without a photo, your initials are shown.</p>
               <div className="row"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => choose(e.target.files[0])} />{hero && <button className="btn" onClick={() => { setPending(null); setRemoved(true); }}>Remove photo</button>}</div>
               {hero && <>
                 {['zoom:1:3:0.05:Zoom', 'x:0:100:1:Left to right', 'y:0:100:1:Top to bottom'].map(d => { const [k, lo, hi, st, label] = d.split(':'); return <Field key={k} label={`${label} (${page.hero[k]})`}><input type="range" min={lo} max={hi} step={st} value={page.hero[k]} onChange={e => setPg({ hero: { ...page.hero, [k]: Number(e.target.value) } })} /></Field>; })}
@@ -195,18 +196,22 @@ export default function PortfolioEditor() {
 
           {tab === 'products' && <>
             <section className="card"><h3>Products section</h3>
-              <p className="hint">Your offerings from Profile &amp; Offerings (books, courses, services…) also appear here automatically.</p>
-              <div className="cols c2"><Txt label="Small heading" value={pf.productsKicker} max={40} ph="Products & initiatives" onChange={v => set({ productsKicker: v })} /><Txt label="Heading" value={pf.productsTitle} max={40} ph="Ideas to Impact" onChange={v => set({ productsTitle: v })} /></div>
+              <p className="hint">Every visible product and offering appears in the shop on your profile home page. Manage buyers and payment setup in <Link to="/admin/purchases">Purchases</Link>.</p>
+              <div className="cols c2"><Txt label="Small heading" value={pf.productsKicker} max={40} ph="Free & paid offerings" onChange={v => set({ productsKicker: v })} /><Txt label="Heading" value={pf.productsTitle} max={40} ph="Shop" onChange={v => set({ productsTitle: v })} /></div>
             </section>
             <section className="card"><h3>Products &amp; initiatives</h3>
-              <Repeater items={pf.products} onChange={products => set({ products })} blank={{ title: '' }} max={24} noun="Product" title={x => x.title || 'New product'}>
+              <Repeater items={pf.products} onChange={products => set({ products })} blank={{ id: '', title: '', pricing: 'free', amount: 0, currency: 'INR', deliveryUrl: '' }} max={24} noun="Product" title={x => x.title || 'New product'}>
                 {(x, p) => <>
                   <Txt label="Name" value={x.title} max={80} ph="Attendance System" onChange={v => p({ title: v })} />
                   <Txt label="Description" value={x.summary} max={240} rows={2} ph="RFID + Face Recognition + IoT Integration" onChange={v => p({ summary: v })} />
                   <div className="cols c2"><Field label="Status"><select value={x.status || ''} onChange={e => p({ status: e.target.value })}>{PRODUCT_STATUS.map(s => <option key={s} value={s}>{s || 'None'}</option>)}</select></Field>
                     <Field label="Icon"><select value={x.icon || ''} onChange={e => p({ icon: e.target.value })}><option value="">Automatic</option>{ICON_NAMES.map(n => <option key={n} value={n}>{n}</option>)}</select></Field></div>
-                  <div className="cols c2"><Txt label="Price (optional)" value={x.price} max={24} ph="₹499 or Free" onChange={v => p({ price: v })} /><Txt label="Picture link" value={x.image} ph="https://…" onChange={v => p({ image: v })} /></div>
-                  <div className="cols c2"><Txt label="Link" value={x.url} ph="https://…" onChange={v => p({ url: v })} /><Txt label="Button text" value={x.linkLabel} max={24} ph="Open" onChange={v => p({ linkLabel: v })} /></div>
+                  <Field label="Free or paid"><select value={x.pricing || 'unspecified'} onChange={e => p({ pricing: e.target.value, price: '' })}><option value="free">Free</option><option value="paid">Paid</option><option value="unspecified">Information only</option></select></Field>
+                  {x.pricing === 'paid' && <div className="cols c2"><Field label="Price"><input type="number" min={0.01} max={9999999.99} step="0.01" value={x.amount ?? ''} onChange={e => p({ amount: e.target.value, price: '' })} /></Field>
+                    <Field label="Currency"><select value={x.currency || 'INR'} onChange={e => p({ currency: e.target.value })}>{CHECKOUT_CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></Field></div>}
+                  {['free', 'paid'].includes(x.pricing) && <Txt label="Access / download link after checkout" value={x.deliveryUrl} max={600} ph="https://…" hint="Released to the buyer after a free claim or verified payment. Add a link to enable checkout." onChange={v => p({ deliveryUrl: v })} />}
+                  <Txt label="Picture link" value={x.image} ph="https://…" onChange={v => p({ image: v })} />
+                  <div className="cols c2"><Txt label="Public details link" value={x.url} ph="https://…" onChange={v => p({ url: v })} /><Txt label="Details button text" value={x.linkLabel} max={24} ph="More details" onChange={v => p({ linkLabel: v })} /></div>
                 </>}
               </Repeater>
             </section>

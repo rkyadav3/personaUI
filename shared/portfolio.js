@@ -5,7 +5,7 @@
 import { ENQUIRY_TYPES } from './enquiryTypes.js';
 
 export const PORTFOLIO_PAGES = ['home', 'work', 'products', 'experience', 'talks', 'updates', 'about', 'contact'];
-export const PAGE_LABELS = { home: 'Home', work: 'Work', products: 'Products', experience: 'Experience', talks: 'Talks', updates: 'Updates', about: 'About', contact: 'Contact' };
+export const PAGE_LABELS = { home: 'Home', work: 'Work', products: 'Shop', experience: 'Experience', talks: 'Talks', updates: 'Updates', about: 'About', contact: 'Contact' };
 export const SOCIAL_KINDS = { github: 'GitHub', linkedin: 'LinkedIn', x: 'X (Twitter)', instagram: 'Instagram', youtube: 'YouTube', email: 'Email', website: 'Website' };
 export const ICON_NAMES = ['spark', 'cpu', 'box', 'layers', 'cloud', 'code', 'chart', 'book', 'mic', 'users', 'globe', 'shield', 'pen', 'briefcase', 'heart', 'trophy'];
 export const PRODUCT_STATUS = ['', 'Live', 'Beta', 'In progress', 'Concept'];
@@ -45,6 +45,15 @@ export function cleanImg(v) {
   return /^https?:\/\//i.test(u) || (u[0] === '/' && u[1] !== '/') ? u : '';
 }
 
+function productPrice(p) {
+  const legacy = clean(p?.price, 24);
+  const legacyAmount = /^(?:₹|INR\s*)?\s*\d+(?:,\d{3})*(?:\.\d{1,2})?$/i.test(legacy) ? Number(legacy.replace(/₹|INR|,|\s/gi, '')) : null;
+  const pricing = ['free', 'paid', 'unspecified'].includes(p?.pricing) ? p.pricing : /^free$/i.test(legacy) ? 'free' : legacyAmount != null ? 'paid' : 'unspecified';
+  const number = p?.amount === '' || p?.amount == null ? legacyAmount : Number(p.amount);
+  const amount = pricing === 'free' ? 0 : pricing === 'paid' && Number.isFinite(number) && number > 0 && number < 1e7 ? number : null;
+  return { pricing, amount, currency: /^[A-Z]{3}$/.test(String(p?.currency || '').toUpperCase()) ? String(p.currency).toUpperCase() : 'INR' };
+}
+
 export function normalizePortfolio(input) {
   const i = input && typeof input === 'object' ? input : {};
   const o = {
@@ -65,9 +74,12 @@ export function normalizePortfolio(input) {
       demoUrl: cleanUrl(p?.demoUrl), demoLabel: clean(p?.demoLabel, 24), repoUrl: cleanUrl(p?.repoUrl), repoLabel: clean(p?.repoLabel, 24), featured: p?.featured === true,
     })).filter(p => p.title),
     productsKicker: clean(i.productsKicker, 40), productsTitle: clean(i.productsTitle, 40),
-    products: list(i.products, 24).map(p => ({
+    products: list(i.products, 24).map((p, index) => ({
+      id: /^[a-zA-Z0-9_-]{1,80}$/.test(p?.id || '') ? p.id : `legacy-${index}`,
       title: clean(p?.title, 80), summary: clean(p?.summary, 240), icon: pick(p?.icon, ICON_NAMES), status: clean(p?.status, 20),
       price: clean(p?.price, 24), image: cleanImg(p?.image), url: cleanUrl(p?.url), linkLabel: clean(p?.linkLabel, 24),
+      ...productPrice(p), deliveryUrl: cleanImg(p?.deliveryUrl),
+      ...(typeof p?.accessReady === 'boolean' ? { accessReady: p.accessReady } : {}),
     })).filter(p => p.title),
     experience: list(i.experience, 20).map(e => ({ role: clean(e?.role, 80), company: clean(e?.company, 80), period: clean(e?.period, 40), summary: clean(e?.summary, 500) })).filter(e => e.role || e.company),
     talks: list(i.talks, 24).map(t => ({ title: clean(t?.title, 100), event: clean(t?.event, 100), date: clean(t?.date, 30), summary: clean(t?.summary, 300), url: cleanUrl(t?.url) })).filter(t => t.title),
@@ -83,4 +95,9 @@ export function normalizePortfolio(input) {
   let seen = false;
   for (const p of o.projects) { if (p.featured && seen) p.featured = false; if (p.featured) seen = true; }
   return o;
+}
+
+export function publicPortfolio(input) {
+  const portfolio = normalizePortfolio(input);
+  return { ...portfolio, products: portfolio.products.map(({ deliveryUrl, ...product }) => ({ ...product, accessReady: !!deliveryUrl })) };
 }

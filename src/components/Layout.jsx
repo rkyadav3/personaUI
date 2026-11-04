@@ -13,6 +13,7 @@ const NAV_GROUPS = [
       { to: '/admin', label: 'Overview', icon: '📊', end: true },
       { to: '/admin/profile', label: 'Profile & Offerings', icon: '👤' },
       { to: '/admin/updates', label: 'Updates & Schedule', icon: '🗓️' },
+      { to: '/admin/purchases', label: 'Purchases', icon: '🛍️' },
       { to: '/admin/enquiries', label: 'Enquiries', icon: '📥', badge: true },
     ],
   },

@@ -7,7 +7,9 @@
     "dev": "vercel dev",
     "dev:web": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.js tests/*.test.cjs",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=server/paymentService.js --test-coverage-include=server/paymentCrypto.js --test-coverage-include=server/rsvpService.js --test-coverage-include=server/razorpay.js --test-coverage-include=server/http.js --test-coverage-include=server/events.js --test-coverage-include=server/commerce.js --test-coverage-include=server/publicRepository.js --test-coverage-include=shared/commerce.js --test-coverage-include=shared/rsvp.js --test-coverage-include=src/lib/publicActions.js --test-coverage-include=api/payments.js --test-coverage-include=api/rsvp.js --test-coverage-include=api/razorpay-webhook.js tests/*.test.js tests/*.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

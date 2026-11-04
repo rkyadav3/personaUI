@@ -5,11 +5,12 @@ import { Confirm, Field, Notice } from '../Ui.jsx';
 import { BG_BUCKET } from '../../../shared/siteSettings.js';
 import { prepareImage } from '../../lib/image.js';
 import { uploadToSigned } from '../../lib/storage.js';
+import { CHECKOUT_CURRENCIES } from '../../../shared/commerce.js';
 
-const blank = { title: '', description: '', pricing: 'unspecified', price: '', currency: 'INR', active: true, details: {} };
+const blank = { title: '', description: '', pricing: 'unspecified', price: '', currency: 'INR', deliveryUrl: '', active: true, details: {} };
 
-function OfferingForm({ contribution, offering, onDone }) {
-  const [f, setF] = useState(offering ? { ...blank, ...offering, price: offering.price ?? '', currency: offering.currency || 'INR' } : blank);
+export function OfferingForm({ contribution, offering, onDone }) {
+  const [f, setF] = useState(offering ? { ...blank, ...offering, price: offering.price ?? '', currency: offering.currency || 'INR', deliveryUrl: offering.delivery_url || offering.deliveryUrl || '' } : blank);
   const [err, setErr] = useState('');
   const fields = OFFERING_FIELDS[contribution.category] || [];
   const det = (k, v) => setF({ ...f, details: { ...f.details, [k]: v } });
@@ -32,7 +33,7 @@ function OfferingForm({ contribution, offering, onDone }) {
       <Field label="Description"><textarea rows={3} value={f.description} onChange={e => setF({ ...f, description: e.target.value })} /></Field>
       <div className="cols c2">
         {fields.map(d => (
-          <Field key={d.key} label={d.label}>
+          <Field key={d.key} label={d.key === 'buy_link' ? 'Public details or booking information link (optional)' : d.label}>
             {d.type === 'select'
               ? <select value={f.details[d.key] || ''} onChange={e => det(d.key, e.target.value)}><option value="">Not specified</option>{d.options.map(o => <option key={o}>{o}</option>)}</select>
               : d.type === 'textarea' ? <textarea rows={2} value={f.details[d.key] || ''} onChange={e => det(d.key, e.target.value)} />
@@ -41,10 +42,11 @@ function OfferingForm({ contribution, offering, onDone }) {
         ))}
         <Field label="Free or paid"><select value={f.pricing} onChange={e => setF({ ...f, pricing: e.target.value })}>{PRICING.map(p => <option key={p}>{p}</option>)}</select></Field>
         {f.pricing === 'paid' && (
-          <div className="row"><div style={{ width: 90 }}><Field label="Currency"><input type="text" value={f.currency} onChange={e => setF({ ...f, currency: e.target.value })} /></Field></div>
-            <div className="grow"><Field label="Price"><input type="number" min={0} step="0.01" value={f.price} onChange={e => setF({ ...f, price: e.target.value })} /></Field></div></div>
+          <div className="row"><div style={{ width: 100 }}><Field label="Currency"><select value={f.currency} onChange={e => setF({ ...f, currency: e.target.value })}>{[...new Set([...CHECKOUT_CURRENCIES, f.currency])].map(code => <option key={code}>{code}</option>)}</select></Field></div>
+            <div className="grow"><Field label="Price"><input type="number" min={0.01} step="0.01" value={f.price} onChange={e => setF({ ...f, price: e.target.value })} /></Field></div></div>
         )}
       </div>
+      {['free', 'paid'].includes(f.pricing) && <Field label="Access / download link after checkout"><input type="text" maxLength={600} placeholder="https://…" value={f.deliveryUrl} onChange={e => setF({ ...f, deliveryUrl: e.target.value })} /><span className="hint">Shown to the buyer after a free claim or verified Razorpay payment. Add this link to enable checkout.</span></Field>}
       <label className="toggle"><input type="checkbox" checked={f.active} onChange={e => setF({ ...f, active: e.target.checked })} /> Active (shown on your profile)</label>
       <Notice kind="error">{err}</Notice>
       <div className="row"><button className="btn primary">{offering ? 'Save offering' : 'Add offering'}</button><button type="button" className="btn" onClick={() => onDone(false)}>Cancel</button></div>

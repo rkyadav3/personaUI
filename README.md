@@ -1,6 +1,6 @@
 # Persona RAG: React + Supabase + Vercel
 
-The Streamlit admin and the static chat page are now one React app (Vite) with two Vercel serverless functions.
+The Streamlit admin and the static chat page are now one React app (Vite) with Vercel serverless APIs.
 
 ```
  you ──► React admin (/admin) ──► /api/admin ──► Supabase  ◄── /api/chat ◄── visitor's browser
@@ -20,12 +20,13 @@ The Streamlit admin and the static chat page are now one React app (Vite) with t
 
 ## Routes
 - `/`: the members' **home page** (see below). Anyone can browse; nobody can join without an invite.
-- `/p/:slug`: a member's **profile**, with **Open persona** and **Talk to me**.
+- `/p/:slug`: a member's **profile home page**, with their photo, Events, free and paid shop items, and contact options.
 - `/u/:slug`: that member's **persona** (the dotted ball you chat with).
 - `/admin`: sign in / create account, then the admin pages. Invite links look like `/admin?invite=CODE`.
+- `/admin/purchases`: that owner's purchases, free claims, buyer details, fulfillment and shared payment settings.
 
 ## Setup
-1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql` (adds users, invite codes, `owner_id`, and owner-scoped search). If your project already has those tables, compare first.
+1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql`, `page.sql`, `portfolio.sql`, `engage.sql`, and `events-commerce.sql`. If your project already has those tables, compare first and run the migrations it is missing.
 2. **Env vars:** copy `.env.example` to `.env.local` (local) or add them in Vercel. `SESSION_SECRET` is new: any long random string.
 3. **Run locally:** `npm install`, `npm i -g vercel`, then `npm run dev` (first run asks you to log in and link a Vercel project; put your variables in `.env.local`). `npm run dev:web` runs only the UI and proxies `/api` to a `vercel dev` on port 3000.
 4. **Deploy:** import the repo in Vercel (framework: Vite). Root directory is the repo root. Add the env vars. Deploy.
@@ -75,7 +76,7 @@ A private platform: set `REGISTRATION_MODE=invite` (now the default in `.env.exa
 How the numbers work:
 - **Most viewed:** an offering counts once a visitor has had it mostly on screen for a second. Once per browser session, and a member's own visits never count.
 - **Top rated:** visitors rate 1 to 5 stars on the profile; one vote per visitor per offering (stored as a salted hash, never an IP). Ranking uses a Bayesian average, so one 5-star vote does not beat forty 4.8s. Members cannot rate their own offerings.
-- **In demand:** clicks on Buy / Open / Enquire. This measures interest, **not confirmed sales**, because purchases happen on the member's own link. Real sales counts need a payment provider (for example Razorpay or Stripe webhooks) and would replace this rail's counter.
+- **In demand:** clicks on offerings measure interest. Confirmed Razorpay purchases and free claims are recorded separately in the seller's **Purchases** panel.
 - The abuse limits in `api/track.js` live in memory per warm serverless instance. For stronger protection, add Vercel's firewall rate limiting.
 
 
@@ -84,12 +85,13 @@ The public profile now has a **portfolio** style (the default; the old chat-gree
 
 | URL | Shows | Appears when |
 |---|---|---|
-| `/p/<slug>` | Hero (awards, big headline, photo, intro, availability, socials, what-I-do list, buttons, numbers), featured project + 3 small ones, "Ideas to Impact" products | always |
+| `/p/<slug>` | Hero with circular photo, Events and attendance, featured projects, every visible free and paid shop item | always |
 | `/p/<slug>/work` | every project (card grid, tech chips, award, links, pop-up details) | at least one project |
-| `/p/<slug>/products` | your portfolio products **plus** your offerings from Profile & Offerings (price, rating, Buy / Enquire) | at least one product or offering |
+| `/p/<slug>/products` | your portfolio products **plus** visible offerings, with free claims and Razorpay checkout | at least one product or offering |
 | `/p/<slug>/experience` | timeline + education | any experience or education |
 | `/p/<slug>/talks` | talks / podcasts / interviews **plus** "Talk Shows" offerings | at least one talk |
 | `/p/<slug>/about` | story, skills, published contact details, social links | any of those |
+| `/p/<slug>/updates` | announcements, schedule, Events and response forms | at least one published item |
 
 **Every profile has its own text for every field** (`site_settings.portfolio`, one JSON document per owner, edited at **Admin → Portfolio Pages** with a live preview).
 **Nothing is shown unless it exists.** `src/lib/portfolioModel.js` decides which blocks and sub-pages exist; the menu lists only pages with content; the layout (`src/styles/portfolio.css`) uses auto-fit grids so a missing photo, stats row, domain list, project image or whole section re-flows instead of leaving a hole. A missing hero photo becomes a monogram, a broken image URL falls back to an icon tile, and a sub-page with no content redirects home.
@@ -103,14 +105,15 @@ Setup: run `supabase/portfolio.sql` once (adds `site_settings.portfolio`). Pictu
 ## Updates, schedule and enquiries
 Run `supabase/engage.sql` once (after `portfolio.sql`). It adds the `updates` and `enquiries` tables.
 
-**Admin → Updates & Schedule** (`/admin/updates`): two tabs.
+**Admin → Updates & Schedule** (`/admin/updates`): three tabs.
 - *Upcoming updates*: news, launches, announcements. Optional "happens on" date; a future date shows as **Upcoming**. Can be pinned.
 - *Schedule*: dated items with start (and optional end), place, link. Visitors see them soonest first, in their own time zone, with an **Add to calendar** link. Finished items move under "Past events".
+- *Events*: dated events with Going / Not going visitor forms, phone settings and up to six questions. Published Events and attendance appear on the profile home page; full responses are available to the owner through the Responses button.
 - Each post is **Published** (visible) or **Draft** (private). Links are checked (http/https/mailto/tel only).
 
 **Public profile:** a "What's new" block on the home page, and a new `/p/<slug>/updates` page. Both appear only when something is published.
 
-**Contact form** (`/p/<slug>/contact`, also opened by the **Enquire** button on an offering, with that offering pre-selected):
+**Contact form** (`/p/<slug>/contact`, where a visitor can select the related offering):
 1. About you: name, email, phone/WhatsApp, organisation, city and country
 2. Your enquiry: kind of enquiry, related offering, subject, message
 3. Timing and budget (only for bookings, meetings, speaking, collaboration): preferred date and time, online / in person, budget
@@ -120,4 +123,10 @@ Run `supabase/engage.sql` once (after `portfolio.sql`). It adds the `updates` an
 
 Protections on `/api/enquiry`: everything is re-validated on the server, a hidden honeypot field catches bots, 5 enquiries per visitor per hour (stored as a salted hash, never the IP), an identical resend within a day is not stored twice, and an offering can only be attached if it belongs to that member and is active.
 
-Notes: there is no email notification yet (enquiries are read in the admin). The **Classic** template does not show updates or the form; they are part of the Portfolio template.
+Notes: there is no email notification yet (enquiries are read in the admin). The **Classic** template includes Events and checkout. Announcements, schedule and the contact page remain part of the Portfolio template.
+
+## Shared Razorpay checkout
+
+Run `supabase/events-commerce.sql` after `engage.sql`. Configure the shared app's Razorpay API keys, webhook secret, and 32-byte payment encryption key. Free claims and verified paid purchases return a confirmation and the item's private access/download link; each owner sees their buyers and fulfillment details at `/admin/purchases`.
+
+See [Events and profile shop setup](docs/events-shop-setup.md) for configuration, webhook events, delivery links and test-mode verification.

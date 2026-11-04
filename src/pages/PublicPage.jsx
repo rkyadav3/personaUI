@@ -116,15 +116,14 @@ export default function PublicPage() {
           </>}
           {tab === 'store' && <>
           <section className="card"><h3>Store</h3>
-            <div className="cols c2"><Field label="Title"><input value={page.storeTitle} maxLength={40} onChange={e => set({ storeTitle: e.target.value })} /></Field>
-              <Field label="Items shown before “Show all”"><input type="number" min={2} max={40} value={page.storeLimit} onChange={e => set({ storeLimit: e.target.value })} /></Field></div>
+            <Field label="Title"><input value={page.storeTitle} maxLength={40} onChange={e => set({ storeTitle: e.target.value })} /></Field>
             <Field label="Subtitle (default counts your items)"><input value={page.storeSubtitle} maxLength={140} onChange={e => set({ storeSubtitle: e.target.value })} /></Field>
             <div className="cols c2"><Field label="Currency for prices without one"><input value={page.currency} maxLength={6} onChange={e => set({ currency: e.target.value })} /></Field></div>
-            <label className="toggle"><input type="checkbox" checked={page.cart} onChange={e => set({ cart: e.target.checked })} /> Let visitors add priced items to a cart</label>
+            <p className="hint">The profile home page shows all visible free and paid items. Visitors claim free items or buy with Razorpay. Manage purchases and payment settings in <Link to="/admin/purchases">Purchases</Link>.</p>
           </section>
 
           <section className="card"><h3>Where each category appears</h3>
-            <p className="hint">Store grid shows product cards. Sidebar lists them next to your profile. Categories with no offerings show as a simple row.</p>
+            <p className="hint">Visible offerings appear in the home-page shop. Sidebar also lists them next to your Classic profile. Hidden categories are excluded. Categories with no offerings show as a simple row.</p>
             {CATEGORIES.map(c => <div className="row" key={c} style={{ justifyContent: 'space-between', marginBottom: 6 }}><span>{c}</span>
               <select value={page.placement[c]} onChange={e => setIn('placement', { [c]: e.target.value })}>{Object.entries(PLACEMENTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>)}
             <h4 style={{ margin: '12px 0 6px' }}>Sections</h4>

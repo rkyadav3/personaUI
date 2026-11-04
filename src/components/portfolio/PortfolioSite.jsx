@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { ACCENTS, FONT_STACK, normalizePage } from '../../../shared/pageSettings.js';
 import { splitSchedule } from '../../../shared/engage.js';
 import { SOCIAL_KINDS } from '../../../shared/portfolio.js';
 import { resolveSite } from '../../lib/portfolioModel.js';
-import { track } from '../../lib/track.js';
-import { useSeen } from '../../lib/useSeen.js';
 import EnquiryForm from './EnquiryForm.jsx';
 import Icon from './Icon.jsx';
 import { EventRow, UpdateCard } from './Updates.jsx';
+import Events from './Events.jsx';
+import Shop from '../commerce/Shop.jsx';
 import '../../styles/portfolio.css';
 
 const luminance = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
@@ -30,15 +30,14 @@ function GoTo({ to, ctx, className, children, ...rest }) {
 }
 
 /** A picture that quietly disappears if its URL is broken, so the fallback shows instead of a broken-image icon. */
-function Pic({ src, className, fallback = null }) {
+function Pic({ src, className, style, fallback = null }) {
   const [bad, setBad] = useState(false);
   useEffect(() => setBad(false), [src]);
   if (!src || bad) return fallback;
-  return <img className={className} src={src} alt="" loading="lazy" onError={() => setBad(true)} />;
+  return <img className={className} style={style} src={src} alt="" loading="lazy" onError={() => setBad(true)} />;
 }
 const Tile = ({ text, icon, className = '' }) => <span className={`pf-tile ${className}`} aria-hidden="true">{icon ? <Icon n={icon} size={28} /> : (String(text || '?').trim()[0] || '?').toUpperCase()}</span>;
 
-const Stars = ({ avg, count }) => (count > 0 ? <span className="pf-rate" title={`${avg} out of 5 from ${count}`}>★ {Number(avg).toFixed(1)} <small>({count})</small></span> : null);
 
 function SectionHead({ kicker, title, action }) {
   return (
@@ -80,9 +79,10 @@ function Hero({ m, ctx }) {
             </div>
           ) : <div />}
           <div className="pf-center">
-            <div className={`pf-photo${m.photo ? '' : ' mono'}${m.photoStyle === 'bw' ? ' bw' : ''}`}>
+            <div className={`pf-photo${m.photoStyle === 'bw' ? ' bw' : ''}`}>
               {m.photo
-                ? <Pic src={m.photo} fallback={<span className="pf-mono">{m.initials}</span>} className="pf-photo-img" />
+                ? <Pic src={m.photo} fallback={<span className="pf-mono">{m.initials}</span>} className="pf-photo-img"
+                    style={{ objectPosition: `${m.heroPos.x ?? 50}% ${m.heroPos.y ?? 25}%`, transform: `scale(${m.heroPos.zoom ?? 1})` }} />
                 : <span className="pf-mono">{m.initials}</span>}
             </div>
           </div>
@@ -151,36 +151,11 @@ function ProjectsHome({ m, ctx }) {
   );
 }
 
-function ProductCard({ x, ctx, big = false }) {
-  const ref = useRef(null);
-  const offering = x.kind === 'offering';
-  useSeen(ref, ctx.live && offering, () => track({ kind: 'view', id: x.id }));
-  const mail = ctx.email ? `mailto:${ctx.email}?subject=${encodeURIComponent(`Interested in: ${x.title}`)}` : `/u/${ctx.slug}`;
-  const form = ctx.enquiry && offering ? `/p/${ctx.slug}/contact?offering=${x.id}` : '';   // opens the contact form with this offering already chosen
-  const href = x.url || (offering ? (form || mail) : '');
-  const label = x.url ? (x.linkLabel || 'Open') : 'Enquire';
-  const click = () => { if (ctx.live && offering) track({ kind: 'click', id: x.id }); };
-  return (
-    <article className={`pf-card pf-prod${big ? ' big' : ''}`} ref={ref}>
-      <div className="pf-prod-top">
-        <Pic src={big ? x.image : ''} className="pf-prod-img" fallback={<span className="pf-icon-box"><Icon n={x.icon || 'spark'} size={22} /></span>} />
-        {x.status && <span className="pf-pill sm">{x.status}</span>}
-      </div>
-      <h3>{x.title}</h3>
-      {x.summary && <p>{x.summary}</p>}
-      <div className="pf-prod-foot">
-        <span>{x.price && <strong>{x.price}</strong>}<Stars avg={x.ratingAvg} count={x.ratingCount} /></span>
-        {href && <A className={big ? 'pf-btn dark sm' : 'pf-round'} href={href} onClick={click} aria-label={label}>{big ? <>{label} <Icon n="arrow" size={14} /></> : <Icon n="arrow" size={16} />}</A>}
-      </div>
-    </article>
-  );
-}
-
 function ProductsHome({ m, ctx }) {
   return (
     <section className="pf-wrap pf-sec" id="products">
       <SectionHead kicker={m.productsKicker} title={m.productsTitle} action={<GoTo to="products" ctx={ctx} className="pf-more">Explore All <Icon n="arrow" size={14} /></GoTo>} />
-      <div className="pf-grid4">{m.products.slice(0, 4).map((x, i) => <ProductCard key={i} x={x} ctx={ctx} />)}</div>
+      <Shop items={m.products} slug={ctx.slug} owner={m.owner} preview={ctx.preview} />
     </section>
   );
 }
@@ -199,6 +174,14 @@ function WhatsNew({ m, ctx }) {
       </div>
     </section>
   );
+}
+
+function EventsHome({ m, ctx }) {
+  if (!m.events.length) return null;
+  return <section className="pf-wrap pf-sec" id="events">
+    <SectionHead kicker="Join the community" title="Events" />
+    <Events events={m.events} slug={ctx.slug} owner={m.owner} preview={ctx.preview} />
+  </section>;
 }
 
 // ------------------------------------------------------------------ sub-pages
@@ -237,7 +220,7 @@ function ProductsPage({ m, ctx }) {
   return (
     <>
       <PageTop kicker={m.productsKicker} title={m.productsTitle} />
-      <section className="pf-wrap pf-sec tight"><div className="pf-cards">{m.products.map((x, i) => <ProductCard key={i} x={x} ctx={ctx} big />)}</div></section>
+      <section className="pf-wrap pf-sec tight"><Shop items={m.products} slug={ctx.slug} owner={m.owner} preview={ctx.preview} /></section>
     </>
   );
 }
@@ -286,11 +269,12 @@ function TalksPage({ m }) {
   );
 }
 
-function UpdatesPage({ m }) {
+function UpdatesPage({ m, ctx }) {
   const now = Date.now(), { upcoming, past } = splitSchedule(m.schedule, now);
   return (
     <>
       <PageTop kicker="Stay in the loop" title={m.updatesTitle} />
+      {m.events.length > 0 && <section className="pf-wrap pf-sec tight"><h3 className="pf-h3">Events</h3><Events events={m.events} slug={ctx.slug} owner={m.owner} preview={ctx.preview} /></section>}
       <section className="pf-wrap pf-sec tight pf-upd-grid">
         {m.updates.length > 0 && <div><h3 className="pf-h3">Latest updates</h3><div className="pf-stack">{m.updates.map(u => <UpdateCard key={u.id} u={u} now={now} />)}</div></div>}
         {m.schedule.length > 0 && (
@@ -412,6 +396,7 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
           <>
             <Hero m={m} ctx={ctx} />
             <WhatsNew m={m} ctx={ctx} />
+            <EventsHome m={m} ctx={ctx} />
             {m.featured && <ProjectsHome m={m} ctx={ctx} />}
             {m.products.length > 0 && <ProductsHome m={m} ctx={ctx} />}
           </>

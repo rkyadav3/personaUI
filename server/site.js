@@ -48,7 +48,14 @@ export async function savePage(db, { page, portfolio, heroPath }) {
   const cur = await row(db);
   const patch = { updated_at: new Date().toISOString() };
   if (page !== undefined) patch.page = normalizePage(page);                       // each editor sends only what it owns
-  if (portfolio !== undefined) patch.portfolio = normalizePortfolio(portfolio);
+  if (portfolio !== undefined) {
+    patch.portfolio = normalizePortfolio(portfolio);
+    const ids = new Set();
+    patch.portfolio.products = patch.portfolio.products.map(product => {
+      const id = product.id.startsWith('legacy-') || ids.has(product.id) ? randomUUID() : product.id;
+      ids.add(id); return { ...product, id };
+    });
+  }
   if (heroPath !== undefined) {
     if (heroPath !== null && !String(heroPath).startsWith(`${db.uid}/`)) throw new Error('Bad image path.');
     if (heroPath !== null) {

@@ -28,7 +28,7 @@ export function UpdateCard({ u, now }) {
 }
 
 /** One dated item of the schedule, with an "add to calendar" link while it is still to come. */
-export function EventRow({ x, now, past = false }) {
+export function EventRow({ x, now, past = false, children }) {
   const d = new Date(x.startsAt), live = !past && d.getTime() <= now;
   return (
     <article className={`pf-card pf-evt${past ? ' past' : ''}`}>
@@ -45,6 +45,7 @@ export function EventRow({ x, now, past = false }) {
             <Link href={calendarUrl(x)}><Icon n="calendar" size={14} /> Add to calendar</Link>
           </div>
         )}
+        {children}
       </div>
     </article>
   );

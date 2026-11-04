@@ -9,6 +9,9 @@
     "api/home.js": { "maxDuration": 15 },
     "api/track.js": { "maxDuration": 10 },
     "api/enquiry.js": { "maxDuration": 15 },
+    "api/rsvp.js": { "maxDuration": 15 },
+    "api/payments.js": { "maxDuration": 30 },
+    "api/razorpay-webhook.js": { "maxDuration": 30 },
     "api/chat.js": { "maxDuration": 30 },
     "api/admin.js": { "maxDuration": 60 },
     "api/profile.js": { "maxDuration": 60 }

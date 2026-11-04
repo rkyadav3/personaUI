@@ -8,6 +8,8 @@ const model = async () => (await import('../server/embed.js')).model();
 const search = async (...a) => (await import('../server/search.js')).search(...a);
 import * as profile from '../server/profile.js';
 import * as engage from '../server/engage.js';
+import * as events from '../server/events.js';
+import * as commerce from '../server/commerce.js';
 import * as site from '../server/site.js';
 import * as store from '../server/store.js';
 import { scoped } from '../server/tenant.js';
@@ -66,6 +68,12 @@ const OPS = {
   'updates.list': ({ db }) => engage.listUpdates(db),
   'updates.save': ({ db }, a) => engage.saveUpdate(db, a),
   'updates.delete': async ({ db }, a) => { await engage.deleteUpdate(db, a.id); return { ok: true }; },
+  'events.responses': ({ db }, a) => events.listResponses(db, a),
+  'events.deleteResponse': ({ db }, a) => events.deleteResponse(db, a),
+  'purchases.list': ({ db }, a) => commerce.listPurchases(db, a),
+  'purchases.fulfill': ({ db }, a) => commerce.fulfillPurchase(db, a),
+  'payments.settings': ({ db }) => commerce.paymentSettings(db),
+  'payments.saveSettings': ({ db }, a) => commerce.savePaymentSettings(db, a),
 
   // enquiries sent through the contact form on the public profile
   'enquiries.list': ({ db }) => engage.listEnquiries(db),
@@ -154,8 +162,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   const { op, args = {} } = req.body || {};
   try {
-    if (PUBLIC[op]) return res.status(200).json(await PUBLIC[op](args, null, { req, res }));
-    const fn = OPS[op];
+    if (Object.hasOwn(PUBLIC, op)) return res.status(200).json(await PUBLIC[op](args, null, { req, res }));
+    const fn = Object.hasOwn(OPS, op) ? OPS[op] : null;
     if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
     const user = await auth.sessionUser(req);
     if (!user) throw new HttpError(401, 'Not signed in.');

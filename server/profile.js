@@ -2,7 +2,7 @@
 import { CATEGORIES, INTENTS, OFFERING_FIELDS, PRICING, VISIBILITY_DEFAULTS } from '../shared/profileSchema.js';
 import { generateJSON } from './gemini.js';
 import { normalizePage } from '../shared/pageSettings.js';
-import { normalizePortfolio } from '../shared/portfolio.js';
+import { cleanImg, publicPortfolio } from '../shared/portfolio.js';
 import { normalizeBg } from '../shared/siteSettings.js';
 import { previewEngage, publicEngage } from './engage.js';
 import { publicUrl } from './site.js';
@@ -238,6 +238,7 @@ export async function saveOffering(db, a) {
     contribution_id: c.id, title, description: str(a.description, 1500), pricing: PRICING.includes(a.pricing) ? a.pricing : 'unspecified',
     price: Number.isFinite(price) && price >= 0 && price < 1e9 ? price : null, currency: str(a.currency, 6) || null, details, active: a.active !== false,
   };
+  if (a.deliveryUrl !== undefined) row.delivery_url = cleanImg(a.deliveryUrl);
   if (row.pricing !== 'paid') row.price = null;
   if (a.id) { await run(db.from('offerings').update(row).eq('id', a.id)); return { id: a.id }; }
   return (await run(db.from('offerings').insert(row).select('id')))[0];
@@ -265,7 +266,7 @@ export function buildPublic(profile, contributions) {
     contributions: v.contributions
       ? contributions.filter(k => k.enabled && k.visible).map(k => ({
         category: k.category, subtype: k.subtype, description: k.description, intent: k.intent,
-        offerings: (k.offerings || []).filter(o => o.active).map(o => ({ id: o.id, title: o.title, description: o.description, pricing: o.pricing, price: o.price, currency: o.currency, details: o.details, createdAt: o.created_at || null, ...offerStats(o) })),
+        offerings: (k.offerings || []).filter(o => o.active).map(o => ({ id: o.id, title: o.title, description: o.description, pricing: o.pricing, price: o.price, currency: o.currency, details: o.details, accessReady: !!cleanImg(o.delivery_url), createdAt: o.created_at || null, ...offerStats(o) })),
       }))
       : [],
   };
@@ -278,10 +279,10 @@ export const safeUrl = u => { try { const x = new URL(String(u || '')); return x
 function decorate(pub, slug, site, engage = { updates: [], schedule: [] }) {
   return {
     ...pub, slug,
-    updates: engage.updates, schedule: engage.schedule,   // published updates and schedule items only (see shapeEngage)
+    updates: engage.updates, schedule: engage.schedule, events: engage.events || [],
     hero: site?.hero_path ? publicUrl(site.hero_path) : null,
     page: normalizePage(site?.page),
-    portfolio: normalizePortfolio(site?.portfolio),   // links and picture URLs are checked inside normalizePortfolio
+    portfolio: publicPortfolio(site?.portfolio),
     bgImage: site?.bg_path ? publicUrl(site.bg_path) : null, bg: normalizeBg(site?.bg),
     contributions: pub.contributions.map(k => ({
       ...k,
