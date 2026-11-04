@@ -1,5 +1,14 @@
 // Small stroke icons, inline so the page needs no icon font or extra request.
 const P = {
+  home: <><path d="M3 10l9-7 9 7v10H3z" /><path d="M9 20v-7h6v7" /></>,
+  folder: <path d="M3 6a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+  template: <><rect x="3" y="3" width="8" height="8" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="11" width="7" height="10" rx="1.5" /><rect x="3" y="14" width="8" height="7" rx="1.5" /></>,
+  search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="M16 16l5 5" /></>,
+  bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></>,
+  chevron: <path d="M7 10l5 5 5-5" />,
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  send: <><path d="M4 4l17 8-17 8 4-8zM8 12h13" /></>,
+  attachment: <path d="M8 13l7-7a3 3 0 0 1 4 4L9 20a5 5 0 0 1-7-7L13 2" />,
   spark: <path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z" />,
   cpu: <><rect x="5" y="5" width="14" height="14" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3" /></>,
   box: <><path d="M21 8l-9-5-9 5v8l9 5 9-5z" /><path d="M3.3 7L12 12l8.7-5M12 22V12" /></>,

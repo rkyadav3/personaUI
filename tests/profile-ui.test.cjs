@@ -41,9 +41,8 @@ test('visitor event forms include attendance choices and the owner’s required 
   assert.match(html, /Show my name/);
 });
 
-test('the classic profile also renders every shop item and Events on its home page', () => {
-  const ProfilePage = require('../src/components/ProfilePage.jsx').default;
-  const html = renderToStaticMarkup(React.createElement(ProfilePage, { slug: 'owner', preview: true, data: { name: 'Owner', page: { template: 'classic', placement: { Books: 'side' } }, contributions: [{ category: 'Books', offerings: Array.from({ length: 7 }, (_, i) => ({ id: i + 1, title: `Classic item ${i + 1}`, pricing: i % 2 ? 'paid' : 'free', price: i % 2 ? 49 : null, currency: 'INR' })) }], portfolio: { products: [{ id: 'extra', title: 'Extra guide', pricing: 'free', accessReady: true }] }, events: [{ id: 8, title: 'Classic meetup', startsAt: '2026-12-10T10:00:00Z', rsvp: { enabled: true } }] } }));
+test('profiles with legacy Classic settings retain every shop item and Event in the portfolio', () => {
+  const html = renderToStaticMarkup(React.createElement(PortfolioSite, { slug: 'owner', preview: true, data: { name: 'Owner', page: { template: 'classic', placement: { Books: 'side' } }, contributions: [{ category: 'Books', offerings: Array.from({ length: 7 }, (_, i) => ({ id: i + 1, title: `Classic item ${i + 1}`, pricing: i % 2 ? 'paid' : 'free', price: i % 2 ? 49 : null, currency: 'INR' })) }], portfolio: { products: [{ id: 'extra', title: 'Extra guide', pricing: 'free', accessReady: true }] }, events: [{ id: 8, title: 'Classic meetup', startsAt: '2026-12-10T10:00:00Z', rsvp: { enabled: true } }] } }));
   for (const text of ['Classic item 7', 'Classic meetup', 'Extra guide', 'Get free', 'Buy now']) assert.ok(html.includes(text), `Missing ${text}`);
 });
 

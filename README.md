@@ -4,7 +4,7 @@ The Streamlit admin and the static chat page are now one React app (Vite) with V
 
 ```
  you ──► React admin (/admin) ──► /api/admin ──► Supabase  ◄── /api/chat ◄── visitor's browser
-         upload, edit, topics,    (auth, files,    Postgres +     embeds the question,   (/ or /u/:slug:
+         upload, edit, topics,    (auth, files,    Postgres +     embeds the question,   (/p/:slug/chat:
          writing, index           index, invites)  pgvector +     searches, asks Gemini   the dotted ball)
                                                    file storage
 ```
@@ -13,24 +13,26 @@ The Streamlit admin and the static chat page are now one React app (Vite) with V
 |---|---|
 | `admin/streamlit_app.py`, `admin/pages/*.py` | `src/pages/*.jsx` (Overview, File manager, Add files, Research topics, Writing, Templates, Knowledge index, Invites, Login) |
 | `admin/lib/{auth,tenant,store,indexer,chunker,embed,extract,search}.py` | `server/*.js` (same logic, same chunk/hash rules) |
-| `web/index.html` (the ball) | `src/pages/Ball.jsx` |
+| `web/index.html` (the ball) | `src/components/portfolio/Chat.jsx` inside Portfolio |
 | `web/api/chat.js` | `api/chat.js` (now per-user via `slug`) |
 | `streamlit-quill` | `react-quill-new` |
 | pypdf / python-docx | `unpdf` / `mammoth` |
 
 ## Routes
 - `/`: the members' **home page** (see below). Anyone can browse; nobody can join without an invite.
-- `/p/:slug`: a member's **profile home page**, with their photo, Events, free and paid shop items, and contact options.
-- `/u/:slug`: that member's **persona** (the dotted ball you chat with).
+- `/p/:slug`: a member's **Portfolio home page**, with their photo, Events, free and paid shop items, and contact options.
+- `/p/:slug/chat`: that member's **persona Chat**, using the same Portfolio navigation and appearance.
+- `/u/:slug`: redirects existing shared links to `/p/:slug/chat`.
 - `/admin`: sign in / create account, then the admin pages. Invite links look like `/admin?invite=CODE`.
 - `/admin/purchases`: that owner's purchases, free claims, buyer details, fulfillment and shared payment settings.
+- `/admin/portfolio`: the single Portfolio editor, with Portfolio content, Look & Store, and Persona settings. Old `/admin/page` and `/admin/settings` links redirect here.
 
 ## Setup
 1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql`, `page.sql`, `portfolio.sql`, `engage.sql`, and `events-commerce.sql`. If your project already has those tables, compare first and run the migrations it is missing.
 2. **Env vars:** copy `.env.example` to `.env.local` (local) or add them in Vercel. `SESSION_SECRET` is new: any long random string.
 3. **Run locally:** `npm install`, `npm i -g vercel`, then `npm run dev` (first run asks you to log in and link a Vercel project; put your variables in `.env.local`). `npm run dev:web` runs only the UI and proxies `/api` to a `vercel dev` on port 3000.
 4. **Deploy:** import the repo in Vercel (framework: Vite). Root directory is the repo root. Add the env vars. Deploy.
-5. **First use:** create an account (put your email in `ADMIN_EMAILS` to see Invites), add files, open Knowledge index and press **Sync now**, then test retrieval and visit `/u/<your-slug>`.
+5. **First use:** create an account (put your email in `ADMIN_EMAILS` to see Invites), add files, open Knowledge Base and press **Sync now**, then test retrieval and visit `/p/<your-slug>/chat`.
 
 ## How uploads work now
 Files go from the browser straight to Supabase Storage using a one-time signed token (so Vercel's 4.5 MB body limit doesn't apply), then `/api/admin` extracts the text and creates the row. Zips are unzipped in the browser into folders. Storage paths are prefixed with the owner id.
@@ -56,21 +58,23 @@ Storage: `profiles`, `contributions`, `offerings` are separate tables. `profile_
 
 Cover images for books are a URL for now (no image upload yet).
 
-## Settings: your personal AI's background
-`/admin/settings` lets each user pick a picture for their public page (`/u/<slug>`, or `/` for `DEFAULT_SLUG`) and adjust it with a live preview (desktop and phone): zoom, focus (or drag the preview), blur, brightness, dark overlay, pointer movement, and whether the glowing ball shows and how strong it is.
+## Portfolio studio: appearance and persona settings
+Open **Projects** in the Studio sidebar, or `/admin/portfolio`. **Portfolio content** edits the photo, text, projects, products and menu. **Look & Store** controls backgrounds, fonts, accents, glass panels, section visibility and offering categories. **Persona settings** controls Chat greetings, suggested questions, microphone, sources, portrait placement, the sphere and background image. The editor previews the relevant Portfolio page and saves these settings together.
+
+Background controls include zoom, horizontal and vertical focus, blur, brightness, dark overlay and pointer parallax. Choose **My background image** in Look to display the image across Portfolio pages. Sphere visibility, size and glow affect Chat.
 
 - Run `supabase/settings.sql` after `registration.sql`. It adds `site_settings` and a **public** `backgrounds` bucket (images only, 3 MB max).
-- The browser shrinks the picture to 2200 px, re-encodes it (removing hidden photo data such as GPS), then uploads it straight to storage with a one-time token. The server checks the path belongs to the user, deletes the old image when you replace it, and clamps every setting to a safe range.
-- Visitors read `/api/site?slug=...`, which returns only the image URL and the look.
-- UI: the settings page and the public page use [open-glass-ui](https://github.com/moekoelueker/open-glass-ui) (`npm i open-glass-ui`, MIT, no runtime dependencies). The rest of the admin keeps its existing styling.
+- The browser shrinks the picture to 2200 px, re-encodes it (removing hidden photo data such as GPS), then uploads it straight to storage with a one-time token. The server validates both image uploads, saves one settings row, and then removes replaced images. A cleanup failure reports a saved-settings warning.
+- Portfolio reads its published appearance from `/api/profile?slug=...`. The background-only `/api/site` API remains available for existing integrations.
+- The Studio overview uses a white sidebar, green accents, a personal greeting, command bar and four shortcuts. The command bar opens the matching editor or tool; it does not perform AI edits automatically.
 
 ## Members' home page (`/`)
 A private platform: set `REGISTRATION_MODE=invite` (now the default in `.env.example`) so an account needs a code from **Admin → Invites**. Visitors browse without an account.
 
 - **Navbar:** site name (`SITE_NAME`), Sign in / Dashboard, and "I have an invite".
 - **Rails under the navbar:** Top rated, Most viewed, In demand, Latest. A rail with nothing in it is hidden, so a new platform just shows Latest. The category chips and the search box re-rank the rails and filter the cards instantly (`shared/ranking.js`).
-- **Member cards:** one for every *published* profile (draft profiles and hidden sections never appear; everything goes through `buildPublic`). A card opens `/p/:slug`, never the persona. The card's picture is the member's persona background if they set one.
-- **Profile:** **Open persona** goes to `/u/:slug`. **Talk to me** shows the email and phone the member chose to publish; if they published none, it points to their persona instead.
+- **Member cards:** one for every *published* profile (draft profiles and hidden sections never appear; everything goes through `buildPublic`). A card opens `/p/:slug`. The card's picture is the member's background if they set one.
+- **Portfolio:** the Chat navigation item and default **Chat with my AI** button open `/p/:slug/chat`. Published contact details and the optional contact form remain inside the same Portfolio.
 - **Data:** `api/home.js` (one cached read) and `api/track.js` (counters). Run `supabase/home.sql` once.
 
 How the numbers work:
@@ -81,11 +85,12 @@ How the numbers work:
 
 
 ## Portfolio pages (`/p/<slug>` and its sub-pages)
-The public profile now has a **portfolio** style (the default; the old chat-greeting + store page stays available as **Classic**).
+Every public profile uses **Portfolio**, including profiles previously saved as Classic. The standalone persona and Classic page components have been removed; existing appearance settings are retained by the unified editor.
 
 | URL | Shows | Appears when |
 |---|---|---|
 | `/p/<slug>` | Hero with circular photo, Events and attendance, featured projects, every visible free and paid shop item | always |
+| `/p/<slug>/chat` | Persona answers, suggested questions, optional microphone and sources, sphere and profile card | always |
 | `/p/<slug>/work` | every project (card grid, tech chips, award, links, pop-up details) | at least one project |
 | `/p/<slug>/products` | your portfolio products **plus** visible offerings, with free claims and Razorpay checkout | at least one product or offering |
 | `/p/<slug>/experience` | timeline + education | any experience or education |
@@ -93,7 +98,7 @@ The public profile now has a **portfolio** style (the default; the old chat-gree
 | `/p/<slug>/about` | story, skills, published contact details, social links | any of those |
 | `/p/<slug>/updates` | announcements, schedule, Events and response forms | at least one published item |
 
-**Every profile has its own text for every field** (`site_settings.portfolio`, one JSON document per owner, edited at **Admin → Portfolio Pages** with a live preview).
+**Every profile has its own text for every field** (`site_settings.portfolio`, one JSON document per owner, edited in **Portfolio studio → Portfolio content** with a live preview).
 **Nothing is shown unless it exists.** `src/lib/portfolioModel.js` decides which blocks and sub-pages exist; the menu lists only pages with content; the layout (`src/styles/portfolio.css`) uses auto-fit grids so a missing photo, stats row, domain list, project image or whole section re-flows instead of leaving a hole. A missing hero photo becomes a monogram, a broken image URL falls back to an icon tile, and a sub-page with no content redirects home.
 
 Sensible defaults come from the real profile when a field is left empty: title line = designation, intro = purpose, "What I do" = expertise, numbers = years of experience / projects / products, experience = employers, About = purpose.
@@ -123,7 +128,7 @@ Run `supabase/engage.sql` once (after `portfolio.sql`). It adds the `updates` an
 
 Protections on `/api/enquiry`: everything is re-validated on the server, a hidden honeypot field catches bots, 5 enquiries per visitor per hour (stored as a salted hash, never the IP), an identical resend within a day is not stored twice, and an offering can only be attached if it belongs to that member and is active.
 
-Notes: there is no email notification yet (enquiries are read in the admin). The **Classic** template includes Events and checkout. Announcements, schedule and the contact page remain part of the Portfolio template.
+Notes: there is no email notification yet (enquiries are read in the admin). Portfolio includes Events, checkout, announcements, schedule and the contact page.
 
 ## Shared Razorpay checkout
 

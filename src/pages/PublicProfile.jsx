@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import ProfilePage from '../components/ProfilePage.jsx';
 import PortfolioSite from '../components/portfolio/PortfolioSite.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { track } from '../lib/track.js';
@@ -11,11 +10,13 @@ export default function PublicProfile() {
   const [data, setData] = useState(undefined);   // undefined = loading, null = nothing to show
 
   useEffect(() => {
+    const controller = new AbortController();
     setData(undefined);
-    fetch(`/api/profile?slug=${encodeURIComponent(slug || '')}`)
+    fetch(`/api/profile?slug=${encodeURIComponent(slug || '')}`, { signal: controller.signal })
       .then(r => (r.ok ? r.json() : null))
-      .then(d => { setData(d); if (d?.name) document.title = `${d.name} · Persona`; }, () => setData(null));
+      .then(d => { if (!controller.signal.aborted) { setData(d); if (d?.name) document.title = `${d.name} · Portfolio`; } }, () => { if (!controller.signal.aborted) setData(null); });
     track({ kind: 'profile', slug });
+    return () => controller.abort();
   }, [slug]);
 
   if (data === undefined) return <p className="muted" style={{ padding: 40, textAlign: 'center' }}>Loading…</p>;
@@ -26,6 +27,5 @@ export default function PublicProfile() {
         <Link to="/" style={{ color: '#6d4aff', fontWeight: 600 }}>← Back to the home page</Link></div>
     </div>
   );
-  if (data.page?.template === 'classic') return <ProfilePage data={data} slug={data.slug || slug} user={auth?.user} />;
   return <PortfolioSite data={data} slug={data.slug || slug} sub={sub} user={auth?.user} />;
 }

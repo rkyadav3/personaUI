@@ -319,7 +319,7 @@ export async function previewProfile(db, slug) {
   return decorate(buildPublic(profile, contributions), slug, site, engage);
 }
 
-/** What the persona page (/u/<slug>) shows beside the chat: the person's name, whether a public profile exists, and every
+/** Legacy offers API: the person's name, whether a public profile exists, and every
  *  offering they have published. Built from buildPublic, so hidden, disabled or inactive things never appear here either. */
 export async function publicOffers(slug) {
   slug = String(slug || process.env.DEFAULT_SLUG || '').toLowerCase().replace(/[^a-z0-9-]/g, '');

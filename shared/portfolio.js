@@ -4,8 +4,8 @@
 // Shared by the editor, the page and the server. Whatever comes in, what comes out is safe to store and render.
 import { ENQUIRY_TYPES } from './enquiryTypes.js';
 
-export const PORTFOLIO_PAGES = ['home', 'work', 'products', 'experience', 'talks', 'updates', 'about', 'contact'];
-export const PAGE_LABELS = { home: 'Home', work: 'Work', products: 'Shop', experience: 'Experience', talks: 'Talks', updates: 'Updates', about: 'About', contact: 'Contact' };
+export const PORTFOLIO_PAGES = ['home', 'work', 'products', 'experience', 'talks', 'updates', 'about', 'chat', 'contact'];
+export const PAGE_LABELS = { home: 'Home', work: 'Work', products: 'Shop', experience: 'Experience', talks: 'Talks', updates: 'Updates', about: 'About', chat: 'Chat', contact: 'Contact' };
 export const SOCIAL_KINDS = { github: 'GitHub', linkedin: 'LinkedIn', x: 'X (Twitter)', instagram: 'Instagram', youtube: 'YouTube', email: 'Email', website: 'Website' };
 export const ICON_NAMES = ['spark', 'cpu', 'box', 'layers', 'cloud', 'code', 'chart', 'book', 'mic', 'users', 'globe', 'shield', 'pen', 'briefcase', 'heart', 'trophy'];
 export const PRODUCT_STATUS = ['', 'Live', 'Beta', 'In progress', 'Concept'];

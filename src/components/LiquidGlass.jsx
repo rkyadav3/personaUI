@@ -14,7 +14,7 @@ const REFRACT = canRefract();
 export default function LiquidGlass({ as: Tag = 'div', radius, refract = false, className = '', style, children, ...rest }) {
   const g = useGlass(), uid = `lg${useId().replace(/:/g, '')}`, ref = useRef(null);
   const [box, setBox] = useState(null);
-  const r = radius ?? 24;
+  const r = radius ?? g.radius ?? 24;
   const want = g.on && refract && REFRACT && g.refraction > 0;
 
   useLayoutEffect(() => {

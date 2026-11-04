@@ -44,9 +44,16 @@ export async function saveSettings(db, { bg, path }) {
 }
 
 /** Save the look of the public profile page (/p/<slug>), and optionally switch its hero photo (the old file is deleted). */
-export async function savePage(db, { page, portfolio, heroPath }) {
+export async function savePage(db, { page, portfolio, heroPath, bg, path }, storageOverride) {
   const cur = await row(db);
   const patch = { updated_at: new Date().toISOString() };
+  if (bg !== undefined) patch.bg = normalizeBg(bg);
+  const uploads = [['hero_path', heroPath], ['bg_path', path]];
+  // Validate ownership for both uploads before writing or deleting either image.
+  for (const [, imagePath] of uploads) {
+    if (imagePath !== undefined && imagePath !== null && (typeof imagePath !== 'string' || !imagePath.startsWith(`${db.uid}/`) || imagePath.slice(db.uid.length + 1).includes('/') || imagePath.includes('..'))) throw new Error('Bad image path.');
+  }
+  const storage = () => storageOverride || raw().storage.from(BG_BUCKET);
   if (page !== undefined) patch.page = normalizePage(page);                       // each editor sends only what it owns
   if (portfolio !== undefined) {
     patch.portfolio = normalizePortfolio(portfolio);
@@ -56,13 +63,14 @@ export async function savePage(db, { page, portfolio, heroPath }) {
       ids.add(id); return { ...product, id };
     });
   }
-  if (heroPath !== undefined) {
-    if (heroPath !== null && !String(heroPath).startsWith(`${db.uid}/`)) throw new Error('Bad image path.');
-    if (heroPath !== null) {
-      const { data } = await raw().storage.from(BG_BUCKET).list(db.uid, { search: heroPath.split('/').pop() });
-      if (!data?.length) throw new Error('The image upload was not found. Try again.');
+  for (const [column, imagePath] of uploads) {
+    if (imagePath === undefined) continue;
+    if (imagePath !== null) {
+      const filename = imagePath.split('/').pop();
+      const { data, error } = await storage().list(db.uid, { search: filename });
+      if (error || !data?.some(file => file.name === filename)) throw new Error('The image upload was not found. Try again.');
     }
-    patch.hero_path = heroPath;
+    patch[column] = imagePath;
   }
   try {
     if (cur) await run(db.from('site_settings').update(patch).eq('id', cur.id)); else await run(db.from('site_settings').insert(patch));
@@ -70,11 +78,22 @@ export async function savePage(db, { page, portfolio, heroPath }) {
     if (/hero_path|\bpage\b|portfolio/i.test(e.message)) throw new Error('The database is missing the new columns. Run supabase/page.sql and supabase/portfolio.sql in the Supabase SQL editor, then try again.');
     throw e;
   }
-  if (heroPath !== undefined && cur?.hero_path && cur.hero_path !== heroPath) await removeFile(cur.hero_path);
-  return getSettings(db);
+  const retained = new Set([patch.hero_path === undefined ? cur?.hero_path : patch.hero_path, patch.bg_path === undefined ? cur?.bg_path : patch.bg_path].filter(Boolean));
+  const stale = [...new Set(uploads.filter(([column, imagePath]) => imagePath !== undefined && cur?.[column] && cur[column] !== imagePath && !retained.has(cur[column])).map(([column]) => cur[column]))];
+  let warning;
+  if (stale.length) {
+    try {
+      const removed = await storage().remove(stale);
+      if (removed?.error) warning = 'Your settings were saved, but an older image could not be removed.';
+    } catch {
+      warning = 'Your settings were saved, but an older image could not be removed.';
+    }
+  }
+  const settings = await getSettings(db);
+  return warning ? { ...settings, warning } : settings;
 }
 
-/** Public: what a visitor of /u/<slug> (or the root page) needs to draw the background. Nothing else. */
+/** Background-only public API retained for existing integrations. Portfolio reads its settings through /api/profile. */
 export async function publicSettings(slug) {
   slug = String(slug || env('DEFAULT_SLUG', '')).toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return null;

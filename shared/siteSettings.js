@@ -1,4 +1,4 @@
-// Per-user look of the public "personal AI" page. Shared by the settings page, the public page and the server.
+// Per-user background and sphere settings. Shared by the Portfolio editor, public Portfolio and server.
 export const BG_DEFAULTS = {
   x: 50, y: 50,          // focal point, % (what stays centred when the screen shape changes)
   zoom: 1,               // 1 to 3

@@ -1,5 +1,5 @@
 // What the owner can customise on their public page (/p/<slug>). Shared by the editor, the page and the server.
-// Empty text means "work it out from my real profile" (see ProfilePage.jsx), so a brand-new profile already looks right.
+// Empty text uses the published profile as a fallback on the portfolio and its Chat page.
 import { CATEGORIES } from './profileSchema.js';
 
 export const ACCENTS = {
@@ -14,7 +14,7 @@ export const PLACEMENT_DEFAULTS = {
 export const SECTION_LABELS = { store: 'Store', expertise: 'Expertise', education: 'Education', experience: 'Experience' };
 
 export const PAGE_DEFAULTS = {
-  template: 'portfolio',                          // 'portfolio' (home + Work / Products / Experience / Talks / About pages) or 'classic' (chat hero + store)
+  template: 'portfolio',                          // one public portfolio, including its Chat page
   headline: '', headlineAccent: '', subtitle: '', placeholder: '', tagline: '', about: '',
   chips: [],                                   // [{ label, prompt }], up to 6. Empty = chips made from what you offer.
   storeTitle: 'Store', storeSubtitle: '', storeLimit: 10,
@@ -50,7 +50,7 @@ export function normalizePage(input) {
     .map(c => ({ label: s(c?.label, 32), prompt: s(c?.prompt, 200) })).filter(c => c.label)
     .map(c => ({ ...c, prompt: c.prompt || c.label }));
   return {
-    template: i.template === 'classic' ? 'classic' : 'portfolio',
+    template: 'portfolio',
     headline: s(i.headline, 60), headlineAccent: s(i.headlineAccent, 40), subtitle: s(i.subtitle, 220), placeholder: s(i.placeholder, 120),
     tagline: s(i.tagline, 120), about: s(i.about, 600), chips,
     storeTitle: s(i.storeTitle, 40) || d.storeTitle, storeSubtitle: s(i.storeSubtitle, 140), storeLimit: Math.round(num(i.storeLimit, 2, 40, d.storeLimit)),

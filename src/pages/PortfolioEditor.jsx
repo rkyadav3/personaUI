@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ACCENTS, PAGE_DEFAULTS, normalizePage } from '../../shared/pageSettings.js';
+import { Link, useSearchParams } from 'react-router-dom';
+import { PAGE_DEFAULTS, normalizePage } from '../../shared/pageSettings.js';
 import { ICON_NAMES, PAGE_LABELS, PORTFOLIO_DEFAULTS, PORTFOLIO_PAGES, PRODUCT_STATUS, SOCIAL_KINDS, normalizePortfolio } from '../../shared/portfolio.js';
-import { BG_BUCKET } from '../../shared/siteSettings.js';
+import { BG_BUCKET, normalizeBg } from '../../shared/siteSettings.js';
 import PortfolioSite from '../components/portfolio/PortfolioSite.jsx';
 import { Field, Notice } from '../components/Ui.jsx';
 import { api } from '../lib/api.js';
@@ -10,6 +10,8 @@ import { useAuth } from '../lib/auth.jsx';
 import { prepareImage } from '../lib/image.js';
 import { uploadToSigned } from '../lib/storage.js';
 import { CHECKOUT_CURRENCIES } from '../../shared/commerce.js';
+import { LookControls, PersonaControls, StoreControls } from '../components/portfolio/PortfolioControls.jsx';
+import '../styles/portfolioEditor.css';
 
 const W = 1320;   // the page is drawn at this width and scaled down into the preview column
 
@@ -61,29 +63,55 @@ function Repeater({ items, onChange, blank, max, noun, title, children }) {
   );
 }
 
-const TABS = { hero: 'Home top', numbers: 'Numbers', projects: 'Projects', products: 'Products', experience: 'Experience', talks: 'Talks', about: 'About', design: 'Look' };
-const TAB_PAGE = { hero: 'home', numbers: 'home', projects: 'work', products: 'products', experience: 'experience', talks: 'talks', about: 'about', design: 'home' };
+const CONTENT_TABS = { hero: 'Home top', numbers: 'Numbers', projects: 'Projects', products: 'Products', experience: 'Experience', talks: 'Talks', about: 'About', design: 'Navigation' };
+const AREAS = { content: 'Portfolio content', look: 'Look & Store', persona: 'Persona settings' };
+const TAB_PAGE = { hero: 'home', numbers: 'home', projects: 'work', products: 'products', experience: 'experience', talks: 'talks', about: 'about', design: 'home', look: 'home', store: 'products', persona: 'chat' };
+
+function Tabs({ items, active, onChange, prefix, label, controls = 'portfolio-area-panel' }) {
+  const entries = Object.entries(items);
+  function keydown(event, index) {
+    let next = index;
+    if (event.key === 'ArrowRight') next = (index + 1) % entries.length;
+    else if (event.key === 'ArrowLeft') next = (index - 1 + entries.length) % entries.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = entries.length - 1;
+    else return;
+    event.preventDefault(); onChange(entries[next][0]);
+    event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next]?.focus();
+  }
+  return <div className="pp-tabs" role="tablist" aria-label={label}>{entries.map(([key, text], index) => <button type="button" key={key} id={`${prefix}-${key}`} role="tab" aria-selected={active === key} aria-controls={controls} tabIndex={active === key ? 0 : -1} className={active === key ? 'on' : ''} onClick={() => onChange(key)} onKeyDown={event => keydown(event, index)}>{text}</button>)}</div>;
+}
 
 export default function PortfolioEditor() {
   const { user } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const tab = Object.hasOwn(TAB_PAGE, params.get('tab')) ? params.get('tab') : 'hero';
+  const area = tab === 'persona' ? 'persona' : ['look', 'store'].includes(tab) ? 'look' : 'content';
+  const setTab = value => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next, { replace: true }); };
   const [saved, setSaved] = useState(null), [page, setPage] = useState(PAGE_DEFAULTS), [pf, setPf] = useState(PORTFOLIO_DEFAULTS), [data, setData] = useState(undefined);
-  const [pending, setPending] = useState(null), [removed, setRemoved] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState(null), [tab, setTab] = useState('hero');
+  const [bg, setBg] = useState(normalizeBg()), [pendingBg, setPendingBg] = useState(null), [removedBg, setRemovedBg] = useState(false);
+  const [pending, setPending] = useState(null), [removed, setRemoved] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState(null);
 
   useEffect(() => {
-    api('site.get').then(s => { setSaved(s); setPage(s.page); setPf(s.portfolio); }, e => setMsg({ kind: 'error', t: e.message }));
+    api('site.get').then(s => { setSaved(s); setPage(s.page); setPf(s.portfolio); setBg(s.bg); }, e => setMsg({ kind: 'error', t: e.message }));
     api('page.preview').then(setData, () => setData(null));
   }, []);
   useEffect(() => () => { if (pending) URL.revokeObjectURL(pending.url); }, [pending]);
+  useEffect(() => () => { if (pendingBg) URL.revokeObjectURL(pendingBg.url); }, [pendingBg]);
 
   if (!saved) return <p className="muted">{msg ? msg.t : 'Loading…'}</p>;
   if (data === null) return <Notice kind="info">Create your profile first (Profile &amp; Offerings). Your pages are built from it.</Notice>;
 
   const hero = removed ? null : pending?.url || saved.heroUrl;
+  const background = removedBg ? null : pendingBg?.url || saved.imageUrl;
   const normPf = normalizePortfolio(pf), normPage = normalizePage(page);
-  const dirty = !!pending || removed || JSON.stringify(normPf) !== JSON.stringify(saved.portfolio) || JSON.stringify(normPage) !== JSON.stringify(saved.page);
+  const dirty = !!pending || removed || !!pendingBg || removedBg || JSON.stringify(normalizeBg(bg)) !== JSON.stringify(saved.bg) || JSON.stringify(normPf) !== JSON.stringify(saved.portfolio) || JSON.stringify(normPage) !== JSON.stringify(saved.page);
   const set = patch => setPf(p => ({ ...p, ...patch }));
   const setIn = (k, patch) => setPf(p => ({ ...p, [k]: { ...p[k], ...patch } }));
-  const setPg = patch => setPage(p => ({ ...p, ...patch }));
+  const setPg = patch => {
+    setPage(p => ({ ...p, ...patch }));
+    if (Object.hasOwn(patch, 'storeTitle')) setPf(p => ({ ...p, productsTitle: patch.storeTitle }));
+  };
 
   async function choose(file) {
     if (!file) return;
@@ -95,29 +123,42 @@ export default function PortfolioEditor() {
     try {
       let heroPath;
       if (pending) { const s = await api('site.sign', { type: pending.type }); await uploadToSigned(s.path, s.token, pending.blob, BG_BUCKET); heroPath = s.path; } else if (removed) heroPath = null;
-      const r = await api('page.save', { page, portfolio: pf, heroPath });
-      setSaved(r); setPage(r.page); setPf(r.portfolio); setPending(null); setRemoved(false);
-      setMsg({ kind: 'success', t: 'Saved. Your public pages now look like the preview (visitors may need up to 30 seconds to see it).' });
+      let path;
+      if (pendingBg) { const s = await api('site.sign', { type: pendingBg.type }); await uploadToSigned(s.path, s.token, pendingBg.blob, BG_BUCKET); path = s.path; } else if (removedBg) path = null;
+      const r = await api('page.save', { page, portfolio: pf, heroPath, bg, path });
+      setSaved(r); setPage(r.page); setPf(r.portfolio); setBg(r.bg); setPending(null); setRemoved(false); setPendingBg(null); setRemovedBg(false);
+      setMsg({ kind: r.warning ? 'info' : 'success', t: r.warning || 'Saved. Your portfolio, shop and persona settings are published together (visitors may need up to 30 seconds to see them).' });
     } catch (e) { setMsg({ kind: 'error', t: e.message }); }
     setBusy(false);
   }
 
-  const preview = data && { ...data, page: normPage, portfolio: normPf };
+  async function chooseBackground(file) {
+    if (!file) return;
+    try { const picture = await prepareImage(file); setPendingBg({ ...picture, url: URL.createObjectURL(picture.blob) }); setRemovedBg(false); setBg(b => ({ ...b, x: 50, y: 50, zoom: 1 })); setPg({ theme: { ...page.theme, bg: 'image' } }); setMsg(null); }
+    catch (e) { setMsg({ kind: 'error', t: e.message }); }
+  }
+
+  const preview = data && { ...data, page: normPage, portfolio: normPf, bgImage: background, bg: normalizeBg(bg) };
   const real = data || {};
   return (
-    <>
+    <div className="portfolio-editor">
       <div className="head" style={{ marginBottom: 8 }}>
-        <div><h1>Portfolio Pages</h1><p className="muted" style={{ margin: 0 }}>Your home page and the Work, Products, Experience, Talks and About pages at <code>/p/{user.slug}</code>. Anything you leave empty is simply left out, and the page re-flows to look complete.</p></div>
+        <div><h1>Portfolio studio</h1><p className="muted" style={{ margin: 0 }}>One public profile at <code>/p/{user.slug}</code> with your work, shop and Chat. Edit the content, appearance and persona here.</p></div>
         <div className="row">
           {user.slug && <a className="btn" href={`/p/${user.slug}`} target="_blank" rel="noreferrer">View live ↗</a>}
           <button className="btn primary" disabled={!dirty || busy} onClick={save}>{busy ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}</button>
         </div>
       </div>
       <Notice kind={msg?.kind}>{msg?.t}</Notice>
-      {normPage.template === 'classic' && <Notice kind="info">Your public page currently uses the <b>Classic</b> style. Choose <b>Portfolio</b> under <Link to="/admin/page">Look &amp; Store → Layout</Link> (or in the Look tab here) to show these pages.</Notice>}
+      <div className="portfolio-areas"><Tabs items={AREAS} active={area} prefix="portfolio-area" label="Portfolio settings" onChange={key => setTab(key === 'content' ? 'hero' : key)} /></div>
       <div className="pp-editor">
-        <div className="pp-form">
-          <div className="pp-tabs" role="tablist">{Object.entries(TABS).map(([k, v]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{v}</button>)}</div>
+        <div className="pp-form" id="portfolio-area-panel" role="tabpanel" aria-labelledby={`portfolio-area-${area}`}>
+          {area === 'content' && <Tabs items={CONTENT_TABS} active={tab} prefix="portfolio-content" controls="portfolio-content-panel" label="Portfolio content pages" onChange={setTab} />}
+          {area === 'look' && <Tabs items={{ look: 'Look', store: 'Store & sections' }} active={tab} prefix="portfolio-content" controls="portfolio-content-panel" label="Look and Store" onChange={setTab} />}
+          <div className="pp-content" id="portfolio-content-panel" role={area !== 'persona' ? 'tabpanel' : undefined} aria-labelledby={area !== 'persona' ? `portfolio-content-${tab}` : undefined}>
+          {tab === 'look' && <LookControls page={normPage} setPage={setPg} imageUrl={background} />}
+          {tab === 'store' && <StoreControls page={{ ...normPage, storeTitle: normPf.productsTitle || normPage.storeTitle }} setPage={setPg} />}
+          {tab === 'persona' && <PersonaControls page={page} bg={bg} setPage={setPg} setBg={patch => setBg(b => ({ ...b, ...patch }))} imageUrl={background} onChooseBackground={chooseBackground} onRemoveBackground={() => { setPendingBg(null); setRemovedBg(true); }} />}
 
           {tab === 'hero' && <>
             <section className="card"><h3>Photo</h3>
@@ -253,13 +294,6 @@ export default function PortfolioEditor() {
           )}
 
           {tab === 'design' && <>
-            <section className="card"><h3>Page style</h3>
-              <Field label="Public page style"><select value={page.template} onChange={e => setPg({ template: e.target.value })}><option value="portfolio">Portfolio (these pages)</option><option value="classic">Classic (chat greeting + store)</option></select></Field>
-              <h4 style={{ margin: '12px 0 6px' }}>Accent colour</h4>
-              <div className="row">{Object.entries(ACCENTS).map(([k, [a, b]]) => <button key={k} className="btn" aria-pressed={!page.accentHex && page.accent === k} title={k} onClick={() => setPg({ accent: k, accentHex: '' })} style={{ width: 44, height: 44, padding: 0, borderRadius: '50%', background: `linear-gradient(135deg,${a},${b})`, outline: !page.accentHex && page.accent === k ? '3px solid #14122e' : 'none', outlineOffset: 2 }} />)}
-                <label className="toggle">Custom <input type="color" value={page.accentHex || ACCENTS[page.accent][0]} onChange={e => setPg({ accentHex: e.target.value })} /></label></div>
-              <p className="hint">More options (fonts, corner roundness, dark background) are under Look &amp; Store.</p>
-            </section>
             <section className="card"><h3>Menu names</h3>
               <p className="hint">Only pages that have content appear in the menu. Rename them here.</p>
               <div className="cols c2">{PORTFOLIO_PAGES.map(k => <Txt key={k} label={PAGE_LABELS[k]} value={pf.navLabels[k]} max={16} ph={PAGE_LABELS[k]} onChange={v => setIn('navLabels', { [k]: v })} />)}</div>
@@ -268,11 +302,12 @@ export default function PortfolioEditor() {
               <Txt label="Footer line" value={pf.footerNote} max={120} ph="Building things that matter." onChange={v => set({ footerNote: v })} />
             </section>
           </>}
+          </div>
         </div>
 
         <div className="pp-prev"><div className="pp-prev-label">Live preview · {PAGE_LABELS[TAB_PAGE[tab]]}</div>
           <ScaledPreview>{preview ? <PortfolioSite data={preview} slug={user.slug} sub={TAB_PAGE[tab]} preview heroOverride={hero} /> : <p className="muted">Loading…</p>}</ScaledPreview></div>
       </div>
-    </>
+    </div>
   );
 }

@@ -3,6 +3,7 @@
 // sub-pages exist, and each hero block says whether it should render. The components never test raw data themselves.
 import { PAGE_LABELS, ICON_NAMES, normalizePortfolio } from '../../shared/portfolio.js';
 import { fmtPrice } from './money.js';
+import { normalizePage } from '../../shared/pageSettings.js';
 
 export const split = s => String(s || '').split(',').map(x => x.trim()).filter(Boolean);
 const firstWord = s => String(s || '').trim().split(/\s+/)[0];
@@ -21,7 +22,7 @@ const CAT_ICON = { Books: 'book', Content: 'pen', 'Information & Knowledge': 'la
 const SINGULAR = { Books: 'Book', 'Other Contributions': 'Other', 'Information & Knowledge': 'Knowledge', 'Advice & Suggestions': 'Advice', 'In-Person Discussions': 'Discussion', 'Talk Shows': 'Talk show' };
 
 export function resolveSite(data, slug, heroOverride) {
-  const p = normalizePortfolio(data.portfolio), page = data.page || {}, cur = page.currency || 'INR';
+  const p = normalizePortfolio(data.portfolio), page = normalizePage(data.page), cur = page.currency;
   const name = data.name || '', me = firstWord(name), email = data.contact?.email || '';
   const photo = (heroOverride !== undefined ? heroOverride : data.hero) || '';
   const label = k => p.navLabels[k] || PAGE_LABELS[k];
@@ -44,19 +45,19 @@ export function resolveSite(data, slug, heroOverride) {
   const projects = p.projects.map(x => ({ ...x, techList: split(x.tech) }));
   const featured = projects.find(x => x.featured) || projects[0] || null;
   const others = featured ? projects.filter(x => x !== featured) : [];
-  const products = [...p.products.map(({ deliveryUrl, ...x }) => ({ kind: 'product', ...x, accessReady: x.accessReady ?? !!deliveryUrl, price: x.pricing === 'unspecified' ? x.price : fmtPrice({ pricing: x.pricing, price: x.amount, currency: x.currency }, cur), checkout: ['free', 'paid'].includes(x.pricing) ? { kind: 'product', id: x.id } : null })), ...offers, ...talkOffers];
+  const products = page.sections.store ? [...p.products.map(({ deliveryUrl, ...x }) => ({ kind: 'product', ...x, accessReady: x.accessReady ?? !!deliveryUrl, price: x.pricing === 'unspecified' ? x.price : fmtPrice({ pricing: x.pricing, price: x.amount, currency: x.currency }, cur), checkout: ['free', 'paid'].includes(x.pricing) ? { kind: 'product', id: x.id } : null })), ...offers, ...talkOffers] : [];
   const exp = data.experience || null;
-  const experience = p.experience.length ? p.experience : (exp?.employers || []).map(e => ({ role: e.role, company: e.company, period: e.duration, summary: '' }));
-  const experienceNote = p.experience.length ? '' : (exp?.description || '');
-  const education = data.education || [];
+  const experience = page.sections.experience ? (p.experience.length ? p.experience : (exp?.employers || []).map(e => ({ role: e.role, company: e.company, period: e.duration, summary: '' }))) : [];
+  const experienceNote = page.sections.experience && !p.experience.length ? (exp?.description || '') : '';
+  const education = page.sections.education ? data.education || [] : [];
   const talks = [...p.talks.map(t => ({ kind: 'talk', ...t })), ...talkOffers.map(t => ({ kind: 'offering', id: t.id, title: t.title, event: t.status, date: '', summary: t.summary, url: t.url, linkLabel: t.linkLabel }))];
-  const expertise = data.expertise || [];
-  const skills = [...new Set([...split(p.about.skills), ...expertise])];
+  const expertise = page.sections.expertise ? data.expertise || [] : [];
+  const skills = page.sections.expertise ? [...new Set([...split(p.about.skills), ...expertise])] : [];
   const contact = data.contact || null;
 
   // ---- hero
-  const domains = (p.domains.length ? p.domains : expertise.slice(0, 6).map(label => ({ label, icon: '' }))).map((d, i) => ({ label: d.label, icon: d.icon || guessIcon(d.label, i) }));
-  const years = Number(exp?.total_years);
+  const domains = page.sections.expertise ? (p.domains.length ? p.domains : expertise.slice(0, 6).map(label => ({ label, icon: '' }))).map((d, i) => ({ label: d.label, icon: d.icon || guessIcon(d.label, i) })) : [];
+  const years = page.sections.experience ? Number(exp?.total_years) : 0;
   const stats = p.stats.length ? p.stats : [
     ...(years > 0 ? [{ value: `${Math.round(years)}+`, label: years === 1 ? 'Year of Experience' : 'Years of Experience' }] : []),
     ...(projects.length ? [{ value: `${projects.length}`, label: projects.length === 1 ? 'Project Built' : 'Projects Built' }] : []),
@@ -65,8 +66,9 @@ export function resolveSite(data, slug, heroOverride) {
   const socials = [...p.socials];
   if (email && !socials.some(s => s.kind === 'email')) socials.push({ kind: 'email', url: `mailto:${email}` });
   const updates = data.updates || [], schedule = data.schedule || [], events = data.events || [], enquiry = p.enquiry;
-  const ctaUrl = p.cta.url || (enquiry.enabled ? `/p/${slug}/contact` : email ? `mailto:${email}` : `/u/${slug}`);   // the form beats a bare mailto
-  const about = data.purpose || '';
+  const chatUrl = `/p/${slug}/chat`;
+  const ctaUrl = p.cta.url || (enquiry.enabled ? `/p/${slug}/contact` : email ? `mailto:${email}` : chatUrl);
+  const about = page.about || data.purpose || '';
   const aboutBody = p.about.body || about;
 
   const pages = [{ key: 'home' }];
@@ -76,6 +78,7 @@ export function resolveSite(data, slug, heroOverride) {
   if (talks.length) pages.push({ key: 'talks' });
   if (updates.length || schedule.length || events.length) pages.push({ key: 'updates' });
   if (aboutBody || skills.length || contact || socials.length) pages.push({ key: 'about' });
+  pages.push({ key: 'chat' });
   if (enquiry.enabled) pages.push({ key: 'contact' });
 
   return {
@@ -83,14 +86,14 @@ export function resolveSite(data, slug, heroOverride) {
     brand: p.brand || name || 'Portfolio',
     pages: pages.map(x => ({ ...x, label: label(x.key), path: x.key === 'home' ? `/p/${slug}` : `/p/${slug}/${x.key}` })),
     navCta: { label: p.navCta.label || 'Let’s Connect', url: p.navCta.url || ctaUrl },
-    greeting: p.greeting || 'Hi I’m', heroName: p.heroName || me || name, titleLine: p.titleLine || data.designation || '',
+    greeting: p.greeting || 'Hi I’m', heroName: p.heroName || me || name, titleLine: p.titleLine || page.tagline || data.designation || '',
     bio: p.bio || clip(about, 230), awards: p.awards, availability: p.availability.show ? (p.availability.text || 'Available for new opportunities') : '',
     socials, domains, stats,
     cta: { label: p.cta.label || 'Work with me', url: ctaUrl },
-    intro: p.intro.url ? { label: p.intro.label || 'Watch Introduction', url: p.intro.url, video: true } : { label: p.intro.label || 'Chat with my AI', url: `/u/${slug}`, video: false },
+    intro: p.intro.url ? { label: p.intro.label || 'Watch Introduction', url: p.intro.url, video: true } : { label: p.intro.label || 'Chat with my AI', url: chatUrl, video: false },
     projects, featured, others,
     projectsKicker: p.projectsKicker || 'Featured work', projectsTitle: p.projectsTitle || 'Selected Projects',
-    products, productsKicker: p.productsKicker || 'Free & paid offerings', productsTitle: p.productsTitle || 'Shop',
+    products, productsKicker: p.productsKicker || 'Free & paid offerings', productsTitle: p.productsTitle || page.storeTitle || 'Shop', productsSubtitle: page.storeSubtitle,
     experience, experienceNote, education, talks, talksTitle: label('talks'), experienceTitle: label('experience'),
     aboutTitle: p.about.title || `About ${me || 'me'}`, aboutBody, skills, expertise, contact,
     footerNote: p.footerNote,

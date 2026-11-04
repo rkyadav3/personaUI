@@ -28,10 +28,10 @@ Every owner's **Purchases → Payment settings** shows whether the server is con
 ## Publish shop items
 
 - Under **Profile & Offerings**, edit each visible offering and choose Free or Paid. For paid items, set a positive price and currency.
-- Under **Portfolio Pages → Products**, add portfolio products with the same pricing options.
+- Under **Portfolio studio → Portfolio content → Products**, add portfolio products with the same pricing options.
 - Set an **Access / download link after checkout** on each item. This link is private until a free claim or verified payment completes. The public details link is for information that visitors can see before purchasing.
 - Activate the offering and keep its category visible. Categories explicitly hidden in Look & Store remain hidden.
-- All visible products and offerings appear on the profile home page and Shop page. The Classic style uses the same checkout.
+- All visible products and offerings appear on the Portfolio home page and Shop page. Shop visibility and offering categories are managed in **Look & Store**.
 
 Free items ask for buyer details, record a free claim, and display the confirmation and access link without Razorpay. Paid items create the server-priced Razorpay order and release the link only after signature, order, amount, currency and capture verification. Receipt recovery and the webhook can finish a captured payment when a browser callback is missed.
 

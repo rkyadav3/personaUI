@@ -268,8 +268,8 @@ export default function SuperAdmin() {
                         <div style={{ display: 'grid', gap: 2 }}>
                           <code>{u.slug}</code>
                           <div style={{ display: 'flex', gap: 6, fontSize: '.78rem' }}>
-                            <a href={`/u/${u.slug}`} target="_blank" rel="noreferrer" title="Chat with persona">
-                              Persona ↗
+                            <a href={`/p/${u.slug}/chat`} target="_blank" rel="noreferrer" title="Chat with persona">
+                              Chat ↗
                             </a>
                             <span>•</span>
                             <a href={`/p/${u.slug}`} target="_blank" rel="noreferrer" title="View public profile">
@@ -539,7 +539,7 @@ export default function SuperAdmin() {
                   required
                 />
               </Field>
-              <Field label="Profile Slug (/u/:slug, /p/:slug)">
+              <Field label="Portfolio slug (/p/:slug)">
                 <input
                   type="text"
                   value={editForm.slug}

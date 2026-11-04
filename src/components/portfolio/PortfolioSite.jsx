@@ -9,13 +9,16 @@ import Icon from './Icon.jsx';
 import { EventRow, UpdateCard } from './Updates.jsx';
 import Events from './Events.jsx';
 import Shop from '../commerce/Shop.jsx';
+import Chat from './Chat.jsx';
+import BackgroundLayer from '../BackgroundLayer.jsx';
+import LiquidGlass, { GlassProvider } from '../LiquidGlass.jsx';
 import '../../styles/portfolio.css';
 
 const luminance = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
 const paras = s => String(s || '').split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
 const isExt = u => /^https?:\/\//i.test(u);
 
-/** Link that opens outside links in a new tab and keeps everything else (mailto:, /u/slug) in place. */
+/** Opens outside links in a new tab and keeps contact links on the current page. */
 function A({ href, className, children, onClick, ...rest }) {
   if (!href) return null;
   const ext = isExt(href);
@@ -90,7 +93,7 @@ function Hero({ m, ctx }) {
             {m.domains.length > 0 && <ul className="pf-domains">{m.domains.map((d, i) => <li key={i}><Icon n={d.icon} size={16} />{d.label}</li>)}</ul>}
             <div className="pf-cta">
               <A className="pf-btn dark" href={m.cta.url}>{m.cta.label} <Icon n="arrow" size={16} /></A>
-              <A className="pf-btn" href={m.intro.url}><Icon n={m.intro.video ? 'play' : 'chat'} size={16} />{m.intro.label}</A>
+              {m.intro.video ? <A className="pf-btn" href={m.intro.url}><Icon n="play" size={16} />{m.intro.label}</A> : <GoTo className="pf-btn" to="chat" ctx={ctx}><Icon n="chat" size={16} />{m.intro.label}</GoTo>}
             </div>
           </div>
         </div>
@@ -143,10 +146,10 @@ function ProjectsHome({ m, ctx }) {
     <section className="pf-wrap pf-sec" id="work">
       <SectionHead kicker={m.projectsKicker} title={m.projectsTitle}
         action={m.projects.length > 1 || ctx.pages.some(p => p.key === 'work') ? <GoTo to="work" ctx={ctx} className="pf-more">View All Projects <Icon n="arrow" size={14} /></GoTo> : null} />
-      <div className="pf-panel">
+      <LiquidGlass className="pf-panel" refract>
         <FeaturedProject x={m.featured} ctx={ctx} />
         {rest.length > 0 && <div className={`pf-minis n${rest.length}`}>{rest.map((x, i) => <MiniProject key={i} x={x} ctx={ctx} />)}</div>}
-      </div>
+      </LiquidGlass>
     </section>
   );
 }
@@ -155,6 +158,7 @@ function ProductsHome({ m, ctx }) {
   return (
     <section className="pf-wrap pf-sec" id="products">
       <SectionHead kicker={m.productsKicker} title={m.productsTitle} action={<GoTo to="products" ctx={ctx} className="pf-more">Explore All <Icon n="arrow" size={14} /></GoTo>} />
+      {m.productsSubtitle && <p className="pf-shop-subtitle">{m.productsSubtitle}</p>}
       <Shop items={m.products} slug={ctx.slug} owner={m.owner} preview={ctx.preview} />
     </section>
   );
@@ -196,7 +200,7 @@ function WorkPage({ m, ctx }) {
       <PageTop kicker={m.projectsKicker} title={m.projectsTitle} />
       <section className="pf-wrap pf-sec tight"><div className="pf-cards">
         {sorted.map((x, i) => (
-          <article className="pf-card pf-proj" key={i}>
+          <LiquidGlass as="article" className="pf-card pf-proj" key={i}>
             <button type="button" className="pf-proj-img" onClick={() => ctx.open(x)} aria-label={`Details: ${x.title}`}>
               <Pic src={x.image} fallback={<Tile text={x.title} icon="spark" className="lg" />} />
               {x === m.featured && <span className="pf-pill sm feat">Featured</span>}
@@ -209,7 +213,7 @@ function WorkPage({ m, ctx }) {
               {(x.award || x.awardSub) && <div className="pf-line-award"><Icon n="trophy" size={15} />{[x.award, x.awardSub].filter(Boolean).join(' · ')}</div>}
               <div className="pf-feat-act"><ProjectLinks x={x} />{!x.demoUrl && !x.repoUrl && x.description && <button type="button" className="pf-btn sm" onClick={() => ctx.open(x)}>Details</button>}</div>
             </div>
-          </article>
+          </LiquidGlass>
         ))}
       </div></section>
     </>
@@ -219,7 +223,7 @@ function WorkPage({ m, ctx }) {
 function ProductsPage({ m, ctx }) {
   return (
     <>
-      <PageTop kicker={m.productsKicker} title={m.productsTitle} />
+      <PageTop kicker={m.productsKicker} title={m.productsTitle}>{m.productsSubtitle && <p className="pf-lead">{m.productsSubtitle}</p>}</PageTop>
       <section className="pf-wrap pf-sec tight"><Shop items={m.products} slug={ctx.slug} owner={m.owner} preview={ctx.preview} /></section>
     </>
   );
@@ -243,9 +247,9 @@ function ExperiencePage({ m }) {
           </ol>
         )}
         {m.education.length > 0 && (
-          <aside className="pf-card pf-edu"><h3><Icon n="book" size={18} /> Education</h3>
+          <LiquidGlass as="aside" className="pf-card pf-edu"><h3><Icon n="book" size={18} /> Education</h3>
             {m.education.map((e, i) => <p key={i}><b>{[e.qualification, e.specialization].filter(Boolean).join(', ')}</b>{e.institution && <small>{e.institution}</small>}</p>)}
-          </aside>
+          </LiquidGlass>
         )}
       </section>
     </>
@@ -258,11 +262,11 @@ function TalksPage({ m }) {
       <PageTop kicker="On stage & on air" title={m.talksTitle} />
       <section className="pf-wrap pf-sec tight"><div className="pf-list">
         {m.talks.map((t, i) => (
-          <article className="pf-card pf-talk" key={i}>
+          <LiquidGlass as="article" className="pf-card pf-talk" key={i}>
             <span className="pf-icon-box"><Icon n="mic" size={22} /></span>
             <div><h3>{t.title}</h3><small>{[t.event, t.date].filter(Boolean).join(' · ')}</small>{t.summary && <p>{t.summary}</p>}</div>
             {t.url && <A className="pf-btn sm" href={t.url}>{t.linkLabel || 'Watch / read'} <Icon n="arrow" size={14} /></A>}
-          </article>
+          </LiquidGlass>
         ))}
       </div></section>
     </>
@@ -297,7 +301,7 @@ function ContactPage({ m, ctx }) {
       <section className="pf-wrap pf-sec tight pf-contact-grid">
         <EnquiryForm slug={ctx.slug} cfg={m.enquiry} offers={m.offerOptions} owner={m.owner} preview={ctx.preview} />
         {(c || m.socials.length > 0) && (
-          <aside className="pf-card pf-side">
+          <LiquidGlass as="aside" className="pf-card pf-side">
             <h3 className="pf-h3">Prefer to reach out directly?</h3>
             <ul className="pf-contact">
               {c?.email && <li><Icon n="email" size={16} /><a href={`mailto:${c.email}`}>{c.email}</a></li>}
@@ -305,7 +309,7 @@ function ContactPage({ m, ctx }) {
               {c?.location && <li><Icon n="pin" size={16} />{c.location}</li>}
             </ul>
             {m.socials.length > 0 && <div className="pf-socials">{m.socials.map((s, i) => <A key={i} className="pf-soc" href={s.url} aria-label={SOCIAL_KINDS[s.kind]} title={SOCIAL_KINDS[s.kind]}><Icon n={s.kind} size={18} /></A>)}</div>}
-          </aside>
+          </LiquidGlass>
         )}
       </section>
     </>
@@ -374,12 +378,14 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
 
   const T = page.theme, accent = page.accentHex ? [page.accentHex, `color-mix(in srgb, ${page.accentHex} 55%, #ffffff)`] : (ACCENTS[page.accent] || ACCENTS.violet);
   const dark = T.bg === 'color' && luminance(T.bgColor) < 0.45;
-  const ctx = { slug, pages: m.pages, preview, live: !preview, email: data.contact?.email || '', enquiry: m.enquiry.enabled, go: k => setPv(k), open: setOpenProj };
+  const ctx = { slug, pages: m.pages, preview, live: !preview, email: data.contact?.email || '', enquiry: m.enquiry.enabled, go: setPv, open: setOpenProj };
   const Body = { home: null, work: WorkPage, products: ProductsPage, experience: ExperiencePage, talks: TalksPage, updates: UpdatesPage, about: AboutPage, contact: ContactPage }[current];
 
   return (
-    <div className={`pf${dark ? ' pf-dark' : ''}${preview ? ' is-preview' : ''}`}
-      style={{ '--a1': accent[0], '--a2': accent[1], '--r': `${T.radius}px`, '--maxw': `${Math.min(T.maxWidth, 1320)}px`, fontFamily: FONT_STACK[T.font], background: T.bg === 'color' ? T.bgColor : undefined }}>
+    <GlassProvider value={{ ...page.glass, dark, radius: T.radius }}>
+    <div className={`pf pf-bg-${T.bg}${dark ? ' pf-dark' : ''}${preview ? ' is-preview' : ''}${page.glass.on ? '' : ' pf-plain-panels'}`}
+      style={{ '--a1': accent[0], '--a2': accent[1], '--r': `${T.radius}px`, '--maxw': `${T.maxWidth}px`, '--pf-blur': `${page.glass.on ? page.glass.blur : 0}px`, '--pf-shadow': page.glass.on ? page.glass.shadow / 100 : 0, '--pf-tint': page.glass.on ? (0.18 + page.glass.tint / 100 * 0.62) : 1, fontFamily: FONT_STACK[T.font], background: T.bg === 'color' ? T.bgColor : undefined }}>
+      {T.bg === 'image' && data.bgImage && <div className="pf-backdrop" aria-hidden="true"><BackgroundLayer imageUrl={data.bgImage} bg={preview ? { ...data.bg, parallax: false } : data.bg} /><div className="pf-background-wash" style={{ opacity: T.wash / 100 }} /></div>}
       <header className="pf-head">
         <div className="pf-wrap pf-head-in">
           <GoTo to="home" ctx={ctx} className="pf-brand">{m.brand}</GoTo>
@@ -400,7 +406,7 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
             {m.featured && <ProjectsHome m={m} ctx={ctx} />}
             {m.products.length > 0 && <ProductsHome m={m} ctx={ctx} />}
           </>
-        ) : <Body m={m} ctx={ctx} />}
+        ) : current === 'chat' ? <Chat key={slug} m={m} ctx={ctx} data={data} /> : <Body m={m} ctx={ctx} />}
       </main>
 
       <footer className="pf-foot">
@@ -412,5 +418,6 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
       </footer>
       {openProj && <ProjectModal x={openProj} onClose={() => setOpenProj(null)} />}
     </div>
+    </GlassProvider>
   );
 }

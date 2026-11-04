@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './lib/auth.jsx';
 const Layout = lazy(() => import('./components/Layout.jsx'));
 import Home from './pages/Home.jsx';
-const Ball = lazy(() => import('./pages/Ball.jsx'));
+import { LegacyLookRedirect, LegacyPersonaRedirect, LegacySettingsRedirect } from './pages/LegacyRedirects.jsx';
 const Overview = lazy(() => import('./pages/Overview.jsx'));
 const FileManager = lazy(() => import('./pages/FileManager.jsx'));
 const AddFiles = lazy(() => import('./pages/AddFiles.jsx'));
@@ -14,8 +14,6 @@ const KnowledgeIndex = lazy(() => import('./pages/KnowledgeIndex.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const PortfolioEditor = lazy(() => import('./pages/PortfolioEditor.jsx'));
 const PublicProfile = lazy(() => import('./pages/PublicProfile.jsx'));
-const Settings = lazy(() => import('./pages/Settings.jsx'));
-const PublicPage = lazy(() => import('./pages/PublicPage.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
 const Register = lazy(() => import('./pages/Register.jsx'));
 const Updates = lazy(() => import('./pages/Updates.jsx'));
@@ -28,7 +26,7 @@ export default function App() {
     <Suspense fallback={null}>
     <Routes>
       <Route path="/" element={<Home />} />
-      <Route path="/u/:slug" element={<Ball />} />
+      <Route path="/u/:slug" element={<LegacyPersonaRedirect />} />
       <Route path="/register" element={<Register />} />
       <Route path="/invite" element={<Register />} />
       <Route path="/invite/:code" element={<Register />} />
@@ -38,7 +36,7 @@ export default function App() {
       <Route path="/admin" element={<Layout />}>
         <Route index element={<Overview />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="settings" element={<Settings />} />
+        <Route path="settings" element={<LegacySettingsRedirect />} />
         <Route path="files" element={<FileManager />} />
         <Route path="add" element={<AddFiles />} />
         <Route path="topics" element={<Topics />} />
@@ -48,7 +46,7 @@ export default function App() {
         <Route path="templates" element={<Templates />} />
         <Route path="knowledge" element={<KnowledgeIndex />} />
         <Route path="superadmin" element={<SuperAdmin />} />
-        <Route path="page" element={<PublicPage />} />
+        <Route path="page" element={<LegacyLookRedirect />} />
         <Route path="portfolio" element={<PortfolioEditor />} />
         <Route path="updates" element={<Updates />} />
         <Route path="enquiries" element={<Enquiries />} />
