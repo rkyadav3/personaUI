@@ -77,3 +77,47 @@ How the numbers work:
 - **Top rated:** visitors rate 1 to 5 stars on the profile; one vote per visitor per offering (stored as a salted hash, never an IP). Ranking uses a Bayesian average, so one 5-star vote does not beat forty 4.8s. Members cannot rate their own offerings.
 - **In demand:** clicks on Buy / Open / Enquire. This measures interest, **not confirmed sales**, because purchases happen on the member's own link. Real sales counts need a payment provider (for example Razorpay or Stripe webhooks) and would replace this rail's counter.
 - The abuse limits in `api/track.js` live in memory per warm serverless instance. For stronger protection, add Vercel's firewall rate limiting.
+
+
+## Portfolio pages (`/p/<slug>` and its sub-pages)
+The public profile now has a **portfolio** style (the default; the old chat-greeting + store page stays available as **Classic**).
+
+| URL | Shows | Appears when |
+|---|---|---|
+| `/p/<slug>` | Hero (awards, big headline, photo, intro, availability, socials, what-I-do list, buttons, numbers), featured project + 3 small ones, "Ideas to Impact" products | always |
+| `/p/<slug>/work` | every project (card grid, tech chips, award, links, pop-up details) | at least one project |
+| `/p/<slug>/products` | your portfolio products **plus** your offerings from Profile & Offerings (price, rating, Buy / Enquire) | at least one product or offering |
+| `/p/<slug>/experience` | timeline + education | any experience or education |
+| `/p/<slug>/talks` | talks / podcasts / interviews **plus** "Talk Shows" offerings | at least one talk |
+| `/p/<slug>/about` | story, skills, published contact details, social links | any of those |
+
+**Every profile has its own text for every field** (`site_settings.portfolio`, one JSON document per owner, edited at **Admin → Portfolio Pages** with a live preview).
+**Nothing is shown unless it exists.** `src/lib/portfolioModel.js` decides which blocks and sub-pages exist; the menu lists only pages with content; the layout (`src/styles/portfolio.css`) uses auto-fit grids so a missing photo, stats row, domain list, project image or whole section re-flows instead of leaving a hole. A missing hero photo becomes a monogram, a broken image URL falls back to an icon tile, and a sub-page with no content redirects home.
+
+Sensible defaults come from the real profile when a field is left empty: title line = designation, intro = purpose, "What I do" = expertise, numbers = years of experience / projects / products, experience = employers, About = purpose.
+
+Safety: links and picture URLs go through `cleanUrl` / `cleanImg` in `shared/portfolio.js` (http/https, mailto, tel or a site path only; `javascript:` etc. become empty) on save **and** on read. Text is length-limited and rendered as text (never as HTML).
+
+Setup: run `supabase/portfolio.sql` once (adds `site_settings.portfolio`). Picture fields (project, product) take a URL; the hero photo is uploaded as before.
+
+## Updates, schedule and enquiries
+Run `supabase/engage.sql` once (after `portfolio.sql`). It adds the `updates` and `enquiries` tables.
+
+**Admin → Updates & Schedule** (`/admin/updates`): two tabs.
+- *Upcoming updates*: news, launches, announcements. Optional "happens on" date; a future date shows as **Upcoming**. Can be pinned.
+- *Schedule*: dated items with start (and optional end), place, link. Visitors see them soonest first, in their own time zone, with an **Add to calendar** link. Finished items move under "Past events".
+- Each post is **Published** (visible) or **Draft** (private). Links are checked (http/https/mailto/tel only).
+
+**Public profile:** a "What's new" block on the home page, and a new `/p/<slug>/updates` page. Both appear only when something is published.
+
+**Contact form** (`/p/<slug>/contact`, also opened by the **Enquire** button on an offering, with that offering pre-selected):
+1. About you: name, email, phone/WhatsApp, organisation, city and country
+2. Your enquiry: kind of enquiry, related offering, subject, message
+3. Timing and budget (only for bookings, meetings, speaking, collaboration): preferred date and time, online / in person, budget
+4. Reply: preferred way to be reached, consent tick-box
+
+**Admin → Enquiries** (`/admin/enquiries`): each submission is stored under the profile owner's id, so it shows in that account's inbox and nowhere else (same tenant isolation as the rest of the admin). New ones are counted in the sidebar. Open one to reply by email / WhatsApp / call, mark it Read / Replied / Archived, add a private note, delete it, or export the list to CSV. The **Form settings** tab turns the form on or off, sets its title, intro and thank-you text, and limits which kinds of enquiry are offered.
+
+Protections on `/api/enquiry`: everything is re-validated on the server, a hidden honeypot field catches bots, 5 enquiries per visitor per hour (stored as a salted hash, never the IP), an identical resend within a day is not stored twice, and an offering can only be attached if it belongs to that member and is active.
+
+Notes: there is no email notification yet (enquiries are read in the admin). The **Classic** template does not show updates or the form; they are part of the Portfolio template.

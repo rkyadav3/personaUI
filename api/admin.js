@@ -7,6 +7,7 @@ const invites = new Proxy({}, { get: (_, k) => async (...a) => (await import('..
 const model = async () => (await import('../server/embed.js')).model();
 const search = async (...a) => (await import('../server/search.js')).search(...a);
 import * as profile from '../server/profile.js';
+import * as engage from '../server/engage.js';
 import * as site from '../server/site.js';
 import * as store from '../server/store.js';
 import { scoped } from '../server/tenant.js';
@@ -60,6 +61,17 @@ const OPS = {
   // public profile page (/p/<slug>): look + live preview data
   'page.save': ({ db }, a) => site.savePage(db, a),
   'page.preview': ({ db, user }) => profile.previewProfile(db, user.slug),
+
+  // updates & schedule (shown on the public profile)
+  'updates.list': ({ db }) => engage.listUpdates(db),
+  'updates.save': ({ db }, a) => engage.saveUpdate(db, a),
+  'updates.delete': async ({ db }, a) => { await engage.deleteUpdate(db, a.id); return { ok: true }; },
+
+  // enquiries sent through the contact form on the public profile
+  'enquiries.list': ({ db }) => engage.listEnquiries(db),
+  'enquiries.count': ({ db }) => engage.countNewEnquiries(db),
+  'enquiries.update': ({ db }, a) => engage.updateEnquiry(db, a),
+  'enquiries.delete': async ({ db }, a) => { await engage.deleteEnquiry(db, a.id); return { ok: true }; },
 
   // folders
   'folders.all': ({ db }) => store.allFolders(db),

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ProfilePage from '../components/ProfilePage.jsx';
+import PortfolioSite from '../components/portfolio/PortfolioSite.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { track } from '../lib/track.js';
 
 export default function PublicProfile() {
-  const { slug } = useParams();
+  const { slug, sub } = useParams();
   const auth = useAuth();
   const [data, setData] = useState(undefined);   // undefined = loading, null = nothing to show
 
@@ -25,5 +26,6 @@ export default function PublicProfile() {
         <Link to="/" style={{ color: '#6d4aff', fontWeight: 600 }}>← Back to the home page</Link></div>
     </div>
   );
-  return <ProfilePage data={data} slug={data.slug || slug} user={auth?.user} />;
+  if (data.page?.template === 'classic') return <ProfilePage data={data} slug={data.slug || slug} user={auth?.user} />;
+  return <PortfolioSite data={data} slug={data.slug || slug} sub={sub} user={auth?.user} />;
 }

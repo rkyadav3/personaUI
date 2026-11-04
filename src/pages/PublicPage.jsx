@@ -159,6 +159,10 @@ export default function PublicPage() {
           </section>
           </>}
           {tab === 'layout' && <>
+          <section className="card"><h3>Page design</h3>
+            <Field label="Public page style"><select value={page.template} onChange={e => set({ template: e.target.value })}><option value="portfolio">Portfolio (Home, Work, Products, Experience, Talks, About)</option><option value="classic">Classic (chat greeting + store)</option></select></Field>
+            <p className="hint">The preview on the right always shows the classic style. Edit the Portfolio style under <Link to="/admin/portfolio">Portfolio Pages</Link>.</p>
+          </section>
           <section className="card"><h3>Layout</h3>
             <div className="cols c2"><Field label="Profile card is on the"><select value={page.layout.sidebar} onChange={e => setIn('layout', { sidebar: e.target.value })}><option value="right">Right</option><option value="left">Left</option></select></Field>
               <Field label="Photo is on the"><select value={page.layout.photo} onChange={e => setIn('layout', { photo: e.target.value })}><option value="left">Left</option><option value="right">Right</option><option value="none">Hidden</option></select></Field></div>

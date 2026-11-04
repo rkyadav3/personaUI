@@ -4,7 +4,7 @@ import { CATEGORIES } from './profileSchema.js';
 
 export const ACCENTS = {
   violet: ['#6d4aff', '#a855f7'], blue: ['#2563eb', '#38bdf8'], emerald: ['#059669', '#34d399'],
-  rose: ['#e11d48', '#fb7185'], amber: ['#d97706', '#fbbf24'], slate: ['#334155', '#64748b'],
+  rose: ['#e11d48', '#fb7185'], amber: ['#d97706', '#fbbf24'], slate: ['#334155', '#64748b'], lime: ['#84cc16', '#bef264'],
 };
 export const PLACEMENTS = { store: 'Store grid', side: 'Sidebar', hidden: 'Hidden' };
 export const PLACEMENT_DEFAULTS = {
@@ -14,6 +14,7 @@ export const PLACEMENT_DEFAULTS = {
 export const SECTION_LABELS = { store: 'Store', expertise: 'Expertise', education: 'Education', experience: 'Experience' };
 
 export const PAGE_DEFAULTS = {
+  template: 'portfolio',                          // 'portfolio' (home + Work / Products / Experience / Talks / About pages) or 'classic' (chat hero + store)
   headline: '', headlineAccent: '', subtitle: '', placeholder: '', tagline: '', about: '',
   chips: [],                                   // [{ label, prompt }], up to 6. Empty = chips made from what you offer.
   storeTitle: 'Store', storeSubtitle: '', storeLimit: 10,
@@ -49,6 +50,7 @@ export function normalizePage(input) {
     .map(c => ({ label: s(c?.label, 32), prompt: s(c?.prompt, 200) })).filter(c => c.label)
     .map(c => ({ ...c, prompt: c.prompt || c.label }));
   return {
+    template: i.template === 'classic' ? 'classic' : 'portfolio',
     headline: s(i.headline, 60), headlineAccent: s(i.headlineAccent, 40), subtitle: s(i.subtitle, 220), placeholder: s(i.placeholder, 120),
     tagline: s(i.tagline, 120), about: s(i.about, 600), chips,
     storeTitle: s(i.storeTitle, 40) || d.storeTitle, storeSubtitle: s(i.storeSubtitle, 140), storeLimit: Math.round(num(i.storeLimit, 2, 40, d.storeLimit)),

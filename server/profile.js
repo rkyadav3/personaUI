@@ -2,7 +2,9 @@
 import { CATEGORIES, INTENTS, OFFERING_FIELDS, PRICING, VISIBILITY_DEFAULTS } from '../shared/profileSchema.js';
 import { generateJSON } from './gemini.js';
 import { normalizePage } from '../shared/pageSettings.js';
+import { normalizePortfolio } from '../shared/portfolio.js';
 import { normalizeBg } from '../shared/siteSettings.js';
+import { previewEngage, publicEngage } from './engage.js';
 import { publicUrl } from './site.js';
 import { raw, run } from './supabase.js';
 
@@ -273,11 +275,13 @@ export const safeUrl = u => { try { const x = new URL(String(u || '')); return x
 
 /** What the public profile page receives: the visibility-filtered profile (buildPublic) plus the page look.
  *  Links and pictures are checked here (http/https only) and moved out of `details`, so the browser never renders a raw URL. */
-function decorate(pub, slug, site) {
+function decorate(pub, slug, site, engage = { updates: [], schedule: [] }) {
   return {
     ...pub, slug,
+    updates: engage.updates, schedule: engage.schedule,   // published updates and schedule items only (see shapeEngage)
     hero: site?.hero_path ? publicUrl(site.hero_path) : null,
     page: normalizePage(site?.page),
+    portfolio: normalizePortfolio(site?.portfolio),   // links and picture URLs are checked inside normalizePortfolio
     bgImage: site?.bg_path ? publicUrl(site.bg_path) : null, bg: normalizeBg(site?.bg),
     contributions: pub.contributions.map(k => ({
       ...k,
@@ -297,20 +301,21 @@ export async function publicProfile(slug) {
   if (!u) return null;
   const [p] = await run(db.from('profiles').select('*').eq('owner_id', u.id).eq('status', 'published').limit(1));
   if (!p) return null;
-  const [cs, os, site] = await Promise.all([
+  const [cs, os, site, engage] = await Promise.all([
     run(db.from('contributions').select('*').eq('owner_id', u.id).order('id')),
     run(db.from('offerings').select('*').eq('owner_id', u.id).order('id')),
     run(db.from('site_settings').select('*').eq('owner_id', u.id).limit(1)).catch(() => []),
+    publicEngage(u.id),
   ]);
-  return decorate(buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) }))), slug, site[0]);
+  return decorate(buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) }))), slug, site[0], engage);
 }
 
 /** Same data as publicProfile, for the owner's live preview in the editor (works while the profile is still a draft). */
 export async function previewProfile(db, slug) {
   const { profile, contributions } = await getProfile(db);
   if (!profile) return null;
-  const [site] = await run(db.from('site_settings').select('*').limit(1)).catch(() => []);
-  return decorate(buildPublic(profile, contributions), slug, site);
+  const [[site], engage] = await Promise.all([run(db.from('site_settings').select('*').limit(1)).catch(() => []), previewEngage(db)]);
+  return decorate(buildPublic(profile, contributions), slug, site, engage);
 }
 
 /** What the persona page (/u/<slug>) shows beside the chat: the person's name, whether a public profile exists, and every

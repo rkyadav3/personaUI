@@ -12,6 +12,8 @@ const NAV_GROUPS = [
     items: [
       { to: '/admin', label: 'Overview', icon: '📊', end: true },
       { to: '/admin/profile', label: 'Profile & Offerings', icon: '👤' },
+      { to: '/admin/updates', label: 'Updates & Schedule', icon: '🗓️' },
+      { to: '/admin/enquiries', label: 'Enquiries', icon: '📥', badge: true },
     ],
   },
   {
@@ -31,7 +33,8 @@ const NAV_GROUPS = [
   {
     category: 'Appearance',
     items: [
-      { to: '/admin/page', label: 'Public Page', icon: '🪟' },
+      { to: '/admin/portfolio', label: 'Portfolio Pages', icon: '🧩' },
+      { to: '/admin/page', label: 'Look & Store', icon: '🪟' },
       { to: '/admin/settings', label: 'Persona Settings', icon: '⚙️' },
     ],
   },
@@ -44,11 +47,18 @@ export default function Layout() {
 function Inner() {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
-  const [needs, setNeeds] = useState(null);
+  const [needs, setNeeds] = useState(null), [unread, setUnread] = useState(0);
 
   useEffect(() => {
     if (user !== null) api('profile.get').then(r => setNeeds(!r.profile), () => setNeeds(false));
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {   // the unread count on the Enquiries link: refreshed on every page change and whenever the inbox changes
+    if (!user) return undefined;
+    const load = () => api('enquiries.count').then(r => setUnread(r.new || 0), () => {});
+    load(); window.addEventListener('enquiries-changed', load);
+    return () => window.removeEventListener('enquiries-changed', load);
+  }, [user?.id, pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (user === undefined) return <p className="muted" style={{ padding: 40 }}>Loading…</p>;
   if (!user) return <Login />;
@@ -67,6 +77,7 @@ function Inner() {
               <NavLink key={item.to} to={item.to} end={item.end} className="nav">
                 <span className="nav-icon" aria-hidden="true">{item.icon}</span>
                 <span>{item.label}</span>
+                {item.badge && unread > 0 && <span className="super-badge" style={{ marginLeft: 'auto' }} aria-label={`${unread} new`}>{unread}</span>}
               </NavLink>
             ))}
           </div>
