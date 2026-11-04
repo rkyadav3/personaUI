@@ -30,7 +30,7 @@ export function normalizeDraft(input) {
     .filter(e => e.qualification || e.specialization || e.institution);
   const email = str(c.email, 160), phone = str(c.phone, 40);
   d.profile.contact = { email: EMAIL_RE.test(email) ? email : null, phone: phone.replace(/\D/g, '').length >= 7 ? phone : null, location: strOrNull(c.location, 160), other: strOrNull(c.other, 300) };
-  const yrs = Number(x.total_years);
+  const yrs = x.total_years == null || x.total_years === '' ? NaN : Number(x.total_years);
   d.profile.experience = {
     total_years: Number.isFinite(yrs) && yrs >= 0 && yrs <= 70 ? Math.round(yrs * 10) / 10 : null,
     description: str(x.description, 1500),
@@ -202,6 +202,29 @@ export async function saveProfile(db, { draft, purpose }) {
     expertise: d.profile.expertise, purpose: d.purpose.description, field_sources: fieldSources(d.profile, cur.ai_extracted), updated_at: new Date().toISOString(),
   }).eq('id', cur.id));
   return getProfile(db);
+}
+
+/** Only the server's reviewed command executor calls this combined profile write. */
+export async function saveAssistantProfile(db, values) {
+  const d = normalizeDraft({ profile: values, purpose: { description: values.purpose } });
+  if (!d.profile.name) throw new Error('A name is required.');
+  if (!['draft', 'published'].includes(values.status || 'draft')) throw new Error('Choose draft or published status.');
+  if (!values.id && !d.purpose.description) throw new Error('Your purpose is required.');
+  const cur = await profileRow(db);
+  if (values.id ? !cur || String(cur.id) !== String(values.id) : cur) throw new Error('The profile changed after review. Prepare a new review.');
+  const stamp = new Date().toISOString(), status = values.status || 'draft';
+  const patch = { ...d.profile, purpose: d.purpose.description, visibility: normalizeVisibility(values.visibility), status, field_sources: fieldSources(d.profile, cur?.ai_extracted), updated_at: stamp, ...(status === 'published' && !cur?.confirmed_at ? { confirmed_at: stamp } : {}) };
+  const saved = await run(cur ? db.from('profiles').update(patch).eq('id', cur.id).select('id') : db.from('profiles').insert(patch).select('id'));
+  if (!saved[0]) throw new Error('The profile change could not be confirmed. Check the profile editor.');
+  return saved[0];
+}
+
+export async function deleteAssistantProfile(db, { id }) {
+  const cur = await profileRow(db);
+  if (!cur || String(cur.id) !== String(id)) throw new Error('The profile changed after review. Prepare a new review.');
+  const saved = await run(db.from('profiles').delete().eq('id', cur.id).select('id'));
+  if (!saved[0]) throw new Error('The profile removal could not be confirmed. Check the profile editor.');
+  return saved[0];
 }
 
 export async function setVisibility(db, visibility) {

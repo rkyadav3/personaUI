@@ -90,10 +90,11 @@ export async function createTextFile(db, { name, folderId, topicId, body = '', s
   return row;
 }
 
-export async function saveFile(db, id, { name, topicId, status, text }) {
+export async function saveFile(db, id, { name, topicId, status, text, folderId }) {
   const f = await getFile(db, id);
   if (!f) throw new Error('File not found.');
   const patch = { name: (name || '').trim() || f.name, topic_id: topicId ?? null, status, updated_at: nowIso() };
+  if (folderId !== undefined) patch.folder_id = folderId ?? null;
   if (text != null && isText(patch.name)) {
     const data = Buffer.from(text, 'utf-8');
     const up = await raw().storage.from(BUCKET).upload(f.storage_path, data, { contentType: f.mime || 'text/plain', upsert: true });
@@ -138,10 +139,10 @@ export const deleteTopic = (db, id) => run(db.from('topics').delete().eq('id', i
 // ---------------- posts ----------------
 export const posts = db => run(db.from('posts').select('id,title,status,topic_id,updated_at').order('updated_at', { ascending: false }));
 export const getPost = (db, id) => first(db.from('posts').select('*').eq('id', id));
-export const createPost = async (db, { html = '<p></p>', topicId = null, templateId = null } = {}) =>
-  (await run(db.from('posts').insert({ title: 'Untitled', html, status: 'draft', topic_id: topicId, template_id: templateId }).select()))[0];
-export const savePost = (db, id, { title, html, topicId, status }) =>
-  run(db.from('posts').update({ title: (title || '').trim() || 'Untitled', html, topic_id: topicId ?? null, status, updated_at: nowIso() }).eq('id', id));
+export const createPost = async (db, { title = 'Untitled', html = '<p></p>', status = 'draft', topicId = null, templateId = null } = {}) =>
+  (await run(db.from('posts').insert({ title: (title || '').trim() || 'Untitled', html, status: status === 'published' ? 'published' : 'draft', topic_id: topicId, template_id: templateId }).select()))[0];
+export const savePost = (db, id, { title, html, topicId, status, templateId }) =>
+  run(db.from('posts').update({ title: (title || '').trim() || 'Untitled', html, topic_id: topicId ?? null, status, ...(templateId !== undefined ? { template_id: templateId ?? null } : {}), updated_at: nowIso() }).eq('id', id));
 export async function deletePost(db, id) {
   await run(db.from('chunks').delete().eq('source_key', `post:${id}`));
   await run(db.from('posts').delete().eq('id', id));

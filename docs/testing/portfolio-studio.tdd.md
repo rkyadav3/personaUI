@@ -1,5 +1,7 @@
 # Portfolio studio TDD evidence
 
+This historical report covers the unified Portfolio refactor. Its Overview launcher has since been replaced by the reviewed admin assistant; see [admin assistant evidence](admin-assistant.tdd.md) for the current command workflow and new migration.
+
 Journeys were derived from the user's request and attached Overview reference image; no plan document was supplied. The patch starts from `da08b7767ed948ba3b9f084b289dcff3eba19564`, which already includes Events and shared Razorpay checkout.
 
 ## User journeys

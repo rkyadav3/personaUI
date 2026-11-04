@@ -28,7 +28,7 @@ The Streamlit admin and the static chat page are now one React app (Vite) with V
 - `/admin/portfolio`: the single Portfolio editor, with Portfolio content, Look & Store, and Persona settings. Old `/admin/page` and `/admin/settings` links redirect here.
 
 ## Setup
-1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql`, `page.sql`, `portfolio.sql`, `engage.sql`, and `events-commerce.sql`. If your project already has those tables, compare first and run the migrations it is missing.
+1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql`, `page.sql`, `portfolio.sql`, `engage.sql`, `events-commerce.sql`, and `studio-assistant.sql`. If your project already has those tables, compare first and run the migrations it is missing.
 2. **Env vars:** copy `.env.example` to `.env.local` (local) or add them in Vercel. `SESSION_SECRET` is new: any long random string.
 3. **Run locally:** `npm install`, `npm i -g vercel`, then `npm run dev` (first run asks you to log in and link a Vercel project; put your variables in `.env.local`). `npm run dev:web` runs only the UI and proxies `/api` to a `vercel dev` on port 3000.
 4. **Deploy:** import the repo in Vercel (framework: Vite). Root directory is the repo root. Add the env vars. Deploy.
@@ -66,7 +66,17 @@ Background controls include zoom, horizontal and vertical focus, blur, brightnes
 - Run `supabase/settings.sql` after `registration.sql`. It adds `site_settings` and a **public** `backgrounds` bucket (images only, 3 MB max).
 - The browser shrinks the picture to 2200 px, re-encodes it (removing hidden photo data such as GPS), then uploads it straight to storage with a one-time token. The server validates both image uploads, saves one settings row, and then removes replaced images. A cleanup failure reports a saved-settings warning.
 - Portfolio reads its published appearance from `/api/profile?slug=...`. The background-only `/api/site` API remains available for existing integrations.
-- The Studio overview uses a white sidebar, green accents, a personal greeting, command bar and four shortcuts. The command bar opens the matching editor or tool; it does not perform AI edits automatically.
+- The Studio overview uses a white sidebar, green accents, a personal greeting, command bar and four shortcuts. Its admin assistant reads records and drafts create, update and delete commands. Every mutation shows a saved review with before/after values and requires **Approve and apply**. See [admin assistant setup](docs/admin-assistant-setup.md).
+
+## Overview admin assistant
+
+The Overview assistant manages your own profile, Portfolio, Look & Store, Persona, projects, products, Events and forms, attendance responses, offerings, files, folders, topics, posts, templates, enquiries, purchase fulfillment and payment preferences. Super Admin accounts can also manage users and invitations. The public Portfolio Chat continues to answer visitors' questions from published knowledge.
+
+Try “Change my title to Product Designer”, “Create a published event tomorrow at 5pm called Design Meetup”, “Make Creator Guide free”, or “Show who is coming to Design Meetup”. Read requests answer directly; edits remain proposals until you approve their review. Sending another command discards the pending proposal before preparing its replacement.
+
+Reviews expire after 15 minutes. The server checks the owner, current permissions and whether data changed since the preview, then claims the saved review once. Repeated approval cannot execute it again. A batch runs in sequence and stops on failure, showing completed, failed and unapplied steps. It does not roll back earlier completed steps. Reloading recovers the saved review; an interrupted command checks its status instead of retrying writes.
+
+Run `supabase/studio-assistant.sql` and keep the existing server `GEMINI_API_KEY`/`GEMINI_MODEL` configuration. Dates use the browser's timezone. Uploads and passwords use the existing editors, and commands cannot change financial payment amounts or status. Knowledge sync, embedding and index clearing are separate reviewed jobs; large embedding jobs continue through another review or Knowledge Base.
 
 ## Members' home page (`/`)
 A private platform: set `REGISTRATION_MODE=invite` (now the default in `.env.example`) so an account needs a code from **Admin → Invites**. Visitors browse without an account.

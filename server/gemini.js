@@ -1,7 +1,7 @@
 // Ask Gemini for a JSON answer. The text is parsed and then validated by our own code, never trusted as-is.
 import { env } from './config.js';
 
-export async function generateJSON(system, user, { maxOutputTokens = 3000 } = {}) {
+export async function generateJSON(system, user, { maxOutputTokens = 3000, signal } = {}) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error('GEMINI_API_KEY is not set.');
   const model = env('GEMINI_MODEL', 'gemini-3.5-flash-lite');
@@ -13,7 +13,7 @@ export async function generateJSON(system, user, { maxOutputTokens = 3000 } = {}
   };
   let last = '';
   for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await fetch(url, { method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(url, { method: 'POST', headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify(body), ...(signal ? { signal } : {}) });
     if (!r.ok) { last = `${r.status} ${(await r.text()).slice(0, 200)}`; if (r.status === 429 || r.status >= 500) continue; throw new Error(`AI request failed (${last})`); }
     const j = await r.json();
     const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').replace(/^```(?:json)?|```$/gim, '').trim();

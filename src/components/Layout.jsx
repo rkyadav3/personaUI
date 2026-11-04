@@ -52,9 +52,12 @@ function Inner() {
   useEffect(() => {
     if (!user) return undefined;
     let active = true; setPhoto(null); setNeeds(null);
-    api('profile.get').then(result => { if (active) setNeeds(!result.profile); }, () => { if (active) setNeeds(false); });
-    api('site.get').then(result => { if (active) setPhoto(result.heroUrl); }, () => {});
-    return () => { active = false; };
+    const load = () => {
+      api('profile.get').then(result => { if (active) setNeeds(!result.profile); }, () => { if (active) setNeeds(false); });
+      api('site.get').then(result => { if (active) setPhoto(result.heroUrl); }, () => {});
+    };
+    load(); window.addEventListener('studio-changed', load);
+    return () => { active = false; window.removeEventListener('studio-changed', load); };
   }, [user?.id]);
   useEffect(() => {
     if (!user) return undefined;

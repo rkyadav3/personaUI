@@ -6,6 +6,7 @@ const indexer = new Proxy({}, { get: (_, k) => async (...a) => (await import('..
 const invites = new Proxy({}, { get: (_, k) => async (...a) => (await import('../server/invites.js'))[k](...a) });
 const model = async () => (await import('../server/embed.js')).model();
 const search = async (...a) => (await import('../server/search.js')).search(...a);
+const assistant = new Proxy({}, { get: (_, k) => async (...a) => (await import('../server/studioAssistant.js'))[k](...a) });
 import * as profile from '../server/profile.js';
 import * as engage from '../server/engage.js';
 import * as events from '../server/events.js';
@@ -13,8 +14,8 @@ import * as commerce from '../server/commerce.js';
 import * as site from '../server/site.js';
 import * as store from '../server/store.js';
 import { scoped } from '../server/tenant.js';
+import { HttpError } from '../server/http.js';
 
-class HttpError extends Error { constructor(status, message) { super(message); this.status = status; } }
 const needAdmin = ({ user }) => { if (!user.isAdmin) throw new HttpError(403, 'This page is for admins. Add your email to ADMIN_EMAILS.'); };
 
 // Public ops (no session needed)
@@ -37,6 +38,10 @@ const PUBLIC = {
 
 // Signed-in ops. `db` is the tenant-scoped client; `s` is the store module bound to it.
 const OPS = {
+  'studio.prepare': (ctx, a) => assistant.prepareStudioCommand(ctx, a),
+  'studio.apply': (ctx, a) => assistant.applyStudioCommand(ctx, a),
+  'studio.discard': (ctx, a) => assistant.discardStudioCommand(ctx, a),
+  'studio.review': (ctx, a) => assistant.studioCommandReview(ctx, a),
   overview: async ({ db }) => {
     const [counts, files] = await Promise.all([store.counts(db), store.allFiles(db)]);
     const recent = [...files].sort((a, b) => (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || '')).slice(0, 8);
@@ -157,19 +162,23 @@ const OPS = {
   },
 };
 
-export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store');
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
-  const { op, args = {} } = req.body || {};
-  try {
-    if (Object.hasOwn(PUBLIC, op)) return res.status(200).json(await PUBLIC[op](args, null, { req, res }));
-    const fn = Object.hasOwn(OPS, op) ? OPS[op] : null;
-    if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
-    const user = await auth.sessionUser(req);
-    if (!user) throw new HttpError(401, 'Not signed in.');
-    return res.status(200).json(await fn({ db: scoped(user.id), user }, args));
-  } catch (e) {
-    if (!(e instanceof HttpError)) console.error(op, e);
-    return res.status(e.status || 500).json({ error: e.message || 'Something went wrong.' });
-  }
+export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: tenantScope = scoped, operations = OPS } = {}) {
+  return async function handler(req, res) {
+    res.setHeader('Cache-Control', 'no-store');
+    if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+    const { op, args = {} } = req.body || {};
+    try {
+      if (Object.hasOwn(PUBLIC, op)) return res.status(200).json(await PUBLIC[op](args, null, { req, res }));
+      const fn = Object.hasOwn(operations, op) ? operations[op] : null;
+      if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
+      const user = await sessionUser(req);
+      if (!user) throw new HttpError(401, 'Not signed in.');
+      return res.status(200).json(await fn({ db: tenantScope(user.id), user }, args));
+    } catch (e) {
+      const studio = typeof op === 'string' && op.startsWith('studio.');
+      if (!(e instanceof HttpError)) console.error(op, studio ? e.name || 'error' : e);
+      return res.status(e.status || 500).json({ error: studio && !(e instanceof HttpError) ? 'The admin assistant could not complete this request. Please try again.' : e.message || 'Something went wrong.' });
+    }
+  };
 }
+export default createAdminHandler();
