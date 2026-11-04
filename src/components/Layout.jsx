@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { Glass } from 'open-glass-ui';
+import { Glass } from './Glass.jsx';
 import GlassShell from './GlassShell.jsx';
 import Login from '../pages/Login.jsx';
 

@@ -22,8 +22,19 @@ export const PAGE_DEFAULTS = {
   placement: PLACEMENT_DEFAULTS,
   sections: { store: true, expertise: true, education: true, experience: true },
   hero: { zoom: 1, x: 50, y: 25 },
+  accentHex: '',                                   // '' = use the preset above; '#rrggbb' = your own colour
+  theme: { bg: 'orbs', bgColor: '#ffffff', wash: 55, font: 'sans', radius: 28, maxWidth: 1380 },
+  glass: { on: true, refraction: 55, blur: 14, tint: 55, dispersion: 25, rim: 70, shadow: 50 },
+  layout: { sidebar: 'right', photo: 'left' },
+  ball: { show: true, size: 220 },
+  chat: { mic: true, sources: true },
 };
+export const BG_MODES = { orbs: 'White with soft colour', plain: 'Plain', color: 'Solid colour', image: 'My background image' };
+export const FONTS = { sans: 'Modern (Figtree)', serif: 'Editorial (Newsreader)', system: 'System', mono: 'Monospace' };
+export const FONT_STACK = { sans: "'Figtree', system-ui, sans-serif", serif: "'Newsreader', Georgia, serif", system: "system-ui, -apple-system, 'Segoe UI', sans-serif", mono: "ui-monospace, 'SFMono-Regular', Menlo, monospace" };
+export const GLASS_LIMITS = { refraction: [0, 100], blur: [0, 40], tint: [0, 100], dispersion: [0, 100], rim: [0, 100], shadow: [0, 100] };
 
+const HEX = /^#[0-9a-f]{6}$/i;
 const s = (v, n) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
 const num = (v, lo, hi, d) => { const n = v == null || v === '' ? NaN : Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
 
@@ -45,5 +56,18 @@ export function normalizePage(input) {
     accent: ACCENTS[i.accent] ? i.accent : d.accent, currency: s(i.currency, 6) || d.currency, cart: typeof i.cart === 'boolean' ? i.cart : d.cart,
     placement, sections,
     hero: { zoom: num(i.hero?.zoom, 1, 3, d.hero.zoom), x: num(i.hero?.x, 0, 100, d.hero.x), y: num(i.hero?.y, 0, 100, d.hero.y) },
+    accentHex: HEX.test(i.accentHex) ? i.accentHex.toLowerCase() : '',
+    theme: {
+      bg: BG_MODES[i.theme?.bg] ? i.theme.bg : d.theme.bg, bgColor: HEX.test(i.theme?.bgColor) ? i.theme.bgColor.toLowerCase() : d.theme.bgColor,
+      wash: Math.round(num(i.theme?.wash, 0, 95, d.theme.wash)), font: FONTS[i.theme?.font] ? i.theme.font : d.theme.font,
+      radius: Math.round(num(i.theme?.radius, 6, 44, d.theme.radius)), maxWidth: Math.round(num(i.theme?.maxWidth, 1000, 1700, d.theme.maxWidth)),
+    },
+    glass: {
+      on: typeof i.glass?.on === 'boolean' ? i.glass.on : d.glass.on,
+      ...Object.fromEntries(Object.entries(GLASS_LIMITS).map(([k, [lo, hi]]) => [k, Math.round(num(i.glass?.[k], lo, hi, d.glass[k]))])),
+    },
+    layout: { sidebar: i.layout?.sidebar === 'left' ? 'left' : 'right', photo: ['left', 'right', 'none'].includes(i.layout?.photo) ? i.layout.photo : 'left' },
+    ball: { show: typeof i.ball?.show === 'boolean' ? i.ball.show : d.ball.show, size: Math.round(num(i.ball?.size, 140, 320, d.ball.size)) },
+    chat: { mic: typeof i.chat?.mic === 'boolean' ? i.chat.mic : true, sources: typeof i.chat?.sources === 'boolean' ? i.chat.sources : true },
   };
 }

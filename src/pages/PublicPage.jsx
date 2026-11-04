@@ -1,5 +1,6 @@
+import { Link } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ACCENTS, PAGE_DEFAULTS, PLACEMENTS, SECTION_LABELS, normalizePage } from '../../shared/pageSettings.js';
+import { ACCENTS, BG_MODES, FONTS, PAGE_DEFAULTS, PLACEMENTS, SECTION_LABELS, normalizePage } from '../../shared/pageSettings.js';
 import { CATEGORIES } from '../../shared/profileSchema.js';
 import { BG_BUCKET } from '../../shared/siteSettings.js';
 import ProfilePage from '../components/ProfilePage.jsx';
@@ -24,10 +25,15 @@ function ScaledPreview({ children }) {
   );
 }
 
+const Range = ({ label, min, max, step = 1, value, onChange, unit = '' }) => (
+  <Field label={`${label}: ${value}${unit}`}><input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))} /></Field>
+);
+const TABS = { content: 'Content', look: 'Look & glass', layout: 'Layout', store: 'Store & sections' };
+
 export default function PublicPage() {
   const { user } = useAuth();
   const [saved, setSaved] = useState(null), [page, setPage] = useState(PAGE_DEFAULTS), [data, setData] = useState(undefined);
-  const [pending, setPending] = useState(null), [removed, setRemoved] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState(null);
+  const [pending, setPending] = useState(null), [removed, setRemoved] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState(null), [tab, setTab] = useState('content');
 
   useEffect(() => {
     api('site.get').then(s => { setSaved(s); setPage(s.page); }, e => setMsg({ kind: 'error', t: e.message }));
@@ -74,6 +80,8 @@ export default function PublicPage() {
       <Notice kind={msg?.kind}>{msg?.t}</Notice>
       <div className="pp-editor">
         <div className="pp-form">
+          <div className="pp-tabs" role="tablist">{Object.entries(TABS).map(([k, v]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{v}</button>)}</div>
+          {tab === 'content' && <>
           <section className="card"><h3>Photo</h3>
             <p className="hint">Shown beside the greeting. Without a photo, the glowing ball is shown instead.</p>
             <div className="row"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => choose(e.target.files[0])} />{hero && <button className="btn" onClick={() => { setPending(null); setRemoved(true); }}>Remove photo</button>}</div>
@@ -105,6 +113,8 @@ export default function PublicPage() {
             <p className="hint">Name, expertise, education and experience come from <b>Profile &amp; Offerings</b>; what is hidden there stays hidden here.</p>
           </section>
 
+          </>}
+          {tab === 'store' && <>
           <section className="card"><h3>Store</h3>
             <div className="cols c2"><Field label="Title"><input value={page.storeTitle} maxLength={40} onChange={e => set({ storeTitle: e.target.value })} /></Field>
               <Field label="Items shown before “Show all”"><input type="number" min={2} max={40} value={page.storeLimit} onChange={e => set({ storeLimit: e.target.value })} /></Field></div>
@@ -121,9 +131,48 @@ export default function PublicPage() {
             <div className="row">{Object.entries(SECTION_LABELS).map(([k, v]) => <label className="toggle" key={k}><input type="checkbox" checked={page.sections[k]} onChange={e => setIn('sections', { [k]: e.target.checked })} /> {v}</label>)}</div>
           </section>
 
-          <section className="card"><h3>Colour</h3>
-            <div className="row">{Object.entries(ACCENTS).map(([k, [a, b]]) => <button key={k} className="btn" aria-pressed={page.accent === k} title={k} onClick={() => set({ accent: k })} style={{ width: 44, height: 44, padding: 0, borderRadius: '50%', background: `linear-gradient(135deg,${a},${b})`, outline: page.accent === k ? '3px solid #14122e' : 'none', outlineOffset: 2 }} />)}</div>
+          </>}
+          {tab === 'look' && <>
+          <section className="card"><h3>Background</h3>
+            <Field label="Style"><select value={page.theme.bg} onChange={e => setIn('theme', { bg: e.target.value })}>{Object.entries(BG_MODES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+            {page.theme.bg === 'color' && <Field label="Colour"><input type="color" value={page.theme.bgColor} onChange={e => setIn('theme', { bgColor: e.target.value })} /></Field>}
+            {page.theme.bg === 'image' && <>
+              {saved.imageUrl ? <Range label="Fade towards white" min={0} max={95} value={page.theme.wash} unit="%" onChange={v => setIn('theme', { wash: v })} /> : <p className="hint">No background image yet. Upload one in <Link to="/admin/settings">Persona Settings</Link> (zoom, focus and blur are set there too).</p>}</>}
+            <p className="hint">Dark solid colours switch the text and glass to light-on-dark automatically.</p>
           </section>
+          <section className="card"><h3>Liquid glass</h3>
+            <label className="toggle"><input type="checkbox" checked={page.glass.on} onChange={e => setIn('glass', { on: e.target.checked })} /> Use glass panels (off = plain white cards)</label>
+            {page.glass.on && <>
+              <Range label="Edge refraction" min={0} max={100} value={page.glass.refraction} onChange={v => setIn('glass', { refraction: v })} />
+              <Range label="Colour fringe at the edge" min={0} max={100} value={page.glass.dispersion} onChange={v => setIn('glass', { dispersion: v })} />
+              <Range label="Frost (blur)" min={0} max={40} value={page.glass.blur} unit="px" onChange={v => setIn('glass', { blur: v })} />
+              <Range label="Tint (opacity)" min={0} max={100} value={page.glass.tint} unit="%" onChange={v => setIn('glass', { tint: v })} />
+              <Range label="Lit rim and glare" min={0} max={100} value={page.glass.rim} onChange={v => setIn('glass', { rim: v })} />
+              <Range label="Shadow" min={0} max={100} value={page.glass.shadow} onChange={v => setIn('glass', { shadow: v })} />
+              <p className="hint">Edge refraction and the colour fringe show in Chrome, Edge and other Chromium browsers. Safari and Firefox show the same glass without the bending.</p></>}
+          </section>
+          <section className="card"><h3>Colour &amp; type</h3>
+            <div className="row">{Object.entries(ACCENTS).map(([k, [a, b]]) => <button key={k} className="btn" aria-pressed={!page.accentHex && page.accent === k} title={k} onClick={() => set({ accent: k, accentHex: '' })} style={{ width: 44, height: 44, padding: 0, borderRadius: '50%', background: `linear-gradient(135deg,${a},${b})`, outline: !page.accentHex && page.accent === k ? '3px solid #14122e' : 'none', outlineOffset: 2 }} />)}
+              <label className="toggle">Custom <input type="color" value={page.accentHex || ACCENTS[page.accent][0]} onChange={e => set({ accentHex: e.target.value })} /></label></div>
+            <div className="cols c2" style={{ marginTop: 10 }}><Field label="Font"><select value={page.theme.font} onChange={e => setIn('theme', { font: e.target.value })}>{Object.entries(FONTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field></div>
+            <Range label="Corner roundness" min={6} max={44} unit="px" value={page.theme.radius} onChange={v => setIn('theme', { radius: v })} />
+          </section>
+          </>}
+          {tab === 'layout' && <>
+          <section className="card"><h3>Layout</h3>
+            <div className="cols c2"><Field label="Profile card is on the"><select value={page.layout.sidebar} onChange={e => setIn('layout', { sidebar: e.target.value })}><option value="right">Right</option><option value="left">Left</option></select></Field>
+              <Field label="Photo is on the"><select value={page.layout.photo} onChange={e => setIn('layout', { photo: e.target.value })}><option value="left">Left</option><option value="right">Right</option><option value="none">Hidden</option></select></Field></div>
+            <Range label="Page width" min={1000} max={1700} step={20} unit="px" value={page.theme.maxWidth} onChange={v => setIn('theme', { maxWidth: v })} />
+          </section>
+          <section className="card"><h3>Glowing ball</h3>
+            <label className="toggle"><input type="checkbox" checked={page.ball.show} onChange={e => setIn('ball', { show: e.target.checked })} /> Show it when there is no photo</label>
+            {page.ball.show && <Range label="Size" min={140} max={320} step={10} unit="px" value={page.ball.size} onChange={v => setIn('ball', { size: v })} />}
+          </section>
+          <section className="card"><h3>Chat</h3>
+            <label className="toggle"><input type="checkbox" checked={page.chat.mic} onChange={e => setIn('chat', { mic: e.target.checked })} /> Voice input button</label>
+            <label className="toggle"><input type="checkbox" checked={page.chat.sources} onChange={e => setIn('chat', { sources: e.target.checked })} /> Show which notes an answer came from</label>
+          </section>
+          </>}
         </div>
 
         <div className="pp-prev"><div className="pp-prev-label">Live preview</div>

@@ -2,6 +2,7 @@
 import { CATEGORIES, INTENTS, OFFERING_FIELDS, PRICING, VISIBILITY_DEFAULTS } from '../shared/profileSchema.js';
 import { generateJSON } from './gemini.js';
 import { normalizePage } from '../shared/pageSettings.js';
+import { normalizeBg } from '../shared/siteSettings.js';
 import { publicUrl } from './site.js';
 import { raw, run } from './supabase.js';
 
@@ -277,6 +278,7 @@ function decorate(pub, slug, site) {
     ...pub, slug,
     hero: site?.hero_path ? publicUrl(site.hero_path) : null,
     page: normalizePage(site?.page),
+    bgImage: site?.bg_path ? publicUrl(site.bg_path) : null, bg: normalizeBg(site?.bg),
     contributions: pub.contributions.map(k => ({
       ...k,
       offerings: k.offerings.map(({ details, ...o }) => {

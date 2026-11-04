@@ -4,7 +4,8 @@ import { api } from '../lib/api.js';
 import { fmtDate } from '../lib/format.js';
 import { useAuth } from '../lib/auth.jsx';
 import { useOp } from '../lib/hooks.js';
-import { Button, Glass } from 'open-glass-ui';
+import { Button } from 'open-glass-ui';
+import { Glass } from '../components/Glass.jsx';
 import { Confirm, Field, Loading, Notice, Pill, Stats } from '../components/Ui.jsx';
 
 const fmt = code => (code && code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code || '');

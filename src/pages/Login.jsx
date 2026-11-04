@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { Button, Glass } from 'open-glass-ui';
+import { Button } from 'open-glass-ui';
+import { Glass } from '../components/Glass.jsx';
 import { Field, Notice } from '../components/Ui.jsx';
 
 export default function Login() {

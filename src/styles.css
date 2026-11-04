@@ -2,7 +2,7 @@
 :root {
   --primary: #6366f1;
   --primary-ink: #ffffff;
-  --bg: #f8fafc;
+  --bg: #ffffff;
   --panel: #ffffff;
   --text: #0f172a;
   --muted: #64748b;
@@ -29,9 +29,9 @@ code { background: #f1f5f9; color: #475569; padding: 2px 6px; border-radius: 6px
 /* wallpaper behind every admin / profile page: soft drifting light pastel blooms */
 .backdrop {
   position: fixed; inset: 0; z-index: -1; overflow: hidden;
-  background: radial-gradient(1200px 700px at 15% -10%, #ede9fe 0%, transparent 60%),
-              radial-gradient(900px 600px at 100% 10%, #e0e7ff 0%, transparent 60%),
-              #f8fafc;
+  background: radial-gradient(1200px 700px at 15% -10%, #f3f0ff 0%, transparent 60%),
+              radial-gradient(900px 600px at 100% 10%, #eef2ff 0%, transparent 60%),
+              #ffffff;
 }
 .backdrop i { position: absolute; border-radius: 50%; opacity: .65; will-change: transform; animation: drift 30s ease-in-out infinite alternate; }
 .backdrop i:nth-child(1) { width: 60vmax; height: 60vmax; left: -18vmax; top: 2vmax; background: radial-gradient(circle, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0) 68%); }

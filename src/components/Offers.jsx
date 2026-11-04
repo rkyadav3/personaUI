@@ -1,4 +1,5 @@
-import { Badge, Button, Glass } from 'open-glass-ui';
+import { Badge, Button } from 'open-glass-ui';
+import { Glass } from './Glass.jsx';
 
 export const money = o => (o.pricing === 'paid' ? (o.price != null ? `${o.currency || ''} ${o.price}`.trim() : 'Paid') : o.pricing === 'free' ? 'Free' : '');
 

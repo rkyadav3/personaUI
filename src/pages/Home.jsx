@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import 'open-glass-ui/styles.css';
-import { Glass, GlassSystemProvider } from 'open-glass-ui';
+import { GlassSystemProvider } from 'open-glass-ui';
+import { Glass } from '../components/Glass.jsx';
+import { GlassProvider } from '../components/LiquidGlass.jsx';
+import { PAGE_DEFAULTS } from '../../shared/pageSettings.js';
 import { CATEGORIES } from '../../shared/profileSchema.js';
 import { buildRails } from '../../shared/ranking.js';
 import { money } from '../components/Offers.jsx';
@@ -15,7 +18,7 @@ import { ago, compact, gradient, initials } from '../lib/ui.js';
 export default function Home() {
   return (
     <GlassSystemProvider renderer="auto" theme={{ appearance: 'dark' }}>
-      <Page />
+      <GlassProvider value={{ ...PAGE_DEFAULTS.glass, dark: true }}><Page /></GlassProvider>
     </GlassSystemProvider>
   );
 }

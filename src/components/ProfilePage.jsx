@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PersonaBall, { amp } from './PersonaBall.jsx';
-import { ACCENTS, normalizePage } from '../../shared/pageSettings.js';
+import BackgroundLayer from './BackgroundLayer.jsx';
+import LiquidGlass, { GlassProvider } from './LiquidGlass.jsx';
+import { ACCENTS, FONT_STACK, normalizePage } from '../../shared/pageSettings.js';
 import { cartable, fmtPrice } from '../lib/money.js';
 import { track } from '../lib/track.js';
 import '../styles/profilePage.css';
@@ -11,6 +13,8 @@ const ICON = { Books: '📖', Content: '📄', 'Information & Knowledge': 'ℹ�
 const TILE = ['#ede9fe', '#e0f2fe', '#dcfce7', '#fef3c7', '#ffe4e6', '#f1f5f9'];
 const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } };
+const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const luminance = h => { const [r, g, b] = hexRgb(h); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
 const first = s => String(s || '').trim().split(/\s+/)[0];
 
 function Stars({ avg = 0, count = 0 }) {
@@ -57,7 +61,10 @@ function ProductCard({ o, i, cur, cart, preview, onAdd, onOpen }) {
 
 export default function ProfilePage({ data, slug, user, preview = false, heroOverride }) {
   const page = useMemo(() => normalizePage(data.page), [data.page]);
-  const cur = page.currency, accent = ACCENTS[page.accent] || ACCENTS.violet;
+  const cur = page.currency, T = page.theme;
+  const accent = page.accentHex ? [page.accentHex, `color-mix(in srgb, ${page.accentHex} 55%, #ffffff)`] : (ACCENTS[page.accent] || ACCENTS.violet);
+  const dark = T.bg === 'color' && luminance(T.bgColor) < 0.45;      // a dark colour flips the text and glass to light-on-dark
+  const rad = T.radius;
   const hero = heroOverride !== undefined ? heroOverride : data.hero;
   const name = data.name || '', me = first(name);
 
@@ -176,47 +183,54 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
 
   const o = open, ov = o ? view(o) : null;
   return (
-    <div className={`pp-page${preview ? ' is-preview' : ''}`} style={{ '--a1': accent[0], '--a2': accent[1] }}>
+    <GlassProvider value={{ ...page.glass, dark }}>
+    <div className={`pp-page${preview ? ' is-preview' : ''}${dark ? ' pp-dark' : ''}`} style={{ '--a1': accent[0], '--a2': accent[1], '--r': `${rad}px`, '--maxw': `${T.maxWidth}px`, fontFamily: FONT_STACK[T.font], background: T.bg === 'color' ? T.bgColor : '#ffffff' }}>
+      <div className="pp-bg" aria-hidden="true">
+        {T.bg === 'orbs' && <><i /><i /><i /></>}
+        {T.bg === 'image' && data.bgImage && <><BackgroundLayer imageUrl={data.bgImage} bg={{ ...data.bg, dim: 0, parallax: false }} /><div className="pp-wash" style={{ background: `rgba(${dark ? '10,10,20' : '255,255,255'},${T.wash / 100})` }} /></>}
+      </div>
       <div className="pp-top">
         {page.cart && store.some(cartable) && <button className="pp-icon" onClick={() => setCartOpen(true)} aria-label={`Cart, ${count} items`}>🛒{count > 0 && <b>{count}</b>}</button>}
         {user ? <Link className="pp-icon" to="/admin" aria-label="Dashboard">👤</Link> : null}
       </div>
       {note && <div className="pp-toast" role="status">{note}</div>}
 
-      <main className="pp-grid">
+      <main className={`pp-grid${page.layout.sidebar === 'left' ? ' side-left' : ''}`}>
         <section className="pp-main">
-          <div className="pp-hero">
+          <LiquidGlass className={`pp-hero photo-${page.layout.photo}`} radius={rad + 4} refract>
             <div className="pp-wave" aria-hidden="true" />
-            <div className="pp-photo">
-              {hero
-                ? <img src={hero} alt={name} style={{ objectPosition: `${page.hero.x}% ${page.hero.y}%`, transform: `scale(${page.hero.zoom})` }} />
-                : <PersonaBall mode={mode} impulse={impulse} width={220} height={220} dotColor={[99, 102, 241]} glowColor={[168, 85, 247]} lightTheme />}
-            </div>
+            {page.layout.photo !== 'none' && (hero || page.ball.show) && (
+              <div className="pp-photo">
+                {hero
+                  ? <img src={hero} alt={name} style={{ objectPosition: `${page.hero.x}% ${page.hero.y}%`, transform: `scale(${page.hero.zoom})` }} />
+                  : <PersonaBall mode={mode} impulse={impulse} width={page.ball.size} height={page.ball.size} dotColor={[99, 102, 241]} glowColor={[168, 85, 247]} lightTheme={!dark} />}
+              </div>
+            )}
             <div className="pp-hero-body">
               <h1>{page.headline || 'Hi! Ask me about my'} <em>{page.headlineAccent || 'work.'}</em></h1>
               <p>{subtitle}</p>
               <div className="pp-chips">{chips.map(c => <button key={c.label} onClick={() => { setInput(c.prompt); inputRef.current?.focus(); }}>{c.label}</button>)}</div>
-              <form className="pp-ask" onSubmit={send}>
+              <LiquidGlass as="form" className="pp-ask" radius={999} onSubmit={send}>
                 <span aria-hidden="true">✦</span>
                 <input ref={inputRef} value={input} onChange={e => { setInput(e.target.value); setImpulse(0.25); }} placeholder={page.placeholder || 'Ask me anything about my work, what I offer, or my ideas…'} aria-label="Ask a question" />
-                {SR && <button type="button" className={`pp-mic${listening ? ' on' : ''}`} onClick={mic} aria-label={listening ? 'Stop listening' : 'Speak your question'}>🎙️</button>}
+                {SR && page.chat.mic && <button type="button" className={`pp-mic${listening ? ' on' : ''}`} onClick={mic} aria-label={listening ? 'Stop listening' : 'Speak your question'}>🎙️</button>}
                 <button className="pp-send" disabled={busy || !input.trim()} aria-label="Send">→</button>
-              </form>
-              {(answer || busy) && <div className="pp-answer" aria-live="polite"><p>{answer || 'Searching my notes…'}</p>{sources.length > 0 && <small>Sources: {sources.join(' · ')}</small>}</div>}
+              </LiquidGlass>
+              {(answer || busy) && <div className="pp-answer" aria-live="polite"><p>{answer || 'Searching my notes…'}</p>{page.chat.sources && sources.length > 0 && <small>Sources: {sources.join(' · ')}</small>}</div>}
             </div>
-          </div>
+          </LiquidGlass>
 
           {sec.store && store.length > 0 && (
-            <div className="pp-card pp-store" id="store">
+            <LiquidGlass className="pp-store" id="store" radius={rad} refract>
               <header><span className="pp-hex">⬡</span><div><h2>{page.storeTitle}</h2><p>{page.storeSubtitle || `${store.length} ${store.length === 1 ? 'item' : 'items'} from ${name || 'me'}, ready to use or order.`}</p></div></header>
               {badges.length > 1 && <div className="pp-filter">{['All', ...badges].map(b => <button key={b} className={filter === b ? 'on' : ''} onClick={() => setFilter(b)}>{b}</button>)}</div>}
               <div className="pp-products">{visible.map((p, i) => <ProductCard key={p.id} o={p} i={i} cur={cur} cart={page.cart} preview={preview} onAdd={add} onOpen={setOpen} />)}</div>
               {shown.length > page.storeLimit && <button className="pp-more" onClick={() => setShowAll(s => !s)}>{showAll ? 'Show less' : `Show all ${shown.length}`}</button>}
-            </div>
+            </LiquidGlass>
           )}
         </section>
 
-        <aside className="pp-card pp-side">
+        <LiquidGlass as="aside" className="pp-side" radius={rad} refract>
           <h2>{name}</h2>
           {tagline && <p className="pp-role">{tagline}</p>}
           {about && <p className="pp-about">{about}</p>}
@@ -248,12 +262,12 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
             if (k.items.length) return <div key={key} className="pp-blk"><h3>{ICON[k.category] || '✨'} {label}</h3>{k.description && <p className="pp-edu">{k.description}</p>}{k.items.map(it => <div key={it.id}>{Offer({ o: it })}</div>)}</div>;
             return <div key={key} className="pp-row"><span>{ICON[k.category] || '✨'}</span><div><strong>{label}</strong><small>{k.description || (k.intent === 'free' ? 'Offered free' : k.intent === 'paid' ? 'Offered as a paid service' : 'Get in touch to know more')}</small></div></div>;
           })}
-        </aside>
+        </LiquidGlass>
       </main>
 
       {o && (
         <div className="pp-modal" onClick={() => setOpen(null)}>
-          <div className="pp-sheet" role="dialog" aria-modal="true" aria-label={o.title} onClick={e => e.stopPropagation()}>
+          <LiquidGlass className="pp-sheet" radius={rad} refract role="dialog" aria-modal="true" aria-label={o.title} onClick={e => e.stopPropagation()}>
             <button className="pp-x" onClick={() => setOpen(null)} aria-label="Close">✕</button>
             <div className="pp-sheet-img"><Thumb o={o} i={0} /></div>
             <span className="pp-badge static">{o.badge}</span>
@@ -268,13 +282,13 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
               {!o.link && mail(o) && <a className="pp-btn" href={mail(o)} onClick={() => click(o)}>Enquire</a>}
               <button className="pp-btn ghost" onClick={() => ask(o)}>Ask about this</button>
             </div>
-          </div>
+          </LiquidGlass>
         </div>
       )}
 
       {cartOpen && (
         <div className="pp-modal right" onClick={() => setCartOpen(false)}>
-          <aside className="pp-drawer" onClick={e => e.stopPropagation()} aria-label="Cart">
+          <LiquidGlass as="aside" className="pp-drawer" radius={0} refract onClick={e => e.stopPropagation()} aria-label="Cart">
             <header><h3>Cart ({count})</h3><button className="pp-x" onClick={() => setCartOpen(false)} aria-label="Close cart">✕</button></header>
             <div className="pp-lines">
               {!lines.length && <p className="pp-empty">Your cart is empty.</p>}
@@ -294,9 +308,10 @@ export default function ProfilePage({ data, slug, user, preview = false, heroOve
                 {data.contact?.email && <a className="pp-btn block" href={`mailto:${data.contact.email}?subject=${encodeURIComponent('Order enquiry')}&body=${encodeURIComponent(lines.map(l => `${l.n} × ${l.o.title}`).join('\n'))}`}>Send my list by email</a>}
               </footer>
             )}
-          </aside>
+          </LiquidGlass>
         </div>
       )}
     </div>
+    </GlassProvider>
   );
 }
