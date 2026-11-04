@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { CATEGORIES, INTENTS, OFFERING_FIELDS, PRICING } from '../../../shared/profileSchema.js';
 import { api } from '../../lib/api.js';
 import { Confirm, Field, Notice } from '../Ui.jsx';
+import { BG_BUCKET } from '../../../shared/siteSettings.js';
+import { prepareImage } from '../../lib/image.js';
+import { uploadToSigned } from '../../lib/storage.js';
 
 const blank = { title: '', description: '', pricing: 'unspecified', price: '', currency: 'INR', active: true, details: {} };
 
@@ -11,6 +14,14 @@ function OfferingForm({ contribution, offering, onDone }) {
   const fields = OFFERING_FIELDS[contribution.category] || [];
   const det = (k, v) => setF({ ...f, details: { ...f.details, [k]: v } });
 
+  async function uploadCover(file) {
+    if (!file) return; setErr('');
+    try {
+      const p = await prepareImage(file), t = await api('site.sign', { type: p.type });
+      await uploadToSigned(t.path, t.token, p.blob, BG_BUCKET);
+      det('cover_image', `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${BG_BUCKET}/${t.path}`);
+    } catch (ex) { setErr(ex.message); }
+  }
   async function submit(e) {
     e.preventDefault(); setErr('');
     try { await api('offerings.save', { ...f, id: offering?.id, contributionId: contribution.id }); onDone(true); } catch (ex) { setErr(ex.message); }
@@ -25,7 +36,7 @@ function OfferingForm({ contribution, offering, onDone }) {
             {d.type === 'select'
               ? <select value={f.details[d.key] || ''} onChange={e => det(d.key, e.target.value)}><option value="">Not specified</option>{d.options.map(o => <option key={o}>{o}</option>)}</select>
               : d.type === 'textarea' ? <textarea rows={2} value={f.details[d.key] || ''} onChange={e => det(d.key, e.target.value)} />
-                : <input type="text" value={f.details[d.key] || ''} onChange={e => det(d.key, e.target.value)} />}
+                : <><input type="text" value={f.details[d.key] || ''} onChange={e => det(d.key, e.target.value)} />{d.key === 'cover_image' && <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => uploadCover(e.target.files[0])} />}</>}
           </Field>
         ))}
         <Field label="Free or paid"><select value={f.pricing} onChange={e => setF({ ...f, pricing: e.target.value })}>{PRICING.map(p => <option key={p}>{p}</option>)}</select></Field>

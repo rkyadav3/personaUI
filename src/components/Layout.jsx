@@ -31,6 +31,7 @@ const NAV_GROUPS = [
   {
     category: 'Appearance',
     items: [
+      { to: '/admin/page', label: 'Public Page', icon: '🪟' },
       { to: '/admin/settings', label: 'Persona Settings', icon: '⚙️' },
     ],
   },
@@ -52,7 +53,7 @@ function Inner() {
   if (user === undefined) return <p className="muted" style={{ padding: 40 }}>Loading…</p>;
   if (!user) return <Login />;
   if (needs === null) return <p className="muted" style={{ padding: 40 }}>Loading…</p>;
-  if (needs && pathname !== '/admin/profile') return <Navigate to="/admin/profile" replace />;
+  if (needs && !['/admin/profile', '/admin/superadmin', '/admin/invites'].includes(pathname)) return <Navigate to="/admin/profile" replace />;
 
   return (
     <div className="shell">
@@ -77,6 +78,10 @@ function Inner() {
             <NavLink to="/admin/superadmin" className="nav">
               <span className="nav-icon" aria-hidden="true">🛡️</span>
               <span>Super Admin</span>
+            </NavLink>
+            <NavLink to="/admin/superadmin?tab=invites" className="nav">
+              <span className="nav-icon" aria-hidden="true">✉️</span>
+              <span>Invite Links</span>
             </NavLink>
           </div>
         )}

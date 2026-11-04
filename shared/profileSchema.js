@@ -20,7 +20,9 @@ export const OFFERING_FIELDS_BASE = {
 };
 
 /** Every category also gets a buy / booking link, so visitors of the persona page can act straight away. */
-export const OFFERING_FIELDS = Object.fromEntries(Object.entries(OFFERING_FIELDS_BASE).map(([k, v]) => [k, [...v, BUY]]));
+/** Every offering can also have a picture (shown on its store card). */
+const COVER = t('cover_image', 'Cover image URL');
+export const OFFERING_FIELDS = Object.fromEntries(Object.entries(OFFERING_FIELDS_BASE).map(([k, v]) => [k, [...(v.some(f => f.key === 'cover_image') ? [] : [COVER]), ...v, BUY]]));
 
 export const VISIBILITY_DEFAULTS = {
   education: true, experience: true, designation: true, expertise: true, purpose: true, contributions: true,

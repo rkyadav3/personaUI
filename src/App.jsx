@@ -14,12 +14,13 @@ const KnowledgeIndex = lazy(() => import('./pages/KnowledgeIndex.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const PublicProfile = lazy(() => import('./pages/PublicProfile.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
-const Invites = lazy(() => import('./pages/Invites.jsx'));
+const PublicPage = lazy(() => import('./pages/PublicPage.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
 const Register = lazy(() => import('./pages/Register.jsx'));
 
 export default function App() {
   return (
+    <AuthProvider>
     <Suspense fallback={null}>
     <Routes>
       <Route path="/" element={<Home />} />
@@ -29,7 +30,7 @@ export default function App() {
       <Route path="/invite/:code" element={<Register />} />
       <Route path="/login" element={<Navigate to="/admin" replace />} />
       <Route path="/p/:slug" element={<PublicProfile />} />
-      <Route path="/admin" element={<AuthProvider><Layout /></AuthProvider>}>
+      <Route path="/admin" element={<Layout />}>
         <Route index element={<Overview />} />
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<Settings />} />
@@ -42,11 +43,13 @@ export default function App() {
         <Route path="templates" element={<Templates />} />
         <Route path="knowledge" element={<KnowledgeIndex />} />
         <Route path="superadmin" element={<SuperAdmin />} />
-        <Route path="invites" element={<Invites />} />
+        <Route path="page" element={<PublicPage />} />
+        <Route path="invites" element={<Navigate to="/admin/superadmin?tab=invites" replace />} />
         <Route path="users" element={<Navigate to="/admin/superadmin" replace />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </Suspense>
+    </AuthProvider>
   );
 }

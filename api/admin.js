@@ -57,6 +57,10 @@ const OPS = {
   'site.sign': ({ db }, a) => site.signBackground(db, a),
   'site.save': ({ db }, a) => site.saveSettings(db, a),
 
+  // public profile page (/p/<slug>): look + live preview data
+  'page.save': ({ db }, a) => site.savePage(db, a),
+  'page.preview': ({ db, user }) => profile.previewProfile(db, user.slug),
+
   // folders
   'folders.all': ({ db }) => store.allFolders(db),
   'folders.create': ({ db }, a) => store.createFolder(db, a.parentId, a.name),

@@ -44,7 +44,7 @@ export default function SuperAdmin() {
   if (!user?.isAdmin) {
     return (
       <Notice kind="error">
-        This area is restricted to Super Administrators. Add your email to <code>ADMIN_EMAILS</code> in your environment.
+        This area is restricted to Super Administrators. You are signed in as <b>{user?.email}</b>. Add that exact email to <code>ADMIN_EMAILS</code> (or <code>SUPERADMIN_EMAILS</code>) in Vercel → Settings → Environment Variables, then redeploy.
       </Notice>
     );
   }
