@@ -1,0 +1,7 @@
+.question-list{display:grid;gap:16px}
+.question-entry{padding:18px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+.question-entry .head{gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.question-entry time,.question-sources{color:var(--muted);font-size:.85rem}
+.question-entry h3{margin-bottom:10px}
+.question-answer{white-space:pre-wrap;line-height:1.65}
+.question-pages{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:20px}

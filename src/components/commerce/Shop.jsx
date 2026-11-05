@@ -5,9 +5,10 @@ import { useSeen } from '../../lib/useSeen.js';
 import { track } from '../../lib/track.js';
 import Icon from '../portfolio/Icon.jsx';
 import CheckoutDialog from './CheckoutDialog.jsx';
+import OfferingRating from '../home/OfferingRating.jsx';
 import '../../styles/profileActions.css';
 
-export function ShopCard({ item, preview, onCheckout }) {
+export function ShopCard({ item, slug, user, preview, onCheckout }) {
   const ref = useRef(null), offering = item.kind === 'offering';
   const [badImage, setBadImage] = useState(false);
   useSeen(ref, !preview && offering, () => track({ kind: 'view', id: item.id }));
@@ -30,15 +31,16 @@ export function ShopCard({ item, preview, onCheckout }) {
       {item.ratingCount > 0 && <small className="persona-muted">★ {Number(item.ratingAvg || 0).toFixed(1)} ({item.ratingCount} ratings)</small>}
       {item.checkout && unavailable && <small className="persona-muted">{item.accessReady === false ? 'Access link coming soon' : 'Contact the owner for pricing'}</small>}
       {info && <a className="persona-info-link" href={info} {...(/^https?:\/\//i.test(info) ? { target: '_blank', rel: 'noopener noreferrer nofollow' } : {})}>{item.linkLabel && !item.checkout ? item.linkLabel : 'More details'} ↗</a>}
+      {offering && slug && <details className="persona-rating-details"><summary>Rate this offering</summary><OfferingRating product={{ ...item, slug }} user={user} preview={preview} /></details>}
     </article>
   );
 }
 
-export default function Shop({ items, slug, owner, preview = false }) {
+export default function Shop({ items, slug, owner, user, preview = false }) {
   const [selected, setSelected] = useState(null);
   return (
     <>
-      <div className="persona-shop-grid">{items.map(item => <ShopCard key={`${item.kind}:${item.id}`} item={item} preview={preview} onCheckout={setSelected} />)}</div>
+      <div className="persona-shop-grid">{items.map(item => <ShopCard key={`${item.kind}:${item.id}`} item={item} slug={slug} user={user} preview={preview} onCheckout={setSelected} />)}</div>
       {selected && <CheckoutDialog key={`${selected.kind}:${selected.id}`} item={selected} slug={slug} owner={owner} preview={preview} onClose={() => setSelected(null)} />}
     </>
   );

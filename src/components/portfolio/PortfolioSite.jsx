@@ -159,7 +159,7 @@ function ProductsHome({ m, ctx }) {
     <section className="pf-wrap pf-sec" id="products">
       <SectionHead kicker={m.productsKicker} title={m.productsTitle} action={<GoTo to="products" ctx={ctx} className="pf-more">Explore All <Icon n="arrow" size={14} /></GoTo>} />
       {m.productsSubtitle && <p className="pf-shop-subtitle">{m.productsSubtitle}</p>}
-      <Shop items={m.products} slug={ctx.slug} owner={m.owner} preview={ctx.preview} />
+      <Shop items={m.products} slug={ctx.slug} owner={m.owner} user={ctx.user} preview={ctx.preview} />
     </section>
   );
 }
@@ -224,7 +224,7 @@ function ProductsPage({ m, ctx }) {
   return (
     <>
       <PageTop kicker={m.productsKicker} title={m.productsTitle}>{m.productsSubtitle && <p className="pf-lead">{m.productsSubtitle}</p>}</PageTop>
-      <section className="pf-wrap pf-sec tight"><Shop items={m.products} slug={ctx.slug} owner={m.owner} preview={ctx.preview} /></section>
+      <section className="pf-wrap pf-sec tight"><Shop items={m.products} slug={ctx.slug} owner={m.owner} user={ctx.user} preview={ctx.preview} /></section>
     </>
   );
 }
@@ -378,7 +378,7 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
 
   const T = page.theme, accent = page.accentHex ? [page.accentHex, `color-mix(in srgb, ${page.accentHex} 55%, #ffffff)`] : (ACCENTS[page.accent] || ACCENTS.violet);
   const dark = T.bg === 'color' && luminance(T.bgColor) < 0.45;
-  const ctx = { slug, pages: m.pages, preview, live: !preview, email: data.contact?.email || '', enquiry: m.enquiry.enabled, go: setPv, open: setOpenProj };
+  const ctx = { slug, user, pages: m.pages, preview, live: !preview, email: data.contact?.email || '', enquiry: m.enquiry.enabled, go: setPv, open: setOpenProj };
   const Body = { home: null, work: WorkPage, products: ProductsPage, experience: ExperiencePage, talks: TalksPage, updates: UpdatesPage, about: AboutPage, contact: ContactPage }[current];
 
   return (

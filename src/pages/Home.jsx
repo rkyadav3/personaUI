@@ -1,178 +1,160 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import 'open-glass-ui/styles.css';
-import { GlassSystemProvider } from 'open-glass-ui';
-import { Glass } from '../components/Glass.jsx';
-import { GlassProvider } from '../components/LiquidGlass.jsx';
-import { PAGE_DEFAULTS } from '../../shared/pageSettings.js';
-import { CATEGORIES } from '../../shared/profileSchema.js';
-import { buildRails } from '../../shared/ranking.js';
-import { money } from '../components/Offers.jsx';
-import { Stars } from '../components/Stars.jsx';
-import { Notice } from '../components/Ui.jsx';
-import { api } from '../lib/api.js';
-import { ago, compact, gradient, initials } from '../lib/ui.js';
-
-/** The private platform's front door: browse members and see what is newest, best rated and most opened.
- *  Visitors do not need an account. Clicking anything opens the member's PROFILE; the persona is one click further. */
-export default function Home() {
-  return (
-    <GlassSystemProvider renderer="auto" theme={{ appearance: 'dark' }}>
-      <GlassProvider value={{ ...PAGE_DEFAULTS.glass, dark: true }}><Page /></GlassProvider>
-    </GlassSystemProvider>
-  );
+import { useAuth } from '../lib/auth.jsx';
+import { compact, initials } from '../lib/ui.js';
+import { directoryModel, checkoutItem, applyHomeRating } from '../lib/homeDirectory.js';
+import { fmtPrice } from '../lib/money.js';
+import { track } from '../lib/track.js';
+import { useSeen } from '../lib/useSeen.js';
+import Icon from '../components/portfolio/Icon.jsx';
+import ProductDialog from '../components/home/ProductDialog.jsx';
+import CheckoutDialog from '../components/commerce/CheckoutDialog.jsx';
+import '../styles/home.css';
+function Arrow({
+  back = false,
+  size = 18
+}) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={back ? 'M19 12H5M11 6l-6 6 6 6' : 'M5 12h14M13 6l6 6-6 6'} /></svg>;
 }
-
-// What each rail shows under a card, and how it is titled. Order = order on the page. Empty rails are hidden.
-const RAILS = [
-  { key: 'topRated', title: 'Top rated', sub: 'Best reviewed by visitors', note: o => <Stars value={o.ratingAvg} count={o.ratingCount} /> },
-  { key: 'mostViewed', title: 'Most viewed', sub: 'What people are opening the most', note: o => `${compact(o.views)} ${o.views === 1 ? 'view' : 'views'}` },
-  { key: 'inDemand', title: 'In demand', sub: 'Most buy, book and enquire clicks', note: o => `${compact(o.clicks)} ${o.clicks === 1 ? 'request' : 'requests'}` },
-  { key: 'latest', title: 'Latest', sub: 'Newly published', note: o => ago(o.createdAt) },
-];
-
-function Page() {
-  const [feed, setFeed] = useState(null), [error, setError] = useState('');
-  const [q, setQ] = useState(''), [cat, setCat] = useState(''), [sort, setSort] = useState('new');
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    fetch('/api/home').then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error); return d; })
-      .then(d => { setFeed(d); document.title = d.name; }, e => setError(e.message || 'Could not load the members.'));
-  }, []);
-  useEffect(() => {   // only decides Sign in vs Dashboard, so it waits a moment instead of competing with the page
-    const t = setTimeout(() => api('auth.me').then(m => setUser(m.user), () => {}), 700);
-    return () => clearTimeout(t);
-  }, []);
-
-  const needle = q.trim().toLowerCase();
-  const titlesBySlug = useMemo(() => {
-    const m = new Map();
-    for (const o of feed?.offers || []) m.set(o.slug, `${m.get(o.slug) || ''} ${o.title}`.toLowerCase());
-    return m;
-  }, [feed]);
-
-  const offers = useMemo(() => (feed?.offers || []).filter(o => (!cat || o.category === cat)
-    && (!needle || `${o.title} ${o.description} ${o.member} ${o.category} ${o.subtype}`.toLowerCase().includes(needle))), [feed, cat, needle]);
-  const rails = useMemo(() => buildRails(offers), [offers]);
-
-  const members = useMemo(() => {
-    const list = (feed?.members || []).filter(m => (!cat || m.categories.includes(cat))
-      && (!needle || `${m.name} ${m.designation || ''} ${m.purpose || ''} ${m.expertise.join(' ')} ${m.categories.join(' ')} ${titlesBySlug.get(m.slug) || ''}`.toLowerCase().includes(needle)));
-    const by = { new: (a, b) => String(b.joined || '').localeCompare(String(a.joined || '')), views: (a, b) => b.views - a.views, name: (a, b) => a.name.localeCompare(b.name) };
-    return [...list].sort(by[sort]);
-  }, [feed, cat, needle, sort, titlesBySlug]);
-
-  const categories = useMemo(() => CATEGORIES.filter(c => (feed?.offers || []).some(o => o.category === c)), [feed]);
-  const mode = feed?.mode || 'invite';
-  const filtering = Boolean(cat || needle);
-
-  return (
-    <div className="home">
-      <Glass as="div" material="regular" className="home-nav">
-        <Link to="/" className="home-brand"><i aria-hidden="true" />{feed?.name || 'Persona'}</Link>
-        <nav aria-label="Account">
-          {user ? <Link to="/admin">Dashboard</Link> : <>
-            <Link to="/admin">Sign in</Link>
-            {mode !== 'closed' && <Link to="/invite" className="cta">I have an invite</Link>}
-          </>}
-        </nav>
-      </Glass>
-
-      <div className="home-tools">
-        <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Search people, books, talks, topics…" aria-label="Search" />
-        {categories.length > 0 && (
-          <div className="home-cats" role="group" aria-label="Filter by category">
-            <button className={!cat ? 'on' : ''} onClick={() => setCat('')}>All</button>
-            {categories.map(c => <button key={c} className={cat === c ? 'on' : ''} onClick={() => setCat(cat === c ? '' : c)}>{c}</button>)}
-          </div>
-        )}
-      </div>
-
-      {error && <Notice kind="error">{error}</Notice>}
-      {!feed && !error && <p className="muted home-empty">Loading…</p>}
-
-      {feed && RAILS.map(r => rails[r.key].length > 0 && (
-        <Rail key={r.key} title={cat ? `${r.title} in ${cat}` : r.title} sub={r.sub}>
-          {rails[r.key].map(o => <OfferCard key={o.id} o={o} note={r.note(o)} />)}
-        </Rail>
-      ))}
-      {feed && filtering && offers.length === 0 && members.length === 0 && <p className="muted home-empty">Nothing matches that. Try another word or clear the filter.</p>}
-
-      {feed && (
-        <section className="home-sec" aria-labelledby="members-h">
-          <div className="home-sec-head">
-            <div><h2 id="members-h">Members</h2><p className="muted">{members.length} {members.length === 1 ? 'person' : 'people'}{filtering ? ' match' : ''}. Open a card to see their profile.</p></div>
-            <label className="home-sort">Sort
-              <select value={sort} onChange={e => setSort(e.target.value)}>
-                <option value="new">Newest</option><option value="views">Most viewed</option><option value="name">A to Z</option>
-              </select>
-            </label>
-          </div>
-          {members.length > 0
-            ? <div className="mgrid">{members.map(m => <MemberCard key={m.slug} m={m} />)}</div>
-            : !filtering && <p className="muted home-empty">No members yet. Profiles appear here as soon as they are published.</p>}
-        </section>
-      )}
-
-      <footer className="home-foot muted">{mode === 'invite' ? 'A private community. Members join by invitation.' : feed?.name}</footer>
-    </div>
-  );
+function Star({
+  size = 19
+}) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9z" /></svg>;
 }
-
-function Rail({ title, sub, children }) {
-  const ref = useRef(null);
-  const nudge = dir => ref.current?.scrollBy({ left: dir * Math.max(240, ref.current.clientWidth * 0.8), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  return (
-    <section className="home-sec" aria-label={title}>
-      <div className="home-sec-head">
-        <div><h2>{title}</h2><p className="muted">{sub}</p></div>
-        <div className="rail-btns"><button onClick={() => nudge(-1)} aria-label={`Scroll ${title} back`}>‹</button><button onClick={() => nudge(1)} aria-label={`Scroll ${title} forward`}>›</button></div>
-      </div>
-      <div className="rail" ref={ref}>{children}</div>
-    </section>
-  );
+function Eye({
+  size = 20
+}) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>;
 }
-
-function Img({ src }) {
+function Portrait({
+  member,
+  featured = false
+}) {
   const [bad, setBad] = useState(false);
-  return src && !bad ? <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBad(true)} /> : null;
+  useEffect(() => setBad(false), [member.photo]);
+  const focus = member.photoFocus || {
+    x: 50,
+    y: 50,
+    zoom: 1
+  };
+  return <div className={featured ? 'directory-portrait featured' : 'directory-portrait'} aria-hidden="true">{member.photo && !bad ? <img src={member.photo} alt="" loading={featured ? 'eager' : 'lazy'} onError={() => setBad(true)} style={{
+      objectPosition: `${focus.x}% ${focus.y}%`,
+      transform: `scale(${featured ? 1 : focus.zoom || 1})`
+    }} /> : <span>{initials(member.name)}</span>}</div>;
 }
-
-function OfferCard({ o, note }) {
-  const price = money(o);
-  return (
-    <Link className="rcard" to={`/p/${o.slug}?o=${o.id}`}>
-      <div className="rcard-img" style={{ background: gradient(`${o.category}${o.id}`) }}>
-        <span className="rcard-letter" aria-hidden="true">{o.category[0]}</span>
-        <Img src={o.image} />
-        <em>{o.subtype || o.category}</em>
-        {price && <b className={o.pricing === 'free' ? 'free' : ''}>{price}</b>}
-      </div>
-      <div className="rcard-body">
-        <strong>{o.title}</strong>
-        <small>by {o.member}</small>
-        <span className="rcard-note">{note}</span>
-      </div>
-    </Link>
-  );
+export function FeaturedProfile({
+  member
+}) {
+  return <article className="directory-feature" aria-label="Featured professional"><Portrait member={member} featured /><div className="directory-feature-copy"><span className="directory-feature-badge"><Star size={13} />{member.ratingCount > 0 ? 'Top Rated Creator' : 'Featured Creator'}</span><h2>{member.name}</h2>{member.designation && <p className="directory-role">{member.designation}</p>}{member.purpose && <p className="directory-bio">{member.purpose}</p>}{!!member.expertise?.length && <ul className="directory-tags" aria-label="Expertise">{member.expertise.slice(0, 4).map(skill => <li key={skill}>{skill}</li>)}</ul>}</div>
+    <div className="directory-feature-stats"><div className="directory-stat"><Star /><div><strong>{member.ratingCount > 0 ? Number(member.ratingAvg).toFixed(1) : 'New'}</strong>{member.ratingCount > 0 && <span> / 5</span>}<small>{member.ratingCount || 0} offering reviews</small></div></div><div className="directory-stat"><Eye /><div><strong>{compact(member.views)}</strong><small>profile views</small></div></div><div className="directory-stat"><Icon n="chat" size={21} /><div><strong>{compact(member.engagements)}</strong><small>offering interactions</small></div></div><Link className="directory-profile-cta" to={`/p/${member.slug}`}>View Profile <Arrow size={16} /></Link></div>
+  </article>;
 }
-
-function MemberCard({ m }) {
-  return (
-    <Link className="mcard" to={`/p/${m.slug}`}>
-      <div className="mcard-cover" style={{ background: gradient(m.slug) }}><Img src={m.cover} /></div>
-      <span className="mcard-av" style={{ background: gradient(`${m.name}${m.slug}`) }} aria-hidden="true">{initials(m.name)}</span>
-      <div className="mcard-body">
-        <h3>{m.name}</h3>
-        {m.designation && <p className="mcard-role">{m.designation}</p>}
-        {m.purpose && <p className="mcard-purpose">{m.purpose}</p>}
-        {m.expertise.length > 0 && <div className="mcard-chips">{m.expertise.slice(0, 3).map(e => <span key={e}>{e}</span>)}</div>}
-        <div className="mcard-foot">
-          <span>{m.offerCount > 0 ? `${m.offerCount} ${m.offerCount === 1 ? 'offering' : 'offerings'}` : 'No offerings yet'}</span>
-          {m.location && <span>{m.location}</span>}
-        </div>
-      </div>
-    </Link>
-  );
+export function ProfileCard({
+  member,
+  first
+}) {
+  return <Link className={`directory-profile-card${first ? ' first' : ''}`} to={`/p/${member.slug}`} aria-label={`View ${member.name}’s profile`}><Portrait member={member} /><h3>{member.name}</h3><p>{member.expertise?.slice(0, 3).join(' · ') || member.designation || 'Explore their profile'}</p><div className="directory-card-stats"><span title={`${member.ratingCount || 0} offering reviews`}><Star size={13} />{member.ratingCount > 0 ? Number(member.ratingAvg).toFixed(1) : 'New'}</span><span title="Profile views"><Eye size={14} />{compact(member.views)}</span><span title="Offering interactions"><Icon n="chat" size={13} />{compact(member.engagements)}</span></div></Link>;
+}
+function ProductCover({
+  product
+}) {
+  const [bad, setBad] = useState(false);
+  const icon = product.icon || (product.typeLabel === 'Book' ? 'book' : ['Course', 'Video'].includes(product.typeLabel) ? 'play' : product.typeLabel === '1:1 Talk' || product.typeLabel === 'Consultation' ? 'calendar' : 'box');
+  return <span className={`directory-product-cover ${icon}`}>{product.image && !bad ? <img src={product.image} alt="" loading="lazy" onError={() => setBad(true)} /> : <Icon n={icon} size={29} />}</span>;
+}
+export function ProductRow({
+  product,
+  onOpen
+}) {
+  const ref = useRef(null);
+  useSeen(ref, (product.kind || 'offering') === 'offering', () => track({
+    kind: 'view',
+    id: product.id
+  }));
+  return <button type="button" className="directory-product-row" ref={ref} onClick={() => onOpen(product)} aria-label={`View ${product.title}`}><ProductCover product={product} /><span className="directory-product-copy"><span className="directory-type">{product.typeLabel || product.category || 'Product'}</span><strong>{product.title}</strong>{product.description && <span className="directory-product-summary">{product.description}</span>}<b>{fmtPrice(product) || 'Contact for details'}</b></span><span className="directory-product-arrow"><Arrow size={15} /></span></button>;
+}
+export function HomeDirectory({
+  feed,
+  error,
+  user,
+  onRetry,
+  onRated
+}) {
+  const [query, setQuery] = useState(''),
+    [sort, setSort] = useState('rated'),
+    [showAll, setShowAll] = useState(false),
+    [selected, setSelected] = useState(null);
+  const search = useRef(null),
+    profiles = useRef(null);
+  const model = useMemo(() => directoryModel(feed || {}, {
+    query,
+    sort
+  }), [feed, query, sort]);
+  const shownProducts = showAll ? model.products : model.products.slice(0, 4);
+  function nudge(back) {
+    const rail = profiles.current;
+    if (rail) rail.scrollBy({
+      left: (back ? -1 : 1) * Math.max(200, rail.clientWidth * .85),
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+    });
+  }
+  function openProduct(product) {
+    setSelected({
+      product,
+      phase: 'details'
+    });
+  }
+  function checkout(item) {
+    if ((item.kind || 'offering') === 'offering') track({
+      kind: 'click',
+      id: item.id
+    });
+    setSelected({
+      product: selected.product,
+      item,
+      phase: 'checkout'
+    });
+  }
+  return <div className="directory"><a className="directory-skip" href="#directory-content">Skip to profiles</a><header className="directory-header"><Link to="/" className="directory-brand" aria-label={`${feed?.name || 'Persona'} home`}>{feed?.name || 'Persona'}<span /></Link><nav aria-label="Account"><button type="button" className="directory-round search" aria-label="Focus profile search" onClick={() => search.current?.focus()}><Icon n="search" size={21} /></button><Link className="directory-round" to="/admin" aria-label={user ? 'Open dashboard' : 'Sign in'} title={user ? 'Dashboard' : 'Sign in'}><Icon n="users" size={19} /></Link></nav></header>
+    <section className="directory-intro" aria-labelledby="directory-heading"><p className="directory-eyebrow"><span aria-hidden="true">❧</span> CREATIVE &amp; TECHNOLOGY LEADERS <span aria-hidden="true">❧</span></p><h1 id="directory-heading">Meet industry’s <em>top-rated</em> professionals</h1><p className="directory-intro-sub">Discover experts, builders and thought leaders. Explore their work and find your next collaboration.</p><form className="directory-search" role="search" onSubmit={event => {
+        event.preventDefault();
+        document.getElementById('directory-content')?.focus();
+      }}><Icon n="search" size={21} /><input ref={search} type="search" value={query} onChange={event => setQuery(event.target.value)} aria-label="Search profiles, expertise, or industries" placeholder="Search profiles, expertise, or industries…" />{query && <button type="button" className="directory-clear" onClick={() => {
+          setQuery('');
+          search.current?.focus();
+        }} aria-label="Clear search">×</button>}<button type="submit" className="directory-search-go" aria-label="Search directory"><Arrow size={19} /></button></form></section>
+    <main id="directory-content" className="directory-content" tabIndex={-1}>{error ? <div className="directory-load-error"><p role="alert">{error}</p><button className="directory-buy" onClick={onRetry}>Retry</button></div> : !feed ? <div className="directory-loading" role="status">Loading profiles and products…</div> : <>{model.filtering && <div className="directory-results" role="status">{model.members.length} {model.members.length === 1 ? 'profile' : 'profiles'} and {model.products.length} {model.products.length === 1 ? 'product' : 'products'} matching “{query.trim()}”</div>}<div className="directory-columns"><div className="directory-people">{model.featured && <FeaturedProfile member={model.featured} />}<section className="directory-profiles" aria-labelledby="directory-profiles-heading"><div className="directory-section-head"><div><h2 id="directory-profiles-heading">{model.filtering ? 'Matching Profiles' : model.hasReviews ? 'Top Rated Profiles' : 'Featured Profiles'}</h2><p>{model.hasReviews ? 'Professionals ranked by visitor reviews of their offerings.' : 'Explore published profiles and discover what they offer.'}</p></div><div className="directory-carousel-controls"><button type="button" className="directory-round" disabled={model.members.length < 2} onClick={() => nudge(true)} aria-label="Previous profiles"><Arrow back size={17} /></button><button type="button" className="directory-round" disabled={model.members.length < 2} onClick={() => nudge(false)} aria-label="Next profiles"><Arrow size={17} /></button></div></div>{model.members.length ? <div className="directory-profile-rail" ref={profiles}>{model.members.map((member, index) => <ProfileCard member={member} first={!index} key={member.slug} />)}</div> : <div className="directory-empty">{model.filtering ? 'No profiles match your search. Try another name, expertise or industry.' : 'No published profiles yet. Profiles appear here when their owners publish them.'}</div>}{model.members.length > 1 && <label className="directory-sort">Sort profiles <select value={sort} onChange={event => setSort(event.target.value)}><option value="rated">Top rated</option><option value="views">Most viewed</option><option value="new">Newest</option><option value="name">Name A–Z</option></select></label>}</section></div><aside className="directory-products" aria-labelledby="directory-products-heading"><div className="directory-products-head"><h2 id="directory-products-heading">{model.filtering ? 'Matching Products' : 'Top Products'}</h2><button type="button" onClick={() => setShowAll(value => !value)} aria-label="Browse products" aria-expanded={showAll}>{showAll ? 'Show less' : 'View All'} <Arrow size={13} /></button></div><div className="directory-product-list">{shownProducts.map(product => <ProductRow key={`${product.slug}:${product.kind || 'offering'}:${product.id}`} product={product} onOpen={openProduct} />)}</div>{!shownProducts.length && <p className="directory-empty">{model.filtering ? 'No products match this search.' : 'Published products and offerings will appear here.'}</p>}</aside></div></>}</main>
+    <footer className="directory-footer"><span>{feed?.name || 'Persona'} · Discover people. Explore possibilities.</span>{feed?.mode === 'invite' && <Link to="/invite">Join with an invitation <Arrow size={14} /></Link>}</footer>{selected?.phase === 'details' && <ProductDialog product={selected.product} user={user} onClose={() => setSelected(null)} onCheckout={checkout} onRated={onRated} />}{selected?.phase === 'checkout' && <CheckoutDialog key={`${selected.product.slug}:${selected.product.id}`} item={selected.item || checkoutItem(selected.product)} slug={selected.product.slug} owner={selected.product.member} onClose={() => setSelected(null)} />}
+  </div>;
+}
+export default function Home() {
+  const {
+      user
+    } = useAuth() || {},
+    [feed, setFeed] = useState(null),
+    [error, setError] = useState(''),
+    [version, setVersion] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setError('');
+    fetch('/api/home', {
+      signal: controller.signal
+    }).then(async response => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not load profiles.');
+      return data;
+    }).then(data => {
+      if (!controller.signal.aborted) {
+        setFeed(data);
+        document.title = `${data.name || 'Persona'} · Discover professionals`;
+      }
+    }, failure => {
+      if (!controller.signal.aborted) setError(failure.message || 'Could not load profiles.');
+    });
+    return () => controller.abort();
+  }, [version]);
+  function rated(product, result) {
+    setFeed(current => applyHomeRating(current, product, result));
+  }
+  return <HomeDirectory feed={feed} error={error} user={user} onRetry={() => setVersion(value => value + 1)} onRated={rated} />;
 }

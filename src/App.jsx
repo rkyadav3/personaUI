@@ -19,6 +19,7 @@ const Register = lazy(() => import('./pages/Register.jsx'));
 const Updates = lazy(() => import('./pages/Updates.jsx'));
 const Enquiries = lazy(() => import('./pages/Enquiries.jsx'));
 const Purchases = lazy(() => import('./pages/Purchases.jsx'));
+const Questions = lazy(() => import('./pages/Questions.jsx'));
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="portfolio" element={<PortfolioEditor />} />
         <Route path="updates" element={<Updates />} />
         <Route path="enquiries" element={<Enquiries />} />
+        <Route path="questions" element={<Questions />} />
         <Route path="purchases" element={<Purchases />} />
         <Route path="invites" element={<Navigate to="/admin/superadmin?tab=invites" replace />} />
         <Route path="users" element={<Navigate to="/admin/superadmin" replace />} />

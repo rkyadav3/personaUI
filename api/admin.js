@@ -13,6 +13,7 @@ import * as events from '../server/events.js';
 import * as commerce from '../server/commerce.js';
 import * as site from '../server/site.js';
 import * as store from '../server/store.js';
+import { listQuestions } from '../server/chatHistory.js';
 import { scoped } from '../server/tenant.js';
 import { HttpError } from '../server/http.js';
 
@@ -85,6 +86,9 @@ const OPS = {
   'enquiries.count': ({ db }) => engage.countNewEnquiries(db),
   'enquiries.update': ({ db }, a) => engage.updateEnquiry(db, a),
   'enquiries.delete': async ({ db }, a) => { await engage.deleteEnquiry(db, a.id); return { ok: true }; },
+
+  // Visitor questions and the persona replies, private to the profile owner.
+  'chat.list': ({ db }, a) => listQuestions(db, a),
 
   // folders
   'folders.all': ({ db }) => store.allFolders(db),

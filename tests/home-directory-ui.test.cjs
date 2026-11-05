@@ -1,0 +1,66 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const Module = require('node:module');
+const { transformSync } = require('esbuild');
+Module._extensions['.jsx'] = (module, file) => module._compile(transformSync(fs.readFileSync(file, 'utf8'), { loader: 'jsx', format: 'cjs', jsx: 'automatic' }).code, file);
+Module._extensions['.css'] = () => {};
+const React = require('react');
+const { renderToStaticMarkup } = require('react-dom/server');
+const { StaticRouter } = require('react-router-dom/server');
+const render = element => renderToStaticMarkup(React.createElement(StaticRouter, {}, element));
+const feed = { name: 'Persona', members: [{ slug: 'ravi', name: 'Ravi Kumar Yadav', designation: 'Technology & Product Development Enthusiast', expertise: ['AI/ML', 'IoT'], purpose: 'Builds useful tools.', photo: 'https://public.test/ravi.png', views: 12400, ratingAvg: 4.9, ratingCount: 128, engagements: 98 }], products: [{ id: 1, slug: 'ravi', member: 'Ravi Kumar Yadav', kind: 'offering', title: 'Building AI Products', typeLabel: 'Book', pricing: 'paid', price: 499, currency: 'INR', accessReady: true }] };
+
+test('main home renders the reference layout with a featured profile, real metrics and products', () => {
+  const { HomeDirectory } = require('../src/pages/Home.jsx');
+  const html = render(React.createElement(HomeDirectory, { feed }));
+  for (const text of ['Meet industry', 'top-rated', 'professionals', 'Top Rated Profiles', 'Top Products', 'Ravi Kumar Yadav', 'Building AI Products', '₹499', '128 offering reviews', '12.4K', 'offering interactions']) assert.ok(html.includes(text), text);
+  assert.match(html, /href="\/p\/ravi"/);
+  assert.match(html, /aria-label="Search profiles, expertise, or industries"/);
+  assert.match(html, /aria-label="Browse products"/);
+  assert.doesNotMatch(html, /reliability score|verified experts/i);
+});
+
+test('the home account control leads to the admin and supports invitation-only joining', () => {
+  const { HomeDirectory } = require('../src/pages/Home.jsx');
+  const html = render(React.createElement(HomeDirectory, { feed: { ...feed, mode: 'invite' }, user: { name: 'Owner' } }));
+  assert.match(html, /aria-label="Open dashboard"/);
+  assert.match(html, /href="\/admin"/);
+  assert.match(html, /href="\/invite"/);
+});
+
+test('empty, loading and failed home feeds have distinct useful states', () => {
+  const { HomeDirectory } = require('../src/pages/Home.jsx');
+  assert.match(render(React.createElement(HomeDirectory, {})), /Loading profiles/);
+  const failed = render(React.createElement(HomeDirectory, { error: 'Could not load profiles', onRetry() {} }));
+  assert.match(failed, /Could not load profiles/); assert.match(failed, /Retry/);
+  const empty = render(React.createElement(HomeDirectory, { feed: { members: [], products: [] } }));
+  assert.match(empty, /No published profiles yet/);
+  assert.doesNotMatch(empty, /4\.9|98%|Top Rated Creator/);
+});
+
+test('product details expose real checkout, creator links and visitor ratings for offerings', () => {
+  const { ProductDetails } = require('../src/components/home/ProductDialog.jsx');
+  const html = render(React.createElement(ProductDetails, { product: feed.products[0], onCheckout() {} }));
+  assert.match(html, /Buy now/);
+  assert.match(html, /href="\/p\/ravi"/);
+  assert.match(html, /aria-label="Rate this offering"/);
+  assert.match(html, /₹499/);
+});
+
+test('a product without an access link exposes contact instead of enabled checkout', () => {
+  const { ProductDetails } = require('../src/components/home/ProductDialog.jsx');
+  const html = render(React.createElement(ProductDetails, { product: { ...feed.products[0], accessReady: false }, onCheckout() {} }));
+  assert.match(html, /Access link coming soon/);
+  assert.match(html, /href="\/p\/ravi\/contact"/);
+  assert.doesNotMatch(html, /class="directory-buy">Buy now/);
+});
+
+test('public profile shops let visitors rate offerings while previews cannot submit feedback', () => {
+  const { ShopCard } = require('../src/components/commerce/Shop.jsx');
+  const item = { kind: 'offering', id: 1, title: 'Book', pricing: 'free', accessReady: true };
+  assert.match(render(React.createElement(ShopCard, { item, slug: 'owner', onCheckout() {} })), /aria-label="Rate this offering"/);
+  const OfferingRating = require('../src/components/home/OfferingRating.jsx').default;
+  assert.match(render(React.createElement(OfferingRating, { product: { ...item, slug: 'owner' }, preview: true })), /Ratings are available on your live profile/);
+  assert.match(render(React.createElement(OfferingRating, { product: { ...item, slug: 'owner' }, user: { slug: 'owner' } })), /You cannot rate your own offering/);
+});

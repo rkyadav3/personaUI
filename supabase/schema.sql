@@ -53,6 +53,7 @@ create index if not exists chunks_embedding_idx on chunks using hnsw (embedding 
 create table if not exists chat_log (
   id bigint generated always as identity primary key,
   question text not null, answered boolean not null default false,
+  answer text, sources jsonb not null default '[]'::jsonb,
   top_similarity real, created_at timestamptz not null default now()
 );
 

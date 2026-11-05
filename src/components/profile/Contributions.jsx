@@ -9,10 +9,12 @@ import { CHECKOUT_CURRENCIES } from '../../../shared/commerce.js';
 
 const blank = { title: '', description: '', pricing: 'unspecified', price: '', currency: 'INR', deliveryUrl: '', active: true, details: {} };
 
-export function OfferingForm({ contribution, offering, onDone }) {
+export function OfferingForm({ contribution, contributions = contribution ? [contribution] : [], offering, onDone }) {
   const [f, setF] = useState(offering ? { ...blank, ...offering, price: offering.price ?? '', currency: offering.currency || 'INR', deliveryUrl: offering.delivery_url || offering.deliveryUrl || '' } : blank);
+  const [categoryId, setCategoryId] = useState(String(offering?.contribution_id ?? contribution?.id ?? ''));
   const [err, setErr] = useState('');
-  const fields = OFFERING_FIELDS[contribution.category] || [];
+  const selected = contributions.find(item => String(item.id) === categoryId);
+  const fields = OFFERING_FIELDS[selected?.category] || [];
   const det = (k, v) => setF({ ...f, details: { ...f.details, [k]: v } });
 
   async function uploadCover(file) {
@@ -25,10 +27,12 @@ export function OfferingForm({ contribution, offering, onDone }) {
   }
   async function submit(e) {
     e.preventDefault(); setErr('');
-    try { await api('offerings.save', { ...f, id: offering?.id, contributionId: contribution.id }); onDone(true); } catch (ex) { setErr(ex.message); }
+    if (!selected) { setErr('Choose a category for this offering.'); return; }
+    try { await api('offerings.save', { ...f, id: offering?.id, contributionId: selected.id }); onDone(true); } catch (ex) { setErr(ex.message); }
   }
   return (
     <form className="card inner" onSubmit={submit}>
+      <Field label="Offering category *"><select aria-label="Offering category" required value={categoryId} onChange={e => setCategoryId(e.target.value)}><option value="" disabled>Choose a category</option>{contributions.map(item => <option key={item.id} value={String(item.id)}>{item.category}{item.subtype ? `: ${item.subtype}` : ''}</option>)}</select><span className="hint">Categories come from your contributions below. Add a category there to make it available here.</span></Field>
       <Field label="Title *"><input type="text" value={f.title} onChange={e => setF({ ...f, title: e.target.value })} /></Field>
       <Field label="Description"><textarea rows={3} value={f.description} onChange={e => setF({ ...f, description: e.target.value })} /></Field>
       <div className="cols c2">
@@ -49,12 +53,12 @@ export function OfferingForm({ contribution, offering, onDone }) {
       {['free', 'paid'].includes(f.pricing) && <Field label="Access / download link after checkout"><input type="text" maxLength={600} placeholder="https://…" value={f.deliveryUrl} onChange={e => setF({ ...f, deliveryUrl: e.target.value })} /><span className="hint">Shown to the buyer after a free claim or verified Razorpay payment. Add this link to enable checkout.</span></Field>}
       <label className="toggle"><input type="checkbox" checked={f.active} onChange={e => setF({ ...f, active: e.target.checked })} /> Active (shown on your profile)</label>
       <Notice kind="error">{err}</Notice>
-      <div className="row"><button className="btn primary">{offering ? 'Save offering' : 'Add offering'}</button><button type="button" className="btn" onClick={() => onDone(false)}>Cancel</button></div>
+      <div className="row"><button className="btn primary" disabled={!selected}>{offering ? 'Save offering' : 'Add offering'}</button><button type="button" className="btn" onClick={() => onDone(false)}>Cancel</button></div>
     </form>
   );
 }
 
-function Card({ c, reload }) {
+function Card({ c, contributions, reload }) {
   const [edit, setEdit] = useState(false), [form, setForm] = useState(null);   // form: null | 'new' | offering
   const [d, setD] = useState({ description: c.description, intent: c.intent, subtype: c.subtype });
   const save = patch => api('contributions.save', { ...c, ...d, ...patch }).then(reload);
@@ -89,7 +93,7 @@ function Card({ c, reload }) {
           </div>
         </div>
       ))}
-      {form ? <OfferingForm contribution={c} offering={form === 'new' ? null : form} onDone={changed => { setForm(null); if (changed) reload(); }} />
+      {form ? <OfferingForm contribution={c} contributions={contributions} offering={form === 'new' ? null : form} onDone={changed => { setForm(null); if (changed) reload(); }} />
         : <button className="btn" style={{ marginTop: 10 }} onClick={() => setForm('new')}>Add offering</button>}
     </section>
   );
@@ -104,7 +108,7 @@ export default function Contributions({ items, reload }) {
   return (
     <>
       {!items.length && <p className="muted">No contribution categories yet. Add one to start listing offerings.</p>}
-      {items.map(c => <Card key={`${c.id}-${c.updated || ''}`} c={c} reload={reload} />)}
+      {items.map(c => <Card key={`${c.id}-${c.updated || ''}`} c={c} contributions={items} reload={reload} />)}
       {open ? (
         <form className="card" onSubmit={add}>
           <h3>Add a category</h3>

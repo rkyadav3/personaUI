@@ -19,6 +19,7 @@ const MANAGE = [
   { to: '/admin/updates', label: 'Updates & Schedule', icon: 'calendar' },
   { to: '/admin/purchases', label: 'Purchases', icon: 'box' },
   { to: '/admin/enquiries', label: 'Enquiries', icon: 'email', badge: true },
+  { to: '/admin/questions', label: 'Profile Q&A', icon: 'chat' },
   { to: '/admin/writing', label: 'Writing & Posts', icon: 'pen' },
   { to: '/admin/topics', label: 'Research Topics', icon: 'layers' },
 ];

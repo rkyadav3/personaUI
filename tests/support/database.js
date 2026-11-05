@@ -5,7 +5,7 @@ export function scriptedDatabase(...responses) {
     const call = { table, steps: initial }; calls.push(call);
     let result;
     const query = {};
-    for (const method of ['select', 'insert', 'update', 'delete', 'eq', 'gt', 'gte', 'order', 'limit', 'range', 'single']) {
+    for (const method of ['select', 'insert', 'update', 'delete', 'eq', 'in', 'gt', 'gte', 'order', 'limit', 'range', 'single']) {
       query[method] = (...args) => { call.steps.push({ method, args }); return query; };
     }
     query.then = (resolve, reject) => {

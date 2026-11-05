@@ -33,13 +33,21 @@ async function ownerId(slug) {
   if (!r.ok) throw new Error(`owner lookup ${r.status}`);
   return (await r.json())[0]?.id || null;
 }
-async function log(owner, question, answered, sim) {
-  try {
-    await fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_log`, {
-      method: 'POST', headers: { ...sbHeaders(), Prefer: 'return=minimal' },
-      body: JSON.stringify({ owner_id: owner, question: question.slice(0, 500), answered, top_similarity: sim })
-    });
-  } catch (e) { /* logging must never break a chat */ }
+async function log(owner, question, answer, sources, answered, sim) {
+  const result = await fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_log`, {
+    method: 'POST', headers: { ...sbHeaders(), Prefer: 'return=minimal' },
+    body: JSON.stringify({ owner_id: owner, question: question.slice(0, 500), answer, sources, answered, top_similarity: sim })
+  });
+  if (!result.ok) throw new Error(`chat history write ${result.status}`);
+}
+
+async function respond(res, owner, question, reply, sources, answered, sim, status = 200) {
+  try { await log(owner, question, reply, sources, answered, sim); }
+  catch (e) {
+    console.error(e);
+    return res.status(503).json({ reply: "I couldn't save this question right now. Please try again in a moment.", sources: [] });
+  }
+  return res.status(status).json({ reply, sources });
 }
 
 async function embedQuery(text) {
@@ -94,16 +102,16 @@ export default async function handler(req, res) {
     topSim = rows.length ? rows[0].similarity : null;
   } catch (e) {
     console.error(e);
-    if (owner) await log(owner, q, false, null);
-    return res.status(502).json({ reply: "I can't reach my notes right now. Try again in a moment.", sources: [] });
+    const reply = "I can't reach my notes right now. Try again in a moment.";
+    if (owner) return respond(res, owner, q, reply, [], false, null, 502);
+    return res.status(502).json({ reply, sources: [] });
   }
 
-  if (!passages.length) { await log(owner, q, false, topSim); return res.status(200).json({ reply: NOT_FOUND, sources: [] }); }
+  if (!passages.length) return respond(res, owner, q, NOT_FOUND, [], false, topSim);
 
   let reply = null;
   try { reply = await generate(q, passages); } catch (e) { console.error(e); }
   if (!reply) reply = passages[0].content.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+/).slice(0, 3).join(' '); // model unavailable: quote the best passage
   const answered = !reply.includes(NOT_FOUND);
-  await log(owner, q, answered, topSim);
-  return res.status(200).json({ reply, sources: answered ? [...new Set(passages.map(p => p.source_name))] : [] });
+  return respond(res, owner, q, reply, answered ? [...new Set(passages.map(p => p.source_name))] : [], answered, topSim);
 }

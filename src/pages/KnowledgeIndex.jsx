@@ -1,13 +1,12 @@
 import { useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { fmtDate } from '../lib/format.js';
+import { ProfileQuestions } from './Questions.jsx';
 import { useOp } from '../lib/hooks.js';
 import { Confirm, Loading, Notice, Pill, Progress } from '../components/Ui.jsx';
 
 export default function KnowledgeIndex() {
   const { data: c, reload: reloadCounts, error } = useOp('index.counts');
   const { data: set } = useOp('index.settings');
-  const { data: log, reload: reloadLog } = useOp('index.log');
 
   const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'test' | 'logs'
 
@@ -50,7 +49,6 @@ export default function KnowledgeIndex() {
       setHits(await api('index.test', { q }));
     } catch (ex) { setSearchErr(ex.message); }
     setSearchBusy(false);
-    reloadLog();
   }
 
   if (!c) return <Loading error={error} />;
@@ -238,47 +236,7 @@ export default function KnowledgeIndex() {
       )}
 
       {/* TAB 3: VISITOR QUERY LOGS */}
-      {activeTab === 'logs' && (
-        <section className="card">
-          <h3>Visitor Questions Log</h3>
-          <p className="muted" style={{ fontSize: '.9rem', margin: '0 0 16px' }}>
-            Real questions asked by visitors on your public page. Unanswered questions highlight topics you might want to write about next!
-          </p>
-
-          {!log?.length ? (
-            <p className="muted" style={{ textAlign: 'center', padding: '24px 0' }}>
-              No visitor queries recorded yet. Questions asked on your Persona page will appear here.
-            </p>
-          ) : (
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>Asked Date</th>
-                  <th>Visitor Question</th>
-                  <th>Answered Status</th>
-                  <th>Top Relevance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {log.map(r => (
-                  <tr key={r.id}>
-                    <td style={{ fontSize: '.84rem' }}>{fmtDate(r.created_at)}</td>
-                    <td><strong>{r.question}</strong></td>
-                    <td>
-                      <span className={`pill ${r.answered ? 'published' : 'revoked'}`}>
-                        {r.answered ? '✓ Answered' : '✗ Missed (No Notes)'}
-                      </span>
-                    </td>
-                    <td>
-                      {r.top_similarity != null ? `${(r.top_similarity * 100).toFixed(1)}%` : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      )}
+      {activeTab === 'logs' && <ProfileQuestions />}
     </>
   );
 }

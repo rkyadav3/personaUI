@@ -25,10 +25,11 @@ The Streamlit admin and the static chat page are now one React app (Vite) with V
 - `/u/:slug`: redirects existing shared links to `/p/:slug/chat`.
 - `/admin`: sign in / create account, then the admin pages. Invite links look like `/admin?invite=CODE`.
 - `/admin/purchases`: that owner's purchases, free claims, buyer details, fulfillment and shared payment settings.
+- `/admin/questions`: the owner's visitor questions, persona replies, sources and dates, with access to older pages of history.
 - `/admin/portfolio`: the single Portfolio editor, with Portfolio content, Look & Store, and Persona settings. Old `/admin/page` and `/admin/settings` links redirect here.
 
 ## Setup
-1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql`, `page.sql`, `portfolio.sql`, `engage.sql`, `events-commerce.sql`, and `studio-assistant.sql`. If your project already has those tables, compare first and run the migrations it is missing.
+1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql`, `page.sql`, `portfolio.sql`, `engage.sql`, `events-commerce.sql`, `studio-assistant.sql`, and `profile-questions.sql`. If your project already has those tables, compare first and run the migrations it is missing.
 2. **Env vars:** copy `.env.example` to `.env.local` (local) or add them in Vercel. `SESSION_SECRET` is new: any long random string.
 3. **Run locally:** `npm install`, `npm i -g vercel`, then `npm run dev` (first run asks you to log in and link a Vercel project; put your variables in `.env.local`). `npm run dev:web` runs only the UI and proxies `/api` to a `vercel dev` on port 3000.
 4. **Deploy:** import the repo in Vercel (framework: Vite). Root directory is the repo root. Add the env vars. Deploy.
@@ -56,6 +57,14 @@ New accounts land on **Profile** and write one free-text introduction instead of
 
 Storage: `profiles`, `contributions`, `offerings` are separate tables. `profile_submissions` keeps every raw input and AI output (private) for corrections and audit, and limits extraction to 12 per hour per user.
 
+Offering forms let you choose any of your saved contribution categories, including custom subtypes. Editing an offering can move it to another category; the server validates that category in your own account and keeps only its allowed detail fields.
+
+## Profile Q&A and content organization
+
+**Profile Q&A** in Manage portfolio (`/admin/questions`) shows visitors' questions with the exact persona replies, source names, dates and answered status. Knowledge Base's visitor log uses the same view. History is private to the signed-in owner and paginated in batches of 50. Run `supabase/profile-questions.sql` **before deploying this code**. Older questions remain visible, but their past replies cannot be recovered because they were never stored. A history write failure returns a retryable chat error instead of silently losing a successful interaction.
+
+Research Topics group files and posts; Templates are reusable article bodies copied into new drafts. Neither is an offering category or a portfolio layout. See [functionality and implementation discussion](docs/profile-management.md) for current behavior and proposed next steps.
+
 Cover images for books are a URL for now (no image upload yet).
 
 ## Portfolio studio: appearance and persona settings
@@ -81,16 +90,18 @@ Run `supabase/studio-assistant.sql` and keep the existing server `GEMINI_API_KEY
 ## Members' home page (`/`)
 A private platform: set `REGISTRATION_MODE=invite` (now the default in `.env.example`) so an account needs a code from **Admin → Invites**. Visitors browse without an account.
 
-- **Navbar:** site name (`SITE_NAME`), Sign in / Dashboard, and "I have an invite".
-- **Rails under the navbar:** Top rated, Most viewed, In demand, Latest. A rail with nothing in it is hidden, so a new platform just shows Latest. The category chips and the search box re-rank the rails and filter the cards instantly (`shared/ranking.js`).
-- **Member cards:** one for every *published* profile (draft profiles and hidden sections never appear; everything goes through `buildPublic`). A card opens `/p/:slug`. The card's picture is the member's background if they set one.
+- **Layout:** a green-and-white directory with a centered headline and search, a featured creator, a ranked profile carousel, and an expandable Top Products panel. It adapts to desktop, tablet and mobile screens.
+- **Search and sorting:** search names, expertise, industries and product titles; sort creators by Top rated, Most viewed, In demand or Latest. Product-title searches also filter the products shown.
+- **Creator cards:** published profiles use their saved portrait and show expertise and real offering metrics. Draft profiles and hidden sections are excluded through `buildPublic`. A card opens `/p/:slug`.
+- **Products:** public portfolio products open a details dialog with existing free-claim or Razorpay checkout actions. Enquiries use the creator's published contact page, or public chat when contact is disabled. Private delivery links are excluded from the directory.
 - **Portfolio:** the Chat navigation item and default **Chat with my AI** button open `/p/:slug/chat`. Published contact details and the optional contact form remain inside the same Portfolio.
-- **Data:** `api/home.js` (one cached read) and `api/track.js` (counters). Run `supabase/home.sql` once.
+- **Data:** `api/home.js` provides a cached directory read and `api/track.js` records engagement. Run `supabase/home.sql` once.
 
 How the numbers work:
 - **Most viewed:** an offering counts once a visitor has had it mostly on screen for a second. Once per browser session, and a member's own visits never count.
-- **Top rated:** visitors rate 1 to 5 stars on the profile; one vote per visitor per offering (stored as a salted hash, never an IP). Ranking uses a Bayesian average, so one 5-star vote does not beat forty 4.8s. Members cannot rate their own offerings.
+- **Top rated:** visitors rate offerings from home product dialogs and public profile shops; one vote per visitor per offering (stored as a salted hash, never an IP). Creator ratings aggregate visible offerings. Ratings with at least five votes rank ahead of preliminary ratings, with Bayesian ranking within each group. Owners and previews cannot submit ratings. Rating changes update home aggregates immediately.
 - **In demand:** clicks on offerings measure interest. Confirmed Razorpay purchases and free claims are recorded separately in the seller's **Purchases** panel.
+- **Interactions:** the featured creator shows actual offering interactions, following the product decision to use real engagement rather than introducing a reliability score. Hidden or unpublished content and malformed tracking requests are rejected.
 - The abuse limits in `api/track.js` live in memory per warm serverless instance. For stronger protection, add Vercel's firewall rate limiting.
 
 
