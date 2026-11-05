@@ -2,6 +2,17 @@ import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, 
 import { HttpError } from './http.js';
 
 export const hashToken = token => createHash('sha256').update(token).digest('hex');
+/** A second receipt capability restores browser access without replacing the original checkout token. */
+export function recoveryReceiptToken(row, secret = process.env.SESSION_SECRET) {
+  if (typeof secret !== 'string' || secret.length < 16) throw new HttpError(503, 'Receipt recovery is not configured. The profile owner needs to check server setup.');
+  return createHmac('sha256', secret).update(JSON.stringify(['purchase-recovery-v1', row.owner_id, row.id, row.request_id, row.receipt_token_hash])).digest('base64url');
+}
+export function validRecoveryReceipt(row, token, secret) {
+  if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) return false;
+  // Original checkout receipts remain usable when recovery signing is not configured.
+  if (typeof secret !== 'string' || secret.length < 16) return false;
+  return timingSafeEqual(Buffer.from(token), Buffer.from(recoveryReceiptToken(row, secret)));
+}
 export function validSignature(body, signature, secret) {
   if (!secret || typeof signature !== 'string' || !/^[a-f0-9]{64}$/i.test(signature)) return false;
   return timingSafeEqual(Buffer.from(signature, 'hex'), createHmac('sha256', secret).update(body).digest());

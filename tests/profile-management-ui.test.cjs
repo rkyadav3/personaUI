@@ -24,10 +24,10 @@ test('editing an offering preselects its saved category', () => {
 });
 
 test('the admin navigation exposes Profile Q&A to ordinary profile owners', () => {
-  const { StudioSidebar } = require('../src/components/Layout.jsx');
-  const html = render(React.createElement(MemoryRouter, null, React.createElement(StudioSidebar, { user: { name: 'Owner', isAdmin: false } })));
+  const { AdminSectionTabs } = require('../src/components/AdminNavigation.jsx');
+  const html = render(React.createElement(MemoryRouter, { initialEntries: ['/admin/questions'] }, React.createElement(AdminSectionTabs, { user: { name: 'Owner', isAdmin: false } })));
   assert.match(html, /href="\/admin\/questions"/);
-  assert.match(html, /Profile Q&amp;A/);
+  assert.match(html, /Visitor Q&amp;A/);
 });
 
 test('Profile Q&A renders answers as text, sources, legacy records and pagination', () => {

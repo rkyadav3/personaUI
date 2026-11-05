@@ -1,12 +1,15 @@
+import AdminTabs from '../components/AdminTabs.jsx';
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { VISIBILITY_DEFAULTS } from '../../shared/profileSchema.js';
 import { api } from '../lib/api.js';
+import { useAdminTab } from '../lib/adminTabs.js';
 import { QUESTIONS, emptyDraft, mergeDraft, missing } from '../lib/draft.js';
 import { Loading, Notice, Pill } from '../components/Ui.jsx';
 import DraftEditor from '../components/profile/DraftEditor.jsx';
 import VisibilityEditor from '../components/profile/VisibilityEditor.jsx';
 import Contributions from '../components/profile/Contributions.jsx';
+import Icon from '../components/portfolio/Icon.jsx';
 
 const PLACEHOLDER = 'Tell us about yourself, your education, professional experience, expertise, and what you would like to contribute to our platform.';
 
@@ -79,7 +82,7 @@ function Onboarding({ onDone }) {
               disabled={busy || text.trim().length < 20}
               onClick={() => run(text, false)}
             >
-              {busy ? 'Extracting your details with AI…' : '✨ Build my profile'}
+              <Icon n="spark" size={18} />{busy ? 'Extracting your details with AI…' : 'Build my profile'}
             </button>
             <span className="muted" style={{ fontSize: '.85rem' }}>{text.length} / 6000 characters</span>
           </div>
@@ -130,9 +133,10 @@ function Onboarding({ onDone }) {
 const toDraft = p => ({ profile: { name: p.name, education: p.education || [], contact: { email: null, phone: null, location: null, other: null, ...(p.contact || {}) },
   experience: { total_years: null, description: '', employers: [], ...(p.experience || {}) }, designation: p.designation, expertise: p.expertise || [] }, purpose: { description: p.purpose || '', contributions: [] } });
 
-function Manager({ data, reload }) {
+export function ProfileManager({ data, reload }) {
   const { profile: p, contributions } = data;
-  const [tab, setTab] = useState('profile'), [draft, setDraft] = useState(toDraft(p)), [vis, setVis] = useState(p.visibility), [msg, setMsg] = useState(null);
+  const [tab, setTab] = useAdminTab({ values: ['profile', 'visibility', 'contrib'], defaultValue: 'profile' });
+  const [draft, setDraft] = useState(toDraft(p)), [vis, setVis] = useState(p.visibility), [msg, setMsg] = useState(null);
   const [slug, setSlug] = useState(null);
   useEffect(() => { setDraft(toDraft(p)); setVis(p.visibility); }, [p.updated_at, p.status]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { api('auth.me').then(r => setSlug(r.user?.slug)); }, []);
@@ -143,7 +147,7 @@ function Manager({ data, reload }) {
     <>
       <div className="head" style={{ marginBottom: 8 }}>
         <div>
-          <h1>Profile & Offerings Hub</h1>
+          <h1>Profile & offerings</h1>
           <p className="muted" style={{ margin: 0 }}>
             Manage your personal identity, bio, public visibility controls, and paid/free contributions.
           </p>
@@ -168,34 +172,22 @@ function Manager({ data, reload }) {
       </div>
 
       <div className="ux-guide-banner">
-        <div className="ux-guide-icon">👤</div>
+        <div className="ux-guide-icon"><Icon n="users" size={24} /></div>
         <div className="ux-guide-content">
-          <h4>Grounding Your Persona AI</h4>
+          <h4>Your profile provides context</h4>
           <p>
             Your bio, education, and experience serve as the permanent knowledge baseline for your AI Persona.
-            Whenever visitors chat with you, answers are strictly aligned with what you publish here.
+            Review the details you publish so visitors receive useful context about your work.
           </p>
         </div>
       </div>
 
       {/* Unified Tab Navigation */}
-      <div className="page-tabs-wrap" role="tablist">
-        {[
-          ['profile', '👤 Bio & Background', null],
-          ['visibility', '👁️ Privacy & Visibility', null],
-          ['contrib', '💎 Contributions & Store', contributions?.length || 0],
-        ].map(([k, l, count]) => (
-          <button
-            key={k}
-            role="tab"
-            className={`page-tab-btn ${tab === k ? 'active' : ''}`}
-            onClick={() => setTab(k)}
-          >
-            <span>{l}</span>
-            {count !== null && <span className="page-tab-badge">{count}</span>}
-          </button>
-        ))}
-      </div>
+      <AdminTabs label="Profile sections" value={tab} onChange={setTab} items={[
+        { id: 'profile', label: 'Bio & background', icon: 'users' },
+        { id: 'visibility', label: 'Privacy & visibility', icon: 'shield' },
+        { id: 'contrib', label: 'Offerings & categories', icon: 'box', count: contributions?.length || 0 },
+      ]} />
 
       <Notice kind={msg?.kind}>{msg?.t}</Notice>
 
@@ -242,13 +234,12 @@ function Manager({ data, reload }) {
 
       {tab === 'contrib' && (
         <>
-          <div className="ux-guide-banner" style={{ background: '#fdf4ff', borderColor: '#f0abfc' }}>
-            <div className="ux-guide-icon">🛍️</div>
+          <div className="ux-guide-banner">
+            <div className="ux-guide-icon"><Icon n="box" size={24} /></div>
             <div className="ux-guide-content">
-              <h4 style={{ color: '#86198f' }}>Knowledge Services & Recommended Items</h4>
-              <p style={{ color: '#701a75' }}>
-                Items listed here appear directly in your Public Profile's "Explore & Buy" and "Featured Products" shelf,
-                complete with shopping cart and details modals.
+              <h4>Categories → offerings → public shop</h4>
+              <p>
+                Add a category, then list your offerings inside it. Active offerings appear in your public shop when the profile is published. For checkout, add a price and an access or download link.
               </p>
             </div>
           </div>
@@ -266,5 +257,5 @@ export default function Profile() {
   useEffect(() => { reload(); }, []);
   if (!data) return <Loading error={error} />;
   if (!data.profile) return <Onboarding onDone={d => { setData(d); setNeeds(false); }} />;
-  return <Manager data={data} reload={reload} />;
+  return <ProfileManager data={data} reload={reload} />;
 }

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import PortfolioSite from '../components/portfolio/PortfolioSite.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { track } from '../lib/track.js';
+import { Loading } from '../components/Ui.jsx';
 
 export default function PublicProfile() {
   const { slug, sub } = useParams();
@@ -19,7 +20,7 @@ export default function PublicProfile() {
     return () => controller.abort();
   }, [slug]);
 
-  if (data === undefined) return <p className="muted" style={{ padding: 40, textAlign: 'center' }}>Loading…</p>;
+  if (data === undefined) return <Loading label="Loading profile…" />;
   if (!data) return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f5f3ff', color: '#1e1b4b', padding: 24, textAlign: 'center' }}>
       <div><h1 style={{ margin: '0 0 8px' }}>This profile isn't available</h1>

@@ -3,6 +3,15 @@ const text = (v, n) => typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().sli
 export const validRequestId = v => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
 export const validReceiptToken = v => typeof v === 'string' && /^[A-Za-z0-9_-]{43}$/.test(v);
 
+export function normalizePurchaseRecovery(input = {}) {
+  const email = typeof input?.email === 'string' ? input.email.trim().toLowerCase() : '';
+  const paymentId = typeof input?.paymentId === 'string' ? input.paymentId.trim() : '';
+  const errors = {};
+  if (email.length > 160 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) errors.email = 'Enter the email used for this purchase.';
+  if (!/^pay_[A-Za-z0-9]{1,80}$/.test(paymentId)) errors.paymentId = 'Enter the Razorpay payment ID from your original receipt (pay_…).';
+  return { ok: !Object.keys(errors).length, value: { email, paymentId }, errors };
+}
+
 export function normalizeBuyer(input = {}) {
   const value = { name: text(input?.name, 100), email: text(input?.email, 160).toLowerCase(), phone: text(input?.phone, 40) };
   const errors = {};

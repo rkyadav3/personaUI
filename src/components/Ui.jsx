@@ -57,4 +57,7 @@ export function Confirm({ label, warn, confirmLabel = 'Yes, delete', onConfirm, 
 
 export const Field = ({ label, children }) => <label className="f">{label}{children}</label>;
 
-export const Loading = ({ error }) => error ? <Notice kind="error">{error}</Notice> : <p className="muted">Loading…</p>;
+export const Loading = ({ error, label = 'Loading…', compact = false }) => error ? <Notice kind="error">{error}</Notice> : <div className={`ui-loading${compact ? ' compact' : ''}`} role="status" aria-live="polite">
+  <svg className="ui-loading-svg" width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false"><circle cx="24" cy="24" r="19" stroke="currentColor" strokeWidth="3" opacity=".15" /><path d="M24 5a19 19 0 0 1 19 19" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /><path d="m24 16 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" fill="currentColor" /></svg>
+  <span>{label}</span>
+</div>;

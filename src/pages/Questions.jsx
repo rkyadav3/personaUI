@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useOp } from '../lib/hooks.js';
 import { fmtDate } from '../lib/format.js';
 import '../styles/questions.css';
+import { Loading } from '../components/Ui.jsx';
 
 export function QuestionHistory({ data, loading, error, onPage, onRefresh }) {
   if (error) return <section className="card"><p role="alert">Could not load visitor questions: {error}</p><button type="button" className="btn" onClick={onRefresh}>Retry</button></section>;
-  if (!data) return <p role="status">Loading visitor questions…</p>;
+  if (!data) return <Loading label="Loading visitor questions…" />;
   const { rows, total, page, pageSize } = data;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return <section className="card question-history" aria-busy={!!loading}>
@@ -32,6 +33,6 @@ export function ProfileQuestions() {
 }
 
 export default function Questions() {
-  useEffect(() => { document.title = 'Profile Q&A'; }, []);
-  return <><div className="head"><div><h1>Profile Q&amp;A</h1><p className="muted">Review visitors’ questions and the answers given by your public profile persona. Only you can access this history.</p></div></div><ProfileQuestions /></>;
+  useEffect(() => { document.title = 'Visitor Q&A'; }, []);
+  return <><div className="head"><div><h1>Visitor Q&amp;A</h1><p className="muted">Review visitors’ questions and the answers given by your public profile persona. Only you can access this history.</p></div></div><ProfileQuestions /></>;
 }

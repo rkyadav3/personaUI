@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './lib/auth.jsx';
 const Layout = lazy(() => import('./components/Layout.jsx'));
 import Home from './pages/Home.jsx';
+import { Loading } from './components/Ui.jsx';
 import { LegacyLookRedirect, LegacyPersonaRedirect, LegacySettingsRedirect } from './pages/LegacyRedirects.jsx';
 const Overview = lazy(() => import('./pages/Overview.jsx'));
 const FileManager = lazy(() => import('./pages/FileManager.jsx'));
@@ -24,7 +25,7 @@ const Questions = lazy(() => import('./pages/Questions.jsx'));
 export default function App() {
   return (
     <AuthProvider>
-    <Suspense fallback={null}>
+    <Suspense fallback={<Loading label="Opening page…" />}>
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/u/:slug" element={<LegacyPersonaRedirect />} />

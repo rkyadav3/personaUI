@@ -1,4 +1,4 @@
-import { validReceiptToken, validRequestId } from '../../shared/commerce.js';
+import { normalizePurchaseRecovery, validReceiptToken, validRequestId } from '../../shared/commerce.js';
 
 export async function publicRequest(path, body, options = {}) {
   const response = await fetch(path, {
@@ -16,6 +16,15 @@ export async function publicRequest(path, body, options = {}) {
 }
 
 export const paymentRequest = (op, input) => publicRequest('/api/payments', { ...input, op });
+export async function recoverPurchase(slug, item, details, { request = paymentRequest, storage } = {}) {
+  const proof = normalizePurchaseRecovery(details);
+  if (!proof.ok) throw Object.assign(new Error('Check your purchase details.'), { errors: proof.errors });
+  const row = await request('recover', { slug, item, ...proof.value });
+  const receipt = row?.receipt;
+  if (!['paid', 'refunded'].includes(row?.status) || row?.kind !== item.kind || String(row?.itemId) !== String(item.id) || row?.requestId !== receipt?.requestId || !validRequestId(receipt?.requestId) || !validReceiptToken(receipt?.receiptToken)) throw new Error('The recovered receipt could not be read. Please try again.');
+  saveReceipt(slug, item, receipt, storage);
+  return row;
+}
 export function newReceipt() {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return { requestId: crypto.randomUUID(), receiptToken: btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') };

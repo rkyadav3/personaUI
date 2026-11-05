@@ -1,12 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import JSZip from 'jszip';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import { breadcrumbs, fmtDate, fmtSize, idOrNull } from '../lib/format.js';
+import { breadcrumbs, fmtSize, idOrNull } from '../lib/format.js';
 import { useFolders, useOp, useTopics } from '../lib/hooks.js';
 import { uploadToSigned } from '../lib/storage.js';
-import { Confirm, Crumbs, Field, Notice, Pill, Progress } from '../components/Ui.jsx';
+import { Confirm, Crumbs, Field, Loading, Notice, Progress } from '../components/Ui.jsx';
 import { FolderSelect, TopicSelect } from '../components/Selects.jsx';
+import AdminDialog from '../components/AdminDialog.jsx';
+import AdminTabs from '../components/AdminTabs.jsx';
+import Icon from '../components/portfolio/Icon.jsx';
+import { LibraryFileList } from '../components/LibraryFileList.jsx';
+import { filterLibraryFiles } from '../lib/fileLibrary.js';
+import { openFileDownload } from '../lib/fileDownload.js';
 
 const MB = 1048576;
 const EDITABLE = /\.(txt|md|markdown|csv|tsv|json|xml|html|htm|tex|js|py|r|yaml|yml|log|bib)$/i;
@@ -20,7 +26,7 @@ async function finishIndexing(ids) {
   let waiting = 0;
   try { waiting = (await api('index.embed', { seconds: 40 })).remaining; } catch (e) { error = error || e.message; }
   if (error) return [{ kind: 'warn', t: `Files are saved, but embedding needs attention: ${error}` }];
-  if (waiting > 0) return [{ kind: 'info', t: `${waiting} chunks are still waiting to be embedded. Open Knowledge index and press Sync to finish.` }];
+  if (waiting > 0) return [{ kind: 'info', t: `${waiting} passages are waiting to become searchable. Open Library → AI knowledge and choose Sync published material to finish.` }];
   return [{ kind: 'success', t: 'Indexed. The chatbot can now search and answer from these files.' }];
 }
 
@@ -44,42 +50,69 @@ async function expandFiles(files, unzip, errors) {
 }
 
 function FileEditorModal({ id, folders, topics, onClose, onChanged }) {
+  const titleId = useId();
   const [file, setFile] = useState(null);
   const [name, setName] = useState(''), [topic, setTopic] = useState(null), [text, setText] = useState(''), [dest, setDest] = useState(null);
   const [msgs, setMsgs] = useState([]);
+  const [loadError, setLoadError] = useState(''), [busy, setBusy] = useState(false), [attempt, setAttempt] = useState(0);
+  const [downloadBusy, setDownloadBusy] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    setLoadError('');
     api('files.get', { id }).then(f => {
-      if (!f) return onClose();
+      if (!active) return;
+      if (!f) return setLoadError('This file no longer exists.');
       setFile(f); setName(f.name); setTopic(f.topic_id); setText(f.text_content || ''); setDest(f.folder_id); setMsgs([]);
-    });
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, error => { if (active) setLoadError(error.message); });
+    return () => { active = false; };
+  }, [id, attempt]);
 
-  if (!file) return null;
+  if (!file) return <AdminDialog titleId={titleId} onClose={onClose}><h2 id={titleId}>File details</h2><Loading error={loadError} label="Loading file…" compact />{loadError && <button className="btn" onClick={() => setAttempt(value => value + 1)}>Retry</button>}</AdminDialog>;
   const editable = EDITABLE.test(file.name);
   const trail = file.folder_id ? breadcrumbs(folders, file.folder_id) : [];
 
   async function save(status) {
+    if (busy) return;
+    setBusy(true);
     try {
-      await api('files.save', { id, name, topicId: topic, status, text: editable ? text : null });
-      const r = await api('index.refresh', { kind: 'file', id });
-      const out = [{ kind: 'success', t: status === 'draft' ? 'Saved as draft.' : !editable ? 'Saved.' : 'Published to AI index.' }];
+      const savedName = name.trim() || file.name;
+      await api('files.save', { id, name: savedName, topicId: topic, status, text: editable ? text : null });
+      setName(savedName);
+      setFile(value => ({ ...value, name: savedName, topic_id: topic, status }));
+      const r = await api('index.refresh', { kind: 'file', id }).catch(error => ({ error: error.message }));
+      const out = [{ kind: 'success', t: status === 'draft' ? 'Saved as a private draft.' : 'Saved for AI indexing.' }];
       if (r.error) out.push({ kind: 'warn', t: `Saved, but indexing needs attention: ${r.error}` });
-      else if (r.waiting > 0) out.push({ kind: 'info', t: `${r.waiting} chunks waiting to be embedded. Sync in Knowledge Index.` });
+      else if (r.waiting > 0) out.push({ kind: 'info', t: `${r.waiting} passages are waiting to become searchable. Sync published material in Library → AI knowledge.` });
       setMsgs(out); onChanged();
     } catch (e) { setMsgs([{ kind: 'error', t: e.message }]); }
+    finally { setBusy(false); }
   }
 
   async function download() {
-    try { window.open((await api('files.url', { id })).url, '_blank', 'noopener'); } catch { setMsgs([{ kind: 'warn', t: 'Download unavailable.' }]); }
+    if (downloadBusy) return;
+    setDownloadBusy(true);
+    try { await openFileDownload({ id }); } catch (error) { setMsgs([{ kind: 'warn', t: error.message || 'Download unavailable. Try again.' }]); }
+    finally { setDownloadBusy(false); }
+  }
+
+  async function changeFile(op, args, close = false) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api(op, args);
+      onChanged();
+      if (close) onClose();
+      else { setFile(value => ({ ...value, folder_id: dest })); setMsgs([{ kind: 'success', t: 'File moved.' }]); }
+    } catch (e) { setMsgs([{ kind: 'error', t: e.message }]); }
+    finally { setBusy(false); }
   }
 
   return (
-    <div className="admin-modal-overlay" onClick={onClose}>
-      <div className="admin-modal" style={{ maxWidth: 720 }} onClick={e => e.stopPropagation()}>
+    <AdminDialog titleId={titleId} onClose={onClose} busy={busy}>
+      <fieldset className="admin-form-body" disabled={busy}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ margin: 0 }}>File Inspector: {file.name}</h3>
-          <button className="btn small" onClick={onClose}>✕ Close</button>
+          <h2 id={titleId} style={{ margin: 0 }}>Manage file</h2>
         </div>
 
         <Crumbs parts={['All files', ...trail.map(c => c.name), file.name]} />
@@ -87,7 +120,7 @@ function FileEditorModal({ id, folders, topics, onClose, onChanged }) {
         <div className="cols c332" style={{ marginTop: 10 }}>
           <Field label="File Name"><input type="text" value={name} onChange={e => setName(e.target.value)} /></Field>
           <TopicSelect value={topic} onChange={setTopic} topics={topics} />
-          <div><button className="btn block" style={{ marginTop: 22 }} onClick={download}>Download 📥</button></div>
+          <div><button className="btn block" style={{ marginTop: 22 }} onClick={download} disabled={downloadBusy}><Icon n="download" size={18} />{downloadBusy ? 'Preparing…' : 'Download'}</button></div>
         </div>
 
         {editable ? (
@@ -96,19 +129,13 @@ function FileEditorModal({ id, folders, topics, onClose, onChanged }) {
           </Field>
         ) : (
           <p className="muted" style={{ fontSize: '.88rem', margin: '10px 0' }}>
-            This binary file (PDF/Word/image) cannot be edited directly in the browser, but its extracted text is searchable by your persona.
+            Edit this file on your device. Published documents with extracted text can be searched by your AI persona.
           </p>
         )}
 
         <div className="row" style={{ marginTop: 12 }}>
-          {editable ? (
-            <>
-              <button className="btn" onClick={() => save('draft')}>Save as Draft (Private)</button>
-              <button className="btn primary" onClick={() => save('published')}>Save &amp; Publish to AI</button>
-            </>
-          ) : (
-            <button className="btn primary" onClick={() => save(file.status)}>Save Details</button>
-          )}
+          <button className="btn" onClick={() => save('draft')}>Save private draft</button>
+          <button className="btn primary" onClick={() => save('published')}>{busy ? 'Saving…' : 'Save & publish to AI'}</button>
           <button className="btn" onClick={onClose}>Close</button>
         </div>
 
@@ -116,13 +143,13 @@ function FileEditorModal({ id, folders, topics, onClose, onChanged }) {
 
         <div className="row" style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--line)', alignItems: 'flex-end' }}>
           <div className="grow"><FolderSelect label="Move to Folder" value={dest} onChange={setDest} folders={folders} /></div>
-          <button className="btn" style={{ marginBottom: 12 }} onClick={async () => { await api('files.move', { id, folderId: dest }); onChanged(); }}>Move</button>
+          <button className="btn" style={{ marginBottom: 12 }} onClick={() => changeFile('files.move', { id, folderId: dest })}>Move</button>
           <span style={{ marginBottom: 12 }}>
-            <Confirm label="Delete File" warn="Are you sure? This removes the file and its searchable chunks from your AI persona." onConfirm={async () => { await api('files.delete', { id }); onClose(); onChanged(); }} />
+            <Confirm label="Delete File" warn="Are you sure? This removes the file and its searchable chunks from your AI persona." onConfirm={() => changeFile('files.delete', { id }, true)} />
           </span>
         </div>
-      </div>
-    </div>
+      </fieldset>
+    </AdminDialog>
   );
 }
 
@@ -130,11 +157,13 @@ export default function FileManager({ defaultTab = 'browse' }) {
   const [params, setParams] = useSearchParams();
   const folder = idOrNull(params.get('folder'));
   const openFile = idOrNull(params.get('file'));
-  const currentTab = params.get('tab') || defaultTab;
+  const requestedTab = params.get('tab') || defaultTab;
+  const currentTab = ['browse', 'upload', 'note'].includes(requestedTab) ? requestedTab : 'browse';
   const setTab = tab => setParams(p => { const n = Object.fromEntries(p); n.tab = tab; return n; });
 
   const [searchQuery, setSearchQuery] = useState('');
-  const { data: foldersData, reload: reloadFolders } = useFolders();
+  const [fileType, setFileType] = useState('all'), [fileStatus, setFileStatus] = useState('all'), [sort, setSort] = useState('newest');
+  const { data: foldersData, reload: reloadFolders, error: foldersError } = useFolders();
   const folders = foldersData ?? [];
   const { data: topicsData } = useTopics();
   const topics = topicsData ?? [];
@@ -144,15 +173,30 @@ export default function FileManager({ defaultTab = 'browse' }) {
   const kids = searchQuery.trim() ? [] : (folders || []).filter(f => (f.parent_id ?? null) === folder).sort((a, b) => a.name.localeCompare(b.name));
   const topicName = Object.fromEntries((topics || []).map(t => [t.id, t.name]));
   const trail = breadcrumbs(folders || [], folder);
+  const visibleFiles = filterLibraryFiles(files || [], { type: fileType, status: fileStatus, sort });
+  const filtered = !!searchQuery.trim() || fileType !== 'all' || fileStatus !== 'all';
+  const resetFilters = () => { setSearchQuery(''); setFileType('all'); setFileStatus('all'); };
+  const chooseFolder = id => { resetFilters(); setParams(id ? { folder: id } : {}); };
+  const inspectFile = id => setParams(p => { const n = Object.fromEntries(p); n.file = id; return n; });
 
   // Upload Tab State
   const [uploadFiles, setUploadFiles] = useState([]);
   const [unzip, setUnzip] = useState(true);
   const [uploadDest, setUploadDest] = useState(folder);
   const [uploadTopic, setUploadTopic] = useState(null);
+  const [uploadStatus, setUploadStatus] = useState('published');
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
   const [uploadMsgs, setUploadMsgs] = useState([]);
+  const [dragging, setDragging] = useState(false);
+  const addUploadFiles = incoming => setUploadFiles(previous => {
+    const known = new Set(previous.map(file => `${file.name}:${file.size}:${file.lastModified}`));
+    return [...previous, ...Array.from(incoming).filter(file => {
+      const key = `${file.name}:${file.size}:${file.lastModified}`;
+      if (known.has(key)) return false;
+      known.add(key); return true;
+    })];
+  });
 
   // New Note Tab State
   const [noteName, setNoteName] = useState('');
@@ -165,8 +209,12 @@ export default function FileManager({ defaultTab = 'browse' }) {
   // New Folder State
   const [newFolderName, setNewFolderName] = useState('');
   const [folderMsg, setFolderMsg] = useState(null);
+  const [folderOpen, setFolderOpen] = useState(false), [folderBusy, setFolderBusy] = useState(false);
+  const folderTitleId = useId();
+  useEffect(() => { setUploadDest(folder); }, [folder]);
 
   async function handleUpload() {
+    if (uploadBusy || !uploadFiles.length) return;
     setUploadBusy(true); setUploadPct(0); setUploadMsgs([]);
     const errors = [], newIds = [];
     try {
@@ -179,15 +227,16 @@ export default function FileManager({ defaultTab = 'browse' }) {
           try {
             const blob = await batch[k].get();
             await uploadToSigned(signed[k].path, signed[k].token, blob);
-            const row = await api('files.register', { path: signed[k].path, name, folderId: uploadDest, folderParts: parts, topicId: uploadTopic, size: blob.size });
+            const row = await api('files.register', { path: signed[k].path, name, folderId: uploadDest, folderParts: parts, topicId: uploadTopic, status: uploadStatus, size: blob.size });
             newIds.push(row.id);
           } catch (e) { errors.push(`${rel}: ${e.message}`); }
           setUploadPct((b + k + 1) / Math.max(1, items.length));
         }
       }
       const out = errors.map(t => ({ kind: 'error', t }));
-      out.push({ kind: 'success', t: `Successfully uploaded ${newIds.length} file(s).` });
-      out.push(...(await finishIndexing(newIds)));
+      if (newIds.length) out.push({ kind: 'success', t: `Uploaded ${newIds.length} file(s).` });
+      if (uploadStatus === 'published') out.push(...(await finishIndexing(newIds)));
+      else if (newIds.length) out.push({ kind: 'info', t: 'Saved privately. Open a file and publish it when you want the AI to use it.' });
       setUploadMsgs(out);
       setUploadFiles([]);
       reload();
@@ -212,149 +261,83 @@ export default function FileManager({ defaultTab = 'browse' }) {
 
   async function handleCreateFolder(e) {
     e.preventDefault();
-    if (!newFolderName.trim()) return;
+    if (!newFolderName.trim() || folderBusy) return;
+    setFolderBusy(true); setFolderMsg(null);
     try {
       await api('folders.create', { parentId: folder, name: newFolderName.trim() });
       setFolderMsg({ kind: 'success', t: `Folder "${newFolderName}" created.` });
       setNewFolderName('');
+      setFolderOpen(false);
       reload();
     } catch (e) {
       setFolderMsg({ kind: 'error', t: e.message });
-    }
+    } finally { setFolderBusy(false); }
   }
 
   return (
     <>
       <div className="head">
         <div>
-          <h1>Files &amp; Storage Hub</h1>
+          <h1>Files & notes</h1>
           <p className="muted" style={{ margin: 0 }}>
-            Upload, organize, and manage documents that feed your AI Persona.
+            Keep source documents and notes organized. Publish the material your AI should use.
           </p>
         </div>
       </div>
 
       {/* UX Guide Banner */}
       <div className="ux-guide-banner">
-        <div className="ux-guide-icon">📁</div>
+        <div className="ux-guide-icon"><Icon n="folder" size={24} /></div>
         <div className="ux-guide-content">
-          <h4>How Your Persona Uses Files</h4>
+          <h4>From source material to answers</h4>
           <p>
-            When you publish files (PDFs, Word docs, notes), their contents are indexed. When a visitor asks a question on your public page, your AI finds the matching text and speaks an answer.
+            Add files → organize them into folders and topics → publish to AI. Draft notes stay private; published material becomes searchable after indexing.
           </p>
         </div>
       </div>
 
       {/* Page Tab Bar */}
-      <div className="page-tabs-wrap">
-        <button className={`page-tab-btn ${currentTab === 'browse' ? 'active' : ''}`} onClick={() => setTab('browse')}>
-          <span>📁 Browse Library</span>
-          {files && <span className="page-tab-badge">{files.length}</span>}
-        </button>
-        <button className={`page-tab-btn ${currentTab === 'upload' ? 'active' : ''}`} onClick={() => setTab('upload')}>
-          <span>📤 Upload Files &amp; ZIP</span>
-        </button>
-        <button className={`page-tab-btn ${currentTab === 'note' ? 'active' : ''}`} onClick={() => setTab('note')}>
-          <span>📝 Write Quick Note</span>
-        </button>
-      </div>
+      <AdminTabs label="File tools" value={currentTab} onChange={setTab} disabled={uploadBusy || noteBusy} items={[{ id: 'browse', label: 'Browse', icon: 'folder', count: files?.length }, { id: 'upload', label: 'Upload files', icon: 'upload' }, { id: 'note', label: 'Write a note', icon: 'pen' }]} />
 
       {/* TAB 1: BROWSE FILES */}
       {currentTab === 'browse' && (
         <>
-          <section className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
-              <Crumbs parts={[{ label: 'All Files', onClick: () => setParams({}) }, ...trail.map(c => ({ label: c.name, onClick: () => setParams({ folder: c.id }) }))]} />
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  type="search"
-                  placeholder="Search file names…"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  style={{ width: 220 }}
-                />
-                <button className="btn small" onClick={() => setTab('upload')}>+ Upload</button>
+          <section className="card library-browser">
+            <div className="library-toolbar">
+              <Crumbs parts={[{ label: 'All files', onClick: () => chooseFolder(null) }, ...trail.map(c => ({ label: c.name, onClick: () => chooseFolder(c.id) }))]} />
+              <div className="row">
+                <button type="button" className="btn small" onClick={() => { setFolderMsg(null); setFolderOpen(true); }}><Icon n="plus" size={17} />New folder</button>
+                <button type="button" className="btn small primary" onClick={() => setTab('upload')}><Icon n="upload" size={17} />Upload</button>
               </div>
             </div>
-
-            {/* Folder creation toggle / quick create */}
-            <form onSubmit={handleCreateFolder} className="row" style={{ marginBottom: 16, background: '#f8fafc', padding: '10px 14px', borderRadius: 14, border: '1px solid #e2e8f0' }}>
-              <span style={{ fontSize: '.86rem', color: '#64748b', fontWeight: 600 }}>Create Subfolder:</span>
-              <input
-                type="text"
-                placeholder="Folder name (e.g. Research Papers)"
-                value={newFolderName}
-                onChange={e => setNewFolderName(e.target.value)}
-                style={{ width: 240, padding: '6px 10px' }}
-              />
-              <button type="submit" className="btn small primary">+ New Folder</button>
-              {folderMsg && <span style={{ fontSize: '.84rem', color: folderMsg.kind === 'error' ? '#ef4444' : '#10b981' }}>{folderMsg.t}</span>}
-            </form>
-
-            {/* Folder List */}
-            {kids.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10, marginBottom: 16 }}>
-                {kids.map(f => (
-                  <button
-                    key={f.id}
-                    className="btn"
-                    style={{ textAlign: 'left', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}
-                    onClick={() => setParams({ folder: f.id })}
-                  >
-                    <span>📁</span>
-                    <strong style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</strong>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* File Roster Table */}
-            <div className="th files-grid">
-              <span>File Name</span>
-              <span>Topic</span>
-              <span>Size</span>
-              <span>Status</span>
-              <span style={{ textAlign: 'right' }}>Actions</span>
+            <div className="library-filters">
+              <Field label="Search all files"><input type="search" placeholder="Name or contents…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} /></Field>
+              <Field label="File type"><select value={fileType} onChange={e => setFileType(e.target.value)}><option value="all">All types</option><option value="documents">Documents</option><option value="text">Text & notes</option><option value="images">Images</option><option value="other">Other files</option></select></Field>
+              <Field label="AI access"><select value={fileStatus} onChange={e => setFileStatus(e.target.value)}><option value="all">All statuses</option><option value="published">Published</option><option value="draft">Private drafts</option></select></Field>
+              <Field label="Sort by"><select value={sort} onChange={e => setSort(e.target.value)}><option value="newest">Newest first</option><option value="name">Name A–Z</option><option value="largest">Largest first</option></select></Field>
             </div>
-
-            {error && <Notice kind="error">{error}</Notice>}
-            {files && !files.length && !kids.length && (
-              <div style={{ textAlign: 'center', padding: '36px 0', color: '#64748b' }}>
-                <p style={{ margin: '0 0 10px' }}>This folder is currently empty.</p>
-                <button className="btn primary small" onClick={() => setTab('upload')}>Upload your first file</button>
-              </div>
-            )}
-
-            {files?.map(f => (
-              <div className="tr files-grid" key={f.id}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>📄</span>
-                  <button
-                    className="btn link"
-                    style={{ fontWeight: 600, color: 'var(--text)' }}
-                    onClick={() => setParams(p => { const n = Object.fromEntries(p); n.file = f.id; return n; })}
-                  >
-                    {f.name}
-                  </button>
-                </div>
-                <span>{topicName[f.topic_id] || <span className="muted">—</span>}</span>
-                <span className="muted" style={{ fontSize: '.84rem' }}>{fmtSize(f.size)}</span>
-                <span><Pill status={f.status} /></span>
-                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                  <button
-                    className="btn small"
-                    onClick={() => setParams(p => { const n = Object.fromEntries(p); n.file = f.id; return n; })}
-                  >
-                    Inspect / Edit
-                  </button>
-                </div>
-              </div>
-            ))}
+            {folderMsg && !folderOpen && <Notice kind={folderMsg.kind}>{folderMsg.t}</Notice>}
+            {foldersError && <Notice kind="error">Could not load folders: {foldersError}<button type="button" className="btn small" onClick={reloadFolders}>Retry</button></Notice>}
+            {kids.length > 0 && <div className="library-folders">{kids.map(f => <button type="button" key={f.id} onClick={() => chooseFolder(f.id)}><Icon n="folder" size={22} /><span>{f.name}</span><Icon n="arrow" size={16} /></button>)}</div>}
+            {!files ? <><Loading error={error} label="Loading your files…" compact />{error && <button type="button" className="btn" onClick={reloadFiles}>Retry</button>}</> : <>
+              <div className="library-results"><span>{visibleFiles.length} of {files.length} files in {searchQuery.trim() ? 'this search' : 'this folder'} · {fmtSize(visibleFiles.reduce((total, file) => total + (file.size || 0), 0))}</span>{filtered && <button type="button" className="btn link" onClick={resetFilters}>Clear filters</button>}</div>
+              <LibraryFileList files={visibleFiles} topicNames={topicName} filtered={filtered} hasFolders={!!kids.length} onOpen={inspectFile} onUpload={() => setTab('upload')} onReset={resetFilters} />
+            </>}
+            <p className="library-hint">Published means available for AI indexing. <Link to="/admin/knowledge">Check AI knowledge</Link> for indexing status.</p>
           </section>
+          {folderOpen && <AdminDialog titleId={folderTitleId} onClose={() => setFolderOpen(false)} busy={folderBusy}>
+            <form onSubmit={handleCreateFolder}>
+              <h2 id={folderTitleId}>New folder</h2><p className="muted">Create inside {trail.at(-1)?.name || 'All files'}.</p>
+              <Field label="Folder name"><input autoFocus required maxLength={200} placeholder="e.g. Research papers" value={newFolderName} onChange={e => setNewFolderName(e.target.value)} disabled={folderBusy} /></Field>
+              {folderMsg?.kind === 'error' && <Notice kind="error">{folderMsg.t}</Notice>}
+              <div className="row"><button className="btn primary" disabled={folderBusy || !newFolderName.trim()}>{folderBusy ? 'Creating…' : 'Create folder'}</button><button type="button" className="btn" disabled={folderBusy} onClick={() => setFolderOpen(false)}>Cancel</button></div>
+            </form>
+          </AdminDialog>}
 
           {/* File Inspector Modal */}
           {openFile && (
             <FileEditorModal
+              key={openFile}
               id={openFile}
               folders={folders}
               topics={topics}
@@ -368,31 +351,31 @@ export default function FileManager({ defaultTab = 'browse' }) {
       {/* TAB 2: UPLOAD FILES */}
       {currentTab === 'upload' && (
         <section className="card" style={{ maxWidth: 680 }}>
-          <h3>Upload Research Files or ZIP</h3>
+          <h3>Add files to your library</h3>
           <p className="muted" style={{ fontSize: '.88rem', margin: '0 0 16px' }}>
             Supported formats: PDF, DOCX, TXT, Markdown, CSV, JSON, and ZIP archives (which unzip automatically into folders).
           </p>
 
-          <Field label="Choose Files from your device">
-            <input
-              type="file"
-              multiple
-              onChange={e => setUploadFiles([...e.target.files])}
-              key={uploadBusy ? 'b' : uploadFiles.length}
-            />
-          </Field>
+          <div className={`library-dropzone${dragging ? ' dragging' : ''}`} onDragOver={e => { e.preventDefault(); if (!uploadBusy) setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); if (!uploadBusy) addUploadFiles(e.dataTransfer.files); }}>
+            <Icon n="upload" size={32} /><strong>Drop files here or browse your device</strong><p>Choose multiple documents or a ZIP archive.</p>
+            <Field label="Choose files"><input type="file" multiple disabled={uploadBusy} onChange={e => { addUploadFiles(e.target.files); e.target.value = ''; }} /></Field>
+          </div>
+          {!!uploadFiles.length && <ul className="library-upload-list" aria-label="Selected files">{uploadFiles.map((file, index) => <li key={`${file.name}-${index}`}><Icon n="file" size={18} /><span>{file.name}<small>{fmtSize(file.size)}</small></span><button type="button" className="btn small" disabled={uploadBusy} aria-label={`Remove ${file.name}`} onClick={() => setUploadFiles(items => items.filter((_, i) => i !== index))}><Icon n="x" size={16} /></button></li>)}</ul>}
 
           <label className="row" style={{ marginBottom: 14 }}>
             <input
               type="checkbox"
               checked={unzip}
+              disabled={uploadBusy}
               onChange={e => setUnzip(e.target.checked)}
             />
             <span>Unzip ZIP archives into folders automatically</span>
           </label>
 
-          <FolderSelect label="Destination Folder" value={uploadDest} onChange={setUploadDest} folders={folders} />
+          <fieldset className="admin-form-body" disabled={uploadBusy}><FolderSelect label="Destination Folder" value={uploadDest} onChange={setUploadDest} folders={folders} />
           <TopicSelect label="Assign to Research Topic (Optional)" value={uploadTopic} onChange={setUploadTopic} topics={topics} />
+          <Field label="Availability"><select value={uploadStatus} onChange={e => setUploadStatus(e.target.value)}><option value="published">Publish to AI</option><option value="draft">Private draft</option></select></Field>
+          <p className="hint">Private drafts are stored in your library. Published files become available for AI answers once indexed.</p></fieldset>
 
           <p className="muted" style={{ fontSize: '.85rem' }}>
             {uploadFiles.length ? `${uploadFiles.length} file(s) selected.` : 'No files selected yet.'}
@@ -404,9 +387,9 @@ export default function FileManager({ defaultTab = 'browse' }) {
               disabled={!uploadFiles.length || uploadBusy}
               onClick={handleUpload}
             >
-              {uploadBusy ? 'Uploading & Indexing…' : 'Start Upload'}
+              <Icon n="upload" size={18} />{uploadBusy ? 'Uploading…' : uploadStatus === 'published' ? 'Upload & publish to AI' : 'Upload privately'}
             </button>
-            <button className="btn" onClick={() => setTab('browse')}>Cancel</button>
+            <button className="btn" disabled={uploadBusy} onClick={() => setTab('browse')}>Back to files</button>
           </div>
 
           {uploadBusy && (
@@ -423,7 +406,7 @@ export default function FileManager({ defaultTab = 'browse' }) {
       {/* TAB 3: NEW NOTE */}
       {currentTab === 'note' && (
         <section className="card" style={{ maxWidth: 680 }}>
-          <h3>Write a Research Note</h3>
+          <h3>Create a note</h3>
           <p className="muted" style={{ fontSize: '.88rem', margin: '0 0 16px' }}>
             Write structured notes, technical ideas, or summaries. Once published, your AI persona can cite this note when speaking to visitors.
           </p>

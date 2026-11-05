@@ -42,8 +42,9 @@ test('the overview matches the reference with a personal greeting, command bar a
 test('studio navigation has one portfolio editor and preserves Events and Purchases access', () => {
   const { StudioSidebar } = require('../src/components/Layout.jsx');
   const html = render(React.createElement(StudioSidebar, { user: { name: 'Ravi', slug: 'ravi', isAdmin: false }, unread: 2, onLogout() {} }));
-  for (const text of ['Studio', 'Overview', 'Projects', 'Templates', 'Files &amp; Storage', 'Knowledge Base', 'Updates &amp; Schedule', 'Purchases']) assert.ok(html.includes(text), text);
+  for (const text of ['Studio', 'Overview', 'Public profile', 'Content', 'Library', 'Activity']) assert.ok(html.includes(text), text);
   assert.doesNotMatch(html, /href="\/admin\/(?:page|settings)"/);
+  assert.match(html, /href="\/admin\/portfolio"/);
   assert.match(html, /href="\/p\/ravi"/);
 });
 

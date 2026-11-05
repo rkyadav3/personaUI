@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { fmtDate } from '../lib/format.js';
@@ -7,16 +7,17 @@ import { useOp } from '../lib/hooks.js';
 import { Button } from 'open-glass-ui';
 import { Glass } from '../components/Glass.jsx';
 import { Confirm, Field, Loading, Notice, Pill, Stats } from '../components/Ui.jsx';
+import AdminDialog from '../components/AdminDialog.jsx';
 
 const fmt = code => (code && code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code || '');
 
 export default function SuperAdmin() {
+  const editTitleId = useId(), passwordTitleId = useId();
   const { user } = useAuth();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const { data, reload, error } = useOp('users.list');
 
   const activeTab = params.get('tab') === 'invites' ? 'invites' : 'users';
-  const setTab = tab => setParams(tab === 'users' ? {} : { tab });
 
   // Filters for user list
   const [search, setSearch] = useState('');
@@ -170,7 +171,7 @@ export default function SuperAdmin() {
     <>
       <div className="head" style={{ marginBottom: 4 }}>
         <div>
-          <h1>Super Admin Portal</h1>
+          <h1>{activeTab === 'invites' ? 'Invite links' : 'People'}</h1>
           <p className="muted" style={{ margin: 0 }}>
             Platform governance, existing user management, and invite-only link controls.
           </p>
@@ -180,24 +181,6 @@ export default function SuperAdmin() {
       <Stats items={statsItems} />
 
       {actionNotice && <Notice kind={actionNotice.kind}>{actionNotice.text}</Notice>}
-
-      {/* Tabs */}
-      <div className="super-tabs">
-        <button
-          className={`super-tab-btn ${activeTab === 'users' ? 'active' : ''}`}
-          onClick={() => setTab('users')}
-        >
-          <span>Users Management</span>
-          <span className="super-badge">{users.length}</span>
-        </button>
-        <button
-          className={`super-tab-btn ${activeTab === 'invites' ? 'active' : ''}`}
-          onClick={() => setTab('invites')}
-        >
-          <span>Invite Links & Access</span>
-          <span className="super-badge">{activeCodesCount}</span>
-        </button>
-      </div>
 
       {/* TAB 1: USERS MANAGEMENT */}
       {activeTab === 'users' && (
@@ -413,13 +396,13 @@ export default function SuperAdmin() {
               <div className="invite-banner">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
                   <strong style={{ color: '#9be8d6', fontSize: '1.05rem' }}>
-                    ✓ Invite Link Created Successfully
+                    Invite link created
                   </strong>
                   <button
                     className="btn primary small"
                     onClick={() => handleCopy(`${window.location.origin}/invite/${createdCode}`)}
                   >
-                    {copied ? '✓ Copied to clipboard!' : 'Copy Direct Link'}
+                    {copied ? 'Copied to clipboard!' : 'Copy Direct Link'}
                   </button>
                 </div>
                 <p style={{ margin: '4px 0 10px', fontSize: '.9rem', color: 'var(--text)' }}>
@@ -519,9 +502,8 @@ export default function SuperAdmin() {
 
       {/* MODAL: EDIT USER */}
       {editUser && (
-        <div className="admin-modal-overlay" onClick={() => setEditUser(null)}>
-          <div className="admin-modal" onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 14px' }}>Edit User Details</h3>
+        <AdminDialog titleId={editTitleId} onClose={() => setEditUser(null)} busy={editBusy}>
+            <h2 id={editTitleId} style={{ margin: '0 0 14px' }}>Edit user details</h2>
             <form onSubmit={saveUserEdit}>
               <Field label="Full Name">
                 <input
@@ -551,7 +533,7 @@ export default function SuperAdmin() {
               <Notice kind="error">{editErr}</Notice>
 
               <div className="row end" style={{ marginTop: 20 }}>
-                <button type="button" className="btn" onClick={() => setEditUser(null)}>
+                <button type="button" className="btn" disabled={editBusy} onClick={() => setEditUser(null)}>
                   Cancel
                 </button>
                 <button type="submit" className="btn primary" disabled={editBusy}>
@@ -559,15 +541,13 @@ export default function SuperAdmin() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </AdminDialog>
       )}
 
       {/* MODAL: RESET PASSWORD */}
       {pwdUser && (
-        <div className="admin-modal-overlay" onClick={() => setPwdUser(null)}>
-          <div className="admin-modal" onClick={e => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 8px' }}>Reset User Password</h3>
+        <AdminDialog titleId={passwordTitleId} onClose={() => setPwdUser(null)} busy={pwdBusy}>
+            <h2 id={passwordTitleId} style={{ margin: '0 0 8px' }}>Reset user password</h2>
             <p className="muted" style={{ fontSize: '.9rem', margin: '0 0 16px' }}>
               Set a new password for <strong>{pwdUser.email}</strong>. The user will immediately be able to sign in with this new password.
             </p>
@@ -586,7 +566,7 @@ export default function SuperAdmin() {
               <Notice kind="error">{pwdErr}</Notice>
 
               <div className="row end" style={{ marginTop: 20 }}>
-                <button type="button" className="btn" onClick={() => setPwdUser(null)}>
+                <button type="button" className="btn" disabled={pwdBusy} onClick={() => setPwdUser(null)}>
                   Cancel
                 </button>
                 <button type="submit" className="btn primary" disabled={pwdBusy}>
@@ -594,8 +574,7 @@ export default function SuperAdmin() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </AdminDialog>
       )}
     </>
   );

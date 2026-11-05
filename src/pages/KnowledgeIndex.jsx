@@ -1,6 +1,9 @@
+import AdminTabs from '../components/AdminTabs.jsx';
 import { useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { ProfileQuestions } from './Questions.jsx';
+import { useAdminTab } from '../lib/adminTabs.js';
+import { Link } from 'react-router-dom';
+import Icon from '../components/portfolio/Icon.jsx';
 import { useOp } from '../lib/hooks.js';
 import { Confirm, Loading, Notice, Pill, Progress } from '../components/Ui.jsx';
 
@@ -8,7 +11,7 @@ export default function KnowledgeIndex() {
   const { data: c, reload: reloadCounts, error } = useOp('index.counts');
   const { data: set } = useOp('index.settings');
 
-  const [activeTab, setActiveTab] = useState('sync'); // 'sync' | 'test' | 'logs'
+  const [activeTab, setActiveTab] = useAdminTab({ values: ['sync', 'test'], defaultValue: 'sync' });
 
   const [syncing, setSyncing] = useState(false);
   const [pct, setPct] = useState(0);
@@ -54,26 +57,26 @@ export default function KnowledgeIndex() {
   if (!c) return <Loading error={error} />;
 
   const waiting = c.chunks - c.embedded;
-  const readyPct = c.chunks > 0 ? Math.round((c.embedded / c.chunks) * 100) : 100;
+  const readyPct = c.chunks > 0 ? Math.round((c.embedded / c.chunks) * 100) : 0;
 
   return (
     <>
       <div className="head">
         <div>
-          <h1>Knowledge Index &amp; AI Brain</h1>
+          <h1>AI knowledge</h1>
           <p className="muted" style={{ margin: 0 }}>
-            Monitor and sync the vector database that powers your Persona’s answers.
+            Check which published materials are ready for AI answers and test what your persona can find.
           </p>
         </div>
       </div>
 
       {/* UX Guide Banner */}
       <div className="ux-guide-banner">
-        <div className="ux-guide-icon">🧠</div>
+        <div className="ux-guide-icon"><Icon n="book" size={24} /></div>
         <div className="ux-guide-content">
           <h4>How Your AI Persona Learns</h4>
           <p>
-            When you publish research files or writing, this system splits them into bite-sized "chunks" and converts them into mathematical vectors. When a visitor asks a question, your Persona searches these vectors to find the best citations.
+            Publish files or articles, then sync any waiting material. Test a question below to see which passages your AI can use in an answer.
           </p>
         </div>
       </div>
@@ -84,7 +87,7 @@ export default function KnowledgeIndex() {
           <div>
             <strong style={{ fontSize: '1.1rem', color: '#0f172a' }}>AI Knowledge Readiness: {readyPct}%</strong>
             <p className="muted" style={{ margin: '2px 0 0', fontSize: '.86rem' }}>
-              {waiting > 0 ? `${waiting} knowledge chunks are waiting to be embedded.` : 'All published files are fully indexed and searchable!'}
+              {waiting > 0 ? `${waiting} knowledge chunks are waiting to be embedded.` : (c.chunks ? 'All indexed passages are ready to search.' : 'Publish a file or article to start building your AI knowledge.')}
             </p>
           </div>
           <button
@@ -92,7 +95,7 @@ export default function KnowledgeIndex() {
             disabled={syncing}
             onClick={sync}
           >
-            {syncing ? 'Syncing to AI Brain…' : waiting > 0 ? '⚡ Sync Now' : '✓ Knowledge Up to Date'}
+            <Icon n="refresh" size={18} />{syncing ? 'Syncing…' : 'Sync published material'}
           </button>
         </div>
 
@@ -120,27 +123,8 @@ export default function KnowledgeIndex() {
       </section>
 
       {/* Page Tabs */}
-      <div className="page-tabs-wrap">
-        <button
-          className={`page-tab-btn ${activeTab === 'sync' ? 'active' : ''}`}
-          onClick={() => setActiveTab('sync')}
-        >
-          <span>🧠 Brain Status &amp; Sync</span>
-        </button>
-        <button
-          className={`page-tab-btn ${activeTab === 'test' ? 'active' : ''}`}
-          onClick={() => setActiveTab('test')}
-        >
-          <span>🔍 Test AI Retrieval</span>
-        </button>
-        <button
-          className={`page-tab-btn ${activeTab === 'logs' ? 'active' : ''}`}
-          onClick={() => setActiveTab('logs')}
-        >
-          <span>💬 Visitor Query Logs</span>
-          {log && <span className="page-tab-badge">{log.length}</span>}
-        </button>
-      </div>
+      <AdminTabs label="AI knowledge tools" value={activeTab} onChange={setActiveTab} items={[{ id: 'sync', label: 'Readiness & sync', icon: 'book' }, { id: 'test', label: 'Test a question', icon: 'search' }]} />
+      <p className="hint">Questions from your public chat are in <Link to="/admin/questions">Activity → Visitor Q&amp;A</Link>.</p>
 
       {/* TAB 1: HOW IT WORKS & ADVANCED CONTROLS */}
       {activeTab === 'sync' && (
@@ -149,22 +133,22 @@ export default function KnowledgeIndex() {
             <div className="ux-step-card">
               <div className="ux-step-num">1</div>
               <h5>Upload Your Materials</h5>
-              <p>Add research papers, notes, or articles in the File Manager or Writing Studio.</p>
+              <p>Add source documents in Library or write an article in Content.</p>
             </div>
             <div className="ux-step-card">
               <div className="ux-step-num">2</div>
-              <h5>Sync to Vector Brain</h5>
-              <p>Click "Sync Now" to process text into 768-dimensional AI embeddings.</p>
+              <h5>Sync published material</h5>
+              <p>Choose “Sync published material” to make waiting passages searchable.</p>
             </div>
             <div className="ux-step-card">
               <div className="ux-step-num">3</div>
-              <h5>Persona Speaks Answers</h5>
-              <p>Visitors ask questions on your site; your persona retrieves and speaks accurate answers!</p>
+              <h5>Visitors ask questions</h5>
+              <p>Your persona searches the published material for context when answering visitors.</p>
             </div>
           </div>
 
-          <section className="card" style={{ marginTop: 18 }}>
-            <h3>Advanced Vector Settings</h3>
+          <details className="card" style={{ marginTop: 18 }}>
+            <summary>Advanced search settings</summary>
             {set ? (
               <p style={{ fontSize: '.9rem', color: '#475569' }}>
                 Embedding Model: <b>{set.model}</b> (768 dimensions) ·
@@ -177,17 +161,17 @@ export default function KnowledgeIndex() {
                 label="Rebuild Everything"
                 warn="This clears the vector index and re-extracts all published files from scratch. Only use this if you change your embedding model."
                 confirmLabel="Yes, rebuild index"
-                onConfirm={async () => { await api('index.rebuild'); reloadCounts(); }}
+                onConfirm={async () => { try { await api('index.rebuild'); reloadCounts(); } catch (e) { setMsgs([{ kind: 'error', t: e.message }]); } }}
               />
             </div>
-          </section>
+          </details>
         </>
       )}
 
       {/* TAB 2: TEST AI RETRIEVAL */}
       {activeTab === 'test' && (
         <section className="card">
-          <h3>Test AI Retrieval Simulator</h3>
+          <h3>Test a question</h3>
           <p className="muted" style={{ fontSize: '.9rem', margin: '0 0 16px' }}>
             Type any question below. This test shows which chunks of your research files will be returned to your Persona to answer that question.
           </p>
@@ -195,6 +179,7 @@ export default function KnowledgeIndex() {
           <form onSubmit={test} className="row">
             <input
               type="text"
+              aria-label="Test a question against AI knowledge"
               className="grow"
               placeholder="e.g. What are the key principles of IoT architecture?"
               value={q}
@@ -236,7 +221,7 @@ export default function KnowledgeIndex() {
       )}
 
       {/* TAB 3: VISITOR QUERY LOGS */}
-      {activeTab === 'logs' && <ProfileQuestions />}
+
     </>
   );
 }

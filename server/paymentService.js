@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { minorUnits, normalizeBuyer, validReceiptToken, validRequestId } from '../shared/commerce.js';
+import { minorUnits, normalizeBuyer, normalizePurchaseRecovery, validReceiptToken, validRequestId } from '../shared/commerce.js';
 import { cleanImg } from '../shared/portfolio.js';
-import { hashToken, validSignature } from './paymentCrypto.js';
+import { hashToken, recoveryReceiptToken, validRecoveryReceipt, validSignature } from './paymentCrypto.js';
 import { HttpError } from './http.js';
 
 const completed = row => ['paid', 'free'].includes(row.status);
@@ -17,7 +17,7 @@ export function purchaseView(row) {
   };
 }
 
-export function createPaymentService({ repo, gateway, clock = Date.now }) {
+export function createPaymentService({ repo, gateway, clock = Date.now, receiptSigningKey = process.env.SESSION_SECRET }) {
   function receiptInput(input) {
     if (!validRequestId(input?.requestId) || !validReceiptToken(input?.receiptToken)) throw new HttpError(400, 'Invalid purchase receipt. Please start a new checkout.');
   }
@@ -28,7 +28,7 @@ export function createPaymentService({ repo, gateway, clock = Date.now }) {
     return value;
   }
   function checkToken(row, token) {
-    if (row.receipt_token_hash !== hashToken(token)) throw new HttpError(403, 'Invalid purchase receipt.');
+    if (row.receipt_token_hash !== hashToken(token) && !validRecoveryReceipt(row, token, receiptSigningKey)) throw new HttpError(403, 'Invalid purchase receipt.');
   }
   async function receipt(input) {
     receiptInput(input); const user = await owner(input.slug, true);
@@ -45,6 +45,36 @@ export function createPaymentService({ repo, gateway, clock = Date.now }) {
     return repo.complete({ ownerId: row.owner_id, purchaseId: row.id, orderId: row.razorpay_order_id, paymentId: payment.id, amount: Number(row.amount), currency: row.currency });
   }
   return {
+    async recover(input, { ip = 'anon' } = {}) {
+      const proof = normalizePurchaseRecovery(input);
+      if (!proof.ok) throw new HttpError(400, 'Check your purchase details.', proof.errors);
+      const ref = input?.item;
+      if (!['offering', 'product'].includes(ref?.kind) || !/^[a-zA-Z0-9_-]{1,80}$/.test(String(ref?.id || ''))) throw new HttpError(400, 'Choose a valid shop item.');
+      const user = await owner(input.slug, true);
+      await repo.claim(user.id, 'checkout', ip);
+      const { email, paymentId } = proof.value;
+      const missing = () => new HttpError(404, 'No matching purchase was found for this item, email and payment ID. Check your original receipt or contact the profile owner.');
+      const matches = row => row && row.owner_id === user.id && row.item_kind === ref.kind && String(row.item_id) === String(ref.id) && String(row.buyer_email || '').trim().toLowerCase() === email;
+      let row = await repo.byPayment(user.id, paymentId);
+      if (row && (!matches(row) || row.razorpay_payment_id !== paymentId)) throw missing();
+      if (!row) {
+        const account = await repo.sharedAccount();
+        if (!account?.keyId || !account.keySecret) throw new HttpError(503, 'The profile owner needs to complete Razorpay setup before checking this payment.');
+        const payment = await gateway.payment(account, paymentId);
+        if (payment?.id !== paymentId || !/^order_[A-Za-z0-9]+$/.test(payment?.order_id || '')) throw missing();
+        row = await repo.byOrder(user.id, payment.order_id);
+        if (!matches(row)) throw missing();
+        checkPayment(row, payment, paymentId);
+        const refunded = Number(payment.amount_refunded ?? 0);
+        if (!Number.isSafeInteger(refunded) || refunded < 0 || refunded > Number(row.amount)) throw new HttpError(502, 'Payment refund status could not be read. Please try again.');
+        if (refunded > 0 && refunded === Number(row.amount)) throw new HttpError(409, 'This payment has been refunded. Contact the profile owner for details.');
+        if (['pending', 'failed'].includes(row.status)) row = await finish(row, payment);
+        else if (row.razorpay_payment_id !== paymentId) throw missing();
+      }
+      if (!['paid', 'refunded'].includes(row.status)) throw missing();
+      const receiptToken = recoveryReceiptToken(row, receiptSigningKey);
+      return { ...purchaseView(row), receipt: { requestId: row.request_id, receiptToken } };
+    },
     async create(input, { ip = 'anon' } = {}) {
       receiptInput(input);
       const buyer = normalizeBuyer(input?.buyer);

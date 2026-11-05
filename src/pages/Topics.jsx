@@ -2,29 +2,40 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useOp } from '../lib/hooks.js';
-import { Confirm, Crumbs, Field, Loading, Pill } from '../components/Ui.jsx';
+import { Confirm, Crumbs, Field, Loading, Notice, Pill } from '../components/Ui.jsx';
+import Icon from '../components/portfolio/Icon.jsx';
 
 function Detail({ id }) {
   const nav = useNavigate();
-  const { data: topics, reload } = useOp('topics.list');
-  const { data: files } = useOp('files.all'), { data: posts } = useOp('posts.list');
+  const { data: topics, reload, error: topicsError } = useOp('topics.list');
+  const { data: files, error: filesError } = useOp('files.all'), { data: posts, error: postsError } = useOp('posts.list');
   const topic = topics?.find(t => t.id === id);
   const [name, setName] = useState(''), [desc, setDesc] = useState('');
+  const [busy, setBusy] = useState(false), [message, setMessage] = useState(null);
+  async function run(action, success) {
+    if (busy) return;
+    setBusy(true); setMessage(null);
+    try { await action(); if (success) setMessage({ kind: 'success', text: success }); }
+    catch (e) { setMessage({ kind: 'error', text: e.message }); }
+    finally { setBusy(false); }
+  }
 
   useEffect(() => {
     if (topic) { setName(topic.name); setDesc(topic.description || ''); }
   }, [topic?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!topics) return <Loading />;
+  if (!topics) return <Loading error={topicsError} label="Loading topic…" />;
   if (!topic) return <><p className="muted">That topic no longer exists.</p><Link to="/admin/topics">← All topics</Link></>;
 
   const myFiles = (files || []).filter(f => f.topic_id === id);
   const myPosts = (posts || []).filter(p => p.topic_id === id);
 
   async function newPost() {
-    const [tpl] = await api('templates.list');
-    const post = await api('posts.create', { html: tpl?.html || '', topicId: id, templateId: tpl?.id ?? null });
-    nav(`/admin/writing/${post.id}`);
+    return run(async () => {
+      const [tpl] = await api('templates.list');
+      const post = await api('posts.create', { html: tpl?.html || '', topicId: id, templateId: tpl?.id ?? null });
+      nav(`/admin/writing/${post.id}`);
+    });
   }
 
   return (
@@ -45,8 +56,8 @@ function Detail({ id }) {
           </Field>
           <button
             className="btn primary"
-            disabled={!name.trim()}
-            onClick={async () => { await api('topics.update', { id, name, description: desc }); reload(); }}
+            disabled={busy || !name.trim()}
+            onClick={() => run(async () => { await api('topics.update', { id, name: name.trim(), description: desc }); reload(); }, 'Topic saved.')}
           >
             Save Changes
           </button>
@@ -54,11 +65,12 @@ function Detail({ id }) {
 
         <section className="card">
           <h3>Associated Files ({myFiles.length})</h3>
-          {!myFiles.length && <p className="muted" style={{ fontSize: '.88rem' }}>No files assigned to this topic yet.</p>}
+          {!files && <Loading error={filesError} compact label="Loading associated files…" />}
+          {files && !myFiles.length && <p className="muted" style={{ fontSize: '.88rem' }}>No files assigned to this topic yet. Assign a topic when uploading or managing a file in Library.</p>}
           <div style={{ display: 'grid', gap: 6, margin: '8px 0 16px' }}>
             {myFiles.map(f => (
               <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>📄</span>
+                <Icon n="file" size={18} />
                 <Link to={`/admin/files?${f.folder_id ? `folder=${f.folder_id}&` : ''}file=${f.id}`}>
                   {f.name}
                 </Link>
@@ -67,11 +79,12 @@ function Detail({ id }) {
           </div>
 
           <h3 style={{ marginTop: 20 }}>Associated Writing ({myPosts.length})</h3>
-          {!myPosts.length && <p className="muted" style={{ fontSize: '.88rem' }}>No posts written under this topic yet.</p>}
+          {!posts && <Loading error={postsError} compact label="Loading associated articles…" />}
+          {posts && !myPosts.length && <p className="muted" style={{ fontSize: '.88rem' }}>No articles assigned to this topic yet.</p>}
           <div style={{ display: 'grid', gap: 8, margin: '8px 0 16px' }}>
             {myPosts.map(p => (
               <div className="row" key={p.id}>
-                <span>✍️</span>
+                <Icon n="pen" size={18} />
                 <Link to={`/admin/writing/${p.id}`} style={{ fontWeight: 600 }}>{p.title}</Link>
                 <Pill status={p.status} />
               </div>
@@ -79,16 +92,17 @@ function Detail({ id }) {
           </div>
 
           <div className="row" style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
-            <button className="btn small primary" onClick={newPost}>+ New Post in this Topic</button>
+            <button className="btn small primary" disabled={busy} onClick={newPost}><Icon n="plus" size={18} />New article in this topic</button>
             <Confirm
               label="Delete Topic"
               warn="Files and articles will be kept safely, but they will be unlinked from this topic."
               confirmLabel="Yes, delete topic"
-              onConfirm={async () => { await api('topics.delete', { id }); nav('/admin/topics'); }}
+              onConfirm={() => run(async () => { await api('topics.delete', { id }); nav('/admin/topics'); })}
             />
           </div>
         </section>
       </div>
+      {message && <Notice kind={message.kind}>{message.text}</Notice>}
     </>
   );
 }
@@ -96,6 +110,8 @@ function Detail({ id }) {
 function List() {
   const { data: topics, reload, error } = useOp('topics.list');
   const [name, setName] = useState(''), [desc, setDesc] = useState('');
+  const [busy, setBusy] = useState(false), [message, setMessage] = useState(null), [search, setSearch] = useState('');
+  const visibleTopics = (topics || []).filter(topic => `${topic.name} ${topic.description || ''}`.toLowerCase().includes(search.trim().toLowerCase()));
 
   return (
     <>
@@ -103,17 +119,17 @@ function List() {
         <div>
           <h1>Research Topics</h1>
           <p className="muted" style={{ margin: 0 }}>
-            Organize your knowledge base into thematic subject areas and domains.
+            Group related files and articles so your source material is easier to find.
           </p>
         </div>
       </div>
 
       <div className="ux-guide-banner">
-        <div className="ux-guide-icon">💡</div>
+        <div className="ux-guide-icon"><Icon n="layers" size={24} /></div>
         <div className="ux-guide-content">
           <h4>Why Use Topics?</h4>
           <p>
-            Topics organize your research papers, notes, and articles into focused domains (e.g. "Artificial Intelligence", "IoT Hardware", "Product Strategy"). Your Persona uses these to organize answers and cite specific topics.
+            Create a topic, then assign it to files and articles. Topics organize your material; your AI uses the published, indexed content inside them to answer questions.
           </p>
         </div>
       </div>
@@ -121,9 +137,13 @@ function List() {
       <div className="cols c12">
         <form className="card" onSubmit={async e => {
           e.preventDefault();
-          if (!name.trim()) return;
-          await api('topics.create', { name: name.trim(), description: desc });
-          setName(''); setDesc(''); reload();
+          if (!name.trim() || busy) return;
+          setBusy(true); setMessage(null);
+          try {
+            await api('topics.create', { name: name.trim(), description: desc });
+            setName(''); setDesc(''); reload(); setMessage({ kind: 'success', text: 'Topic created. Assign it to a file or article to start organizing.' });
+          } catch (error) { setMessage({ kind: 'error', text: error.message }); }
+          finally { setBusy(false); }
         }}>
           <h3>Create New Topic</h3>
           <p className="muted" style={{ fontSize: '.86rem', margin: '0 0 14px' }}>
@@ -146,7 +166,8 @@ function List() {
               onChange={e => setDesc(e.target.value)}
             />
           </Field>
-          <button className="btn primary">+ Create Topic</button>
+          <button className="btn primary" disabled={busy || !name.trim()}><Icon n="plus" size={18} />{busy ? 'Creating…' : 'Create topic'}</button>
+          {message && <Notice kind={message.kind}>{message.text}</Notice>}
         </form>
 
         <section className="card">
@@ -156,6 +177,7 @@ function List() {
           </div>
 
           {!topics && <Loading error={error} />}
+          <Field label="Find a topic"><input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search topics…" /></Field>
           {topics && !topics.length && (
             <p className="muted" style={{ textAlign: 'center', padding: '24px 0' }}>
               No topics created yet. Add your first topic on the left to start grouping files.
@@ -163,7 +185,8 @@ function List() {
           )}
 
           <div style={{ display: 'grid', gap: 10 }}>
-            {topics?.map(t => (
+            {topics && !!topics.length && !visibleTopics.length && <p className="muted">No topics match your search.</p>}
+            {visibleTopics.map(t => (
               <div
                 key={t.id}
                 style={{
@@ -179,7 +202,7 @@ function List() {
               >
                 <div>
                   <Link to={`/admin/topics/${t.id}`} style={{ fontWeight: 600, fontSize: '.98rem', color: '#0f172a' }}>
-                    💡 {t.name}
+                    <Icon n="layers" size={18} /> {t.name}
                   </Link>
                   {t.description && (
                     <p style={{ margin: '4px 0 0', fontSize: '.82rem', color: '#64748b', lineClamp: 1 }}>
@@ -206,5 +229,5 @@ function List() {
 
 export default function Topics() {
   const { id } = useParams();
-  return id ? <Detail id={Number(id)} /> : <List />;
+  return id ? <Detail key={id} id={Number(id)} /> : <List />;
 }

@@ -4,7 +4,7 @@ import { PAGE_DEFAULTS, normalizePage } from '../../shared/pageSettings.js';
 import { ICON_NAMES, PAGE_LABELS, PORTFOLIO_DEFAULTS, PORTFOLIO_PAGES, PRODUCT_STATUS, SOCIAL_KINDS, normalizePortfolio } from '../../shared/portfolio.js';
 import { BG_BUCKET, normalizeBg } from '../../shared/siteSettings.js';
 import PortfolioSite from '../components/portfolio/PortfolioSite.jsx';
-import { Field, Notice } from '../components/Ui.jsx';
+import { Field, Loading, Notice } from '../components/Ui.jsx';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { prepareImage } from '../lib/image.js';
@@ -82,6 +82,12 @@ function Tabs({ items, active, onChange, prefix, label, controls = 'portfolio-ar
   return <div className="pp-tabs" role="tablist" aria-label={label}>{entries.map(([key, text], index) => <button type="button" key={key} id={`${prefix}-${key}`} role="tab" aria-selected={active === key} aria-controls={controls} tabIndex={active === key ? 0 : -1} className={active === key ? 'on' : ''} onClick={() => onChange(key)} onKeyDown={event => keydown(event, index)}>{text}</button>)}</div>;
 }
 
+export function PortfolioPreviewState({ error, missing, onRetry }) {
+  if (error) return <div><Notice kind="error">Could not load the preview: {error}</Notice><button type="button" className="btn" onClick={onRetry}>Retry preview</button></div>;
+  if (missing) return <Notice kind="info">Create your profile to preview your public page. <Link to="/admin/profile">Create your profile</Link></Notice>;
+  return <Loading compact label="Loading preview…" />;
+}
+
 export default function PortfolioEditor() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
@@ -89,18 +95,21 @@ export default function PortfolioEditor() {
   const area = tab === 'persona' ? 'persona' : ['look', 'store'].includes(tab) ? 'look' : 'content';
   const setTab = value => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next, { replace: true }); };
   const [saved, setSaved] = useState(null), [page, setPage] = useState(PAGE_DEFAULTS), [pf, setPf] = useState(PORTFOLIO_DEFAULTS), [data, setData] = useState(undefined);
+  const [previewError, setPreviewError] = useState('');
   const [bg, setBg] = useState(normalizeBg()), [pendingBg, setPendingBg] = useState(null), [removedBg, setRemovedBg] = useState(false);
   const [pending, setPending] = useState(null), [removed, setRemoved] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState(null);
 
   useEffect(() => {
-    api('site.get').then(s => { setSaved(s); setPage(s.page); setPf(s.portfolio); setBg(s.bg); }, e => setMsg({ kind: 'error', t: e.message }));
-    api('page.preview').then(setData, () => setData(null));
+    let active = true;
+    api('site.get').then(s => { if (active) { setSaved(s); setPage(s.page); setPf(s.portfolio); setBg(s.bg); } }, e => { if (active) setMsg({ kind: 'error', t: e.message }); });
+    api('page.preview').then(value => { if (active) setData(value); }, error => { if (active) setPreviewError(error.message); });
+    return () => { active = false; };
   }, []);
   useEffect(() => () => { if (pending) URL.revokeObjectURL(pending.url); }, [pending]);
   useEffect(() => () => { if (pendingBg) URL.revokeObjectURL(pendingBg.url); }, [pendingBg]);
 
-  if (!saved) return <p className="muted">{msg ? msg.t : 'Loading…'}</p>;
-  if (data === null) return <Notice kind="info">Create your profile first (Profile &amp; Offerings). Your pages are built from it.</Notice>;
+  if (!saved) return <Loading error={msg?.t} label="Loading page editor…" />;
+  if (data === null) return <PortfolioPreviewState missing />;
 
   const hero = removed ? null : pending?.url || saved.heroUrl;
   const background = removedBg ? null : pendingBg?.url || saved.imageUrl;
@@ -112,6 +121,10 @@ export default function PortfolioEditor() {
     setPage(p => ({ ...p, ...patch }));
     if (Object.hasOwn(patch, 'storeTitle')) setPf(p => ({ ...p, productsTitle: patch.storeTitle }));
   };
+  async function retryPreview() {
+    setPreviewError('');
+    try { setData(await api('page.preview')); } catch (error) { setPreviewError(error.message); }
+  }
 
   async function choose(file) {
     if (!file) return;
@@ -143,7 +156,7 @@ export default function PortfolioEditor() {
   return (
     <div className="portfolio-editor">
       <div className="head" style={{ marginBottom: 8 }}>
-        <div><h1>Portfolio studio</h1><p className="muted" style={{ margin: 0 }}>One public profile at <code>/p/{user.slug}</code> with your work, shop and Chat. Edit the content, appearance and persona here.</p></div>
+        <div><h1>Public page editor</h1><p className="muted" style={{ margin: 0 }}>Edit the page visitors see: your introduction, work, shop, appearance and AI chat.</p></div>
         <div className="row">
           {user.slug && <a className="btn" href={`/p/${user.slug}`} target="_blank" rel="noreferrer">View live ↗</a>}
           <button className="btn primary" disabled={!dirty || busy} onClick={save}>{busy ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}</button>
@@ -306,7 +319,7 @@ export default function PortfolioEditor() {
         </div>
 
         <div className="pp-prev"><div className="pp-prev-label">Live preview · {PAGE_LABELS[TAB_PAGE[tab]]}</div>
-          <ScaledPreview>{preview ? <PortfolioSite data={preview} slug={user.slug} sub={TAB_PAGE[tab]} preview heroOverride={hero} /> : <p className="muted">Loading…</p>}</ScaledPreview></div>
+          {preview ? <ScaledPreview><PortfolioSite data={preview} slug={user.slug} sub={TAB_PAGE[tab]} preview heroOverride={hero} /></ScaledPreview> : <PortfolioPreviewState error={previewError} onRetry={retryPreview} />}</div>
       </div>
     </div>
   );

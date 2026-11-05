@@ -1,7 +1,9 @@
+import AdminTabs from '../components/AdminTabs.jsx';
 // Admin → Enquiries. Everything a visitor sends through the contact form on this member's profile arrives here, and only here.
 import { useEffect, useMemo, useState } from 'react';
 import { ENQUIRY_STATUS, ENQUIRY_TYPES } from '../../shared/enquiryTypes.js';
 import { api } from '../lib/api.js';
+import { useAdminTab } from '../lib/adminTabs.js';
 import { useAuth } from '../lib/auth.jsx';
 import { useOp } from '../lib/hooks.js';
 import { fmtStamp } from '../lib/when.js';
@@ -133,13 +135,11 @@ function FormSettings() {
 }
 
 export default function Enquiries() {
-  const [tab, setTab] = useState('inbox');
+  const [tab, setTab] = useAdminTab({ values: ['inbox', 'form'], defaultValue: 'inbox' });
   return (
     <>
       <div className="head"><div><h1>Enquiries</h1><p className="muted" style={{ margin: 0 }}>Messages sent through the contact form on your profile arrive here and nowhere else.</p></div></div>
-      <div className="tabs" role="tablist">
-        {[['inbox', 'Inbox'], ['form', 'Form settings']].map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
-      </div>
+      <AdminTabs label="Enquiry tools" value={tab} onChange={setTab} items={[{ id: 'inbox', label: 'Inbox', icon: 'email' }, { id: 'form', label: 'Contact form settings', icon: 'template' }]} />
       {tab === 'inbox' ? <Inbox /> : <FormSettings />}
     </>
   );

@@ -58,6 +58,7 @@ const service = () => createPaymentService({ repo: createCommerceRepository(), g
 export const createPurchase = (input, meta) => service().create(input, meta);
 export const verifyPurchase = input => service().verify(input);
 export const purchaseReceipt = input => service().status(input);
+export const recoverPurchaseReceipt = (input, meta) => service().recover(input, meta);
 export const paymentWebhook = input => service().webhook(input);
 
 export async function paymentSettings(db) {

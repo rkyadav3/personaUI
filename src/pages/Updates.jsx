@@ -1,7 +1,9 @@
+import AdminTabs from '../components/AdminTabs.jsx';
 // Admin → Updates & Schedule. Whatever is published here appears on the member's public profile (/p/<slug>/updates and the
 // "What's new" block on their home page). Drafts stay private.
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
+import { useAdminTab } from '../lib/adminTabs.js';
 import { useAuth } from '../lib/auth.jsx';
 import { useOp } from '../lib/hooks.js';
 import { fmtStamp, fromLocalInput, toLocalInput } from '../lib/when.js';
@@ -10,7 +12,7 @@ import { Confirm, Field, Loading, Notice } from '../components/Ui.jsx';
 
 const blank = kind => ({ kind, title: '', body: '', startsAt: '', endsAt: '', location: '', url: '', linkLabel: '', status: 'published', pinned: false });
 const COPY = {
-  update: { tab: 'Upcoming updates', add: 'New update', empty: 'No updates yet. Post news, launches or announcements and they appear on your profile.', hint: 'News, launches and announcements. Add a date in the future and it shows as Upcoming.' },
+  update: { tab: 'Updates', add: 'New update', empty: 'No updates yet. Post news, launches or announcements and they appear on your profile.', hint: 'News, launches and announcements. Add a date in the future and it shows as Upcoming.' },
   schedule: { tab: 'Schedule', add: 'New schedule item', empty: 'Nothing scheduled. Add sessions, talks, office hours or events with a date and time.', hint: 'Dated sessions, talks and events. Visitors see them soonest first, with an add-to-calendar link.' },
   event: { tab: 'Events', add: 'Add Event', empty: 'No events yet. Add an event and let visitors tell you whether they are coming.', hint: 'Events appear on your profile home page with a Going / Not going response form and attendance counts.' },
 };
@@ -86,7 +88,9 @@ function EventResponses({ event }) {
 export default function Updates() {
   const { user } = useAuth();
   const { data, error, reload } = useOp('updates.list');
-  const [kind, setKind] = useState('update'), [edit, setEdit] = useState(null), [msg, setMsg] = useState(null), [responses, setResponses] = useState(null);
+  const [kind, setKind] = useAdminTab({ values: Object.keys(COPY), defaultValue: 'update', parameter: 'kind' });
+  const [edit, setEdit] = useState(null), [msg, setMsg] = useState(null), [responses, setResponses] = useState(null);
+  useEffect(() => { setEdit(null); setMsg(null); setResponses(null); }, [kind]);
 
   const list = useMemo(() => {
     const rows = (data || []).filter(r => r.kind === kind);
@@ -103,13 +107,11 @@ export default function Updates() {
     <>
       <div className="head">
         <div>
-          <h1>Updates &amp; Schedule</h1>
+          <h1>Events &amp; updates</h1>
           <p className="muted" style={{ margin: 0 }}>Post what is new and what is coming up. Published items appear on your public profile{user.slug && <> at <a href={`/p/${user.slug}/updates`} target="_blank" rel="noreferrer">/p/{user.slug}/updates</a></>}.</p>
         </div>
       </div>
-      <div className="tabs" role="tablist">
-        {Object.entries(COPY).map(([k, c]) => <button key={k} role="tab" aria-selected={kind === k} className={kind === k ? 'on' : ''} onClick={() => { setKind(k); setEdit(null); setMsg(null); setResponses(null); }}>{c.tab} ({count(k)})</button>)}
-      </div>
+      <AdminTabs label="Event and update types" value={kind} items={Object.entries(COPY).map(([key, c]) => ({ id: key, label: c.tab, icon: key === 'update' ? 'pen' : 'calendar', count: count(key) }))} onChange={setKind} />
       <p className="hint" style={{ marginTop: 0 }}>{COPY[kind].hint}</p>
       <Notice kind={msg?.kind}>{msg?.t}</Notice>
 

@@ -1,8 +1,10 @@
+import AdminTabs from '../components/AdminTabs.jsx';
 import { Fragment, useState } from 'react';
 import { formatAmount } from '../../shared/commerce.js';
 import { cleanImg } from '../../shared/portfolio.js';
 import { Field, Loading, Notice, Stats } from '../components/Ui.jsx';
 import { api } from '../lib/api.js';
+import { useAdminTab } from '../lib/adminTabs.js';
 import { useOp } from '../lib/hooks.js';
 import { fmtStamp } from '../lib/when.js';
 
@@ -51,7 +53,7 @@ export function SharedPaymentSettings() {
     <Notice kind={data.configured ? 'success' : 'info'}>{data.configured ? `Payments are configured${data.testMode ? ' in test mode' : ''}.` : 'The platform administrator needs to configure Razorpay credentials and the payment encryption key.'}</Notice>
     {!data.webhookConfigured && <Notice kind="info">Set the shared Razorpay webhook secret to receive payment and refund updates.</Notice>}
     <label className="toggle"><input type="checkbox" checked={enabled ?? data.enabled} onChange={e => setEnabled(e.target.checked)} disabled={busy} />Enable paid checkout on my profile</label>
-    <p className="hint">Free claims work without Razorpay. Add an access or download link to each free or paid item in Profile &amp; Offerings or Portfolio Pages → Products.</p>
+    <p className="hint">Free claims work without Razorpay. Add an access or download link in Public profile → Profile &amp; offerings, or in Page editor → Store.</p>
     <button className="btn primary" disabled={busy || enabled === null} onClick={save}>{busy ? 'Saving…' : 'Save payment preference'}</button>
     <Notice kind={msg?.kind}>{msg?.t}</Notice>
   </section>;
@@ -86,10 +88,10 @@ function PurchaseList() {
 }
 
 export default function Purchases() {
-  const [tab, setTab] = useState('purchases');
+  const [tab, setTab] = useAdminTab({ values: ['purchases', 'payments'], defaultValue: 'purchases', aliases: { settings: 'payments' } });
   return <>
     <div className="head"><div><h1>Purchases</h1><p className="muted" style={{ margin: 0 }}>Buyer details, payment receipts, free claims and fulfillment for your profile shop.</p></div></div>
-    <div className="tabs" role="tablist">{[['purchases', 'Purchases'], ['payments', 'Payment settings']].map(([key, label]) => <button key={key} role="tab" aria-selected={tab === key} className={tab === key ? 'on' : ''} onClick={() => setTab(key)}>{label}</button>)}</div>
+    <AdminTabs label="Purchase tools" value={tab} onChange={setTab} items={[{ id: 'purchases', label: 'Receipts & fulfillment', icon: 'box' }, { id: 'payments', label: 'Payment settings', icon: 'shield' }]} />
     {tab === 'purchases' ? <PurchaseList /> : <SharedPaymentSettings />}
   </>;
 }

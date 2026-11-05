@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { STUDIO_SHORTCUTS } from '../../shared/studio.js';
 import { studioCatalog } from '../../shared/studioAssistant.js';
 import { createStudioSession, initialStudioState, studioMessageGroups } from '../lib/studioSession.js';
 import Icon from './portfolio/Icon.jsx';
+import AdminDialog from './AdminDialog.jsx';
+import { Loading } from './Ui.jsx';
 import '../styles/studioAssistant.css';
 
 function Value({ value }) {
@@ -29,6 +31,26 @@ export function StudioReview({ review, busy, onApprove, onDiscard }) {
     </article>)}</div>
     {pending && <footer><p>{expired ? 'This draft has expired. Send a new command to review current data.' : 'You can discard this draft or send another command to revise it.'}</p><div><button type="button" className="btn" onClick={onDiscard} disabled={!!busy}>Discard</button><button type="button" className="btn primary" onClick={onApprove} disabled={!!busy || expired || !review.changes.length}>{busy === 'applying' ? 'Applying…' : 'Approve and apply'}</button></div></footer>}
   </section>;
+}
+
+export function StudioApproval({ review, busy, error, onApprove, onDiscard }) {
+  const [open, setOpen] = useState(true);
+  const titleId = useId();
+  if (!review) return null;
+  if (review.status !== 'pending') return <details className="studio-saved-review"><summary>View saved changes</summary><StudioReview review={review} /></details>;
+  const summary = [['create', 'addition'], ['update', 'update'], ['delete', 'deletion']].map(([kind, label]) => {
+    const count = review.changes.filter(change => change.kind === kind).length;
+    return count ? `${count} ${label}${count === 1 ? '' : 's'}` : null;
+  }).filter(Boolean).join(', ');
+  return <>
+    <button type="button" className="btn studio-review-reopen" onClick={() => setOpen(true)} disabled={!!busy}><Icon n="layers" size={18} />Review proposed changes<span>{review.changes.length}</span></button>
+    {open && <AdminDialog titleId={titleId} onClose={() => setOpen(false)} busy={!!busy} closeLabel="Close proposed changes">
+      <header className="admin-dialog-header"><span className="admin-eyebrow">Approval required</span><h2 id={titleId}>Proposed changes</h2><p>The assistant has prepared {summary || 'a draft'}. Review the summary and details before applying.</p></header>
+      <div className="studio-change-summary"><h3>What will change</h3><ul>{review.changes.map(change => <li key={change.id}><Icon n={change.kind === 'create' ? 'plus' : change.kind === 'delete' ? 'x' : 'refresh'} size={17} /><span>{change.title}</span></li>)}</ul></div>
+      {error && <p className="studio-assistant-error" role="alert">{error}</p>}
+      <StudioReview review={review} busy={busy} onApprove={onApprove} onDiscard={onDiscard} />
+    </AdminDialog>}
+  </>;
 }
 
 export function StudioResult({ result, onCheck, busy }) {
@@ -56,7 +78,7 @@ export function StudioConversation({ messages, historyBefore, historyBusy, histo
       {studioMessageGroups(messages).map((group, index) => <div className="studio-chat-exchange" key={group[0].id || index}>
         {group.map((message, number) => <article className={message.role} key={message.id || number}><span>{message.role === 'user' ? 'You' : 'Studio assistant'}{message.createdAt && <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString()}</time>}</span><p>{message.text}</p>{message.unsaved && <small className="studio-chat-unsaved">This exchange was not saved to history.</small>}</article>)}
       </div>)}
-      {historyBusy && <p className="studio-assistant-wait" role="status">Loading chat history…</p>}
+      {historyBusy && <Loading compact label="Loading chat history…" />}
       {!messages.length && !historyBusy && !historyError && busy !== 'planning' && <p className="studio-chat-empty">Your conversations will appear here. Send a message to get started.</p>}
       {historyBefore && <button type="button" className="btn studio-history-more" onClick={onLoadOlder} disabled={historyBusy}>Load older messages</button>}
     </div>
@@ -87,7 +109,7 @@ export default function StudioAssistant({ user, focusCommand, onApplied, call = 
     <div className="studio-assistant-output">
       <StudioConversation messages={messages} historyBefore={historyBefore} historyBusy={historyBusy} historyError={historyError} busy={busy} onLoadOlder={() => session.current?.loadOlder()} />
       {error && <p className="studio-assistant-error" role="alert">{error}</p>}
-      <StudioReview review={review} busy={busy} onApprove={() => session.current?.approve()} onDiscard={() => session.current?.discard()} />
+      <StudioApproval key={`${user?.id}-${review?.id}`} review={review} busy={busy} error={error} onApprove={() => session.current?.approve()} onDiscard={() => session.current?.discard()} />
       <StudioResult result={result} busy={busy} onCheck={() => session.current?.checkStatus()} />
       <details className="studio-assistant-skills"><summary>What can I manage?</summary><div>{studioCatalog(user).map(item => <Link key={item.entity} to={item.href}><strong>{item.label}</strong><small>{item.modes.join(' · ')}</small></Link>)}</div></details>
     </div>
