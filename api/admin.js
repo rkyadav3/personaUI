@@ -14,6 +14,7 @@ import * as commerce from '../server/commerce.js';
 import * as site from '../server/site.js';
 import * as store from '../server/store.js';
 import { listQuestions } from '../server/chatHistory.js';
+import { listStudioHistory } from '../server/studioChatHistory.js';
 import { scoped } from '../server/tenant.js';
 import { HttpError } from '../server/http.js';
 
@@ -39,6 +40,7 @@ const PUBLIC = {
 
 // Signed-in ops. `db` is the tenant-scoped client; `s` is the store module bound to it.
 const OPS = {
+  'studio.history': (ctx, a) => listStudioHistory(ctx, a),
   'studio.prepare': (ctx, a) => assistant.prepareStudioCommand(ctx, a),
   'studio.apply': (ctx, a) => assistant.applyStudioCommand(ctx, a),
   'studio.discard': (ctx, a) => assistant.discardStudioCommand(ctx, a),

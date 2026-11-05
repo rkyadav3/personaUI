@@ -1,7 +1,25 @@
 import { studioCommand } from '../../shared/studioAssistant.js';
 
-export const initialStudioState = userId => ({ userId, input: '', messages: [], review: null, result: null, error: '', busy: '' });
+export const initialStudioState = userId => ({ userId, input: '', messages: [], review: null, result: null, error: '', busy: '', historyBefore: null, historyBusy: false, historyError: '' });
 const browserTimeZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } };
+const turnMessages = turn => [
+  { id: `${turn.id}:q`, role: 'user', text: turn.question, createdAt: turn.createdAt },
+  { id: `${turn.id}:a`, role: 'assistant', text: turn.answer, createdAt: turn.createdAt },
+];
+const mergeMessages = (older, newer) => {
+  const seen = new Set(newer.map(message => message.id));
+  return [...older.filter(message => !seen.has(message.id)), ...newer];
+};
+
+/** Reverse exchanges while keeping each question before its reply and model context chronological. */
+export function studioMessageGroups(messages) {
+  const groups = [];
+  for (const message of messages) {
+    if (message.role === 'user' || !groups.length) groups.push([]);
+    groups.at(-1).push(message);
+  }
+  return groups.reverse();
+}
 
 /** One session belongs to one mounted owner. Late responses cannot change a newer session. */
 export function createStudioSession({ userId, call, publish, onApplied, storage, timeZone = browserTimeZone(), now = Date.now }) {
@@ -12,6 +30,19 @@ export function createStudioSession({ userId, call, publish, onApplied, storage,
   const remember = id => { try { if (id) persistence?.setItem(key, id); else persistence?.removeItem(key); } catch { /* Browser recovery is optional. */ } };
   const review = value => { update({ review: value }); remember(value?.id); };
   const notifyApplied = value => { if (['applied', 'partial'].includes(value.status)) onApplied?.(); };
+  async function loadHistory(before) {
+    update({ historyBusy: true });
+    try {
+      const value = await call('studio.history', before ? { before } : {});
+      if (!active) return;
+      if (!Array.isArray(value?.rows)) throw new Error('Admin chat history could not be loaded.');
+      const messages = [...value.rows].reverse().flatMap(turnMessages);
+      update({ messages: mergeMessages(messages, state.messages), historyBefore: value.nextBefore || null, historyError: '' });
+      return value.rows[0]?.reviewId;
+    } catch (failure) {
+      if (active) update({ historyError: failure.message || 'Admin chat history could not be loaded. Please try again.' });
+    } finally { if (active) update({ historyBusy: false }); }
+  }
   async function refresh(id, version) {
     try {
       const value = await call('studio.review', { reviewId: id });
@@ -28,12 +59,22 @@ export function createStudioSession({ userId, call, publish, onApplied, storage,
     setInput: input => update({ input }),
     dispose() { active = false; revision++; },
     async recover() {
-      let id; try { id = persistence?.getItem(key); } catch { return; }
-      if (!id || !active || state.busy) return;
+      if (!active || state.busy) return;
       const version = ++revision;
-      update({ busy: 'checking', review: { id, status: 'unknown', changes: [] }, result: { status: 'unknown', results: [] } });
-      await refresh(id, version);
+      update({ busy: 'checking' });
+      let id; try { id = persistence?.getItem(key); } catch { /* Account history can still restore the latest review. */ }
+      const latestReview = await loadHistory();
+      if (!live(version)) return;
+      id ||= latestReview;
+      if (id) {
+        update({ review: { id, status: 'unknown', changes: [] }, result: { status: 'unknown', results: [] } });
+        await refresh(id, version);
+      }
       if (live(version)) update({ busy: '' });
+    },
+    async loadOlder() {
+      if (!active || state.historyBusy || (!state.historyBefore && !state.historyError)) return;
+      await loadHistory(state.historyBefore);
     },
     async submit() {
       if (!active || state.busy) return;
@@ -48,10 +89,14 @@ export function createStudioSession({ userId, call, publish, onApplied, storage,
           review(null);
         }
         const history = state.messages.slice(-6).map(item => ({ role: item.role, text: item.text.slice(0, 3000) }));
-        update({ messages: [...state.messages.slice(-10), { role: 'user', text: message }], input: '' });
+        const messageId = `local:${version}:${now()}`;
+        update({ messages: [...state.messages, { id: messageId, role: 'user', text: message }], input: '' });
         const value = await call('studio.prepare', { message, history, timeZone });
         if (!live(version)) return;
-        update({ messages: [...state.messages, { role: 'assistant', text: value.answer || 'Review the proposed changes below.' }] }); review(value.review || null);
+        const messages = value.turn
+          ? [...state.messages.filter(item => item.id !== messageId), ...turnMessages(value.turn)]
+          : [...state.messages.map(item => item.id === messageId ? { ...item, unsaved: !!value.historyWarning } : item), { id: `${messageId}:a`, role: 'assistant', text: value.answer || 'Review the proposed changes below.' }];
+        update({ messages, ...(value.historyWarning ? { historyError: value.historyWarning } : {}) }); review(value.review || null);
       } catch (failure) { if (live(version)) update({ error: failure.message || 'The command could not be planned. Try again.', input: message }); }
       finally { if (live(version)) update({ busy: '' }); }
     },

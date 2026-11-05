@@ -65,6 +65,27 @@ test('read commands answer without creating a mutation review', async () => {
   assert.equal(f.writes.length, 0);
 });
 
+test('completed command, read and clarification replies are saved to account history', async () => {
+  const { createStudioAssistant } = await module();
+  for (const mode of ['command', 'read', 'clarification']) {
+    const f = fixture({ answer: 'Exact reply', actions: mode === 'command' ? [{ entity: 'projects', action: 'create', values: { title: 'New project' } }] : [] }, { entities: mode === 'clarification' ? [] : ['projects'] });
+    const saved = [];
+    f.dependencies.history = { record: async (ctx, value) => { saved.push({ owner: ctx.user.id, ...value }); return { id: '99', ...value }; } };
+    const result = await createStudioAssistant(f.dependencies).prepare(actor, { message: 'Please help' });
+    assert.equal(saved.length, 1, mode); assert.equal(saved[0].question, 'Please help'); assert.equal(saved[0].answer, result.answer);
+    assert.equal(saved[0].owner, 'owner'); assert.equal(saved[0].reviewId, result.review?.id || null); assert.equal(result.turn.id, '99');
+    assert.equal(f.writes.length, 0);
+  }
+});
+
+test('history storage failure preserves the pending review and reports a safe warning', async () => {
+  const { createStudioAssistant } = await module(), f = fixture();
+  f.dependencies.history = { record: async () => { throw new Error('private database credentials'); } };
+  const result = await createStudioAssistant(f.dependencies).prepare(actor, { message: 'Create a project' });
+  assert.equal(result.review.status, 'pending'); assert.equal(f.records.size, 1); assert.equal(f.writes.length, 0);
+  assert.match(result.historyWarning, /history|saved/i); assert.doesNotMatch(result.historyWarning, /private/i);
+});
+
 test('approval is required explicitly and client changes cannot replace the reviewed plan', async () => {
   const { createStudioAssistant } = await module(), f = fixture(), service = createStudioAssistant(f.dependencies);
   await service.prepare(actor, { message: 'Create a project' });

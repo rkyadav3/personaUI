@@ -26,7 +26,17 @@ Delete folders/categories/Events only when explicitly requested; linked children
 Knowledge jobs must be reviewed separately. Existing invites can only be revoked. New accounts register with invitations; passwords use the account editor.
 Return no arbitrary operations, SQL, URLs to execute, credentials, ownership or permission fields.`;
 
-export function createStudioAssistant({ reviews, readState, generate, execute, now = Date.now, makeId = randomUUID }) {
+export function createStudioAssistant({ reviews, history, readState, generate, execute, now = Date.now, makeId = randomUUID }) {
+  async function remember(ctx, question, value) {
+    if (!history) return value;
+    try {
+      const turn = await history.record(ctx, { question, answer: value.answer, reviewId: value.review?.id || null });
+      return { ...value, turn };
+    } catch (failure) {
+      // A saved review must remain available even if the separate transcript write fails.
+      return { ...value, historyWarning: failure instanceof HttpError ? failure.message : 'This exchange could not be saved to Admin chat history. Please try loading history again.' };
+    }
+  }
   async function generateSafe(system, value, signal) {
     try { return await generate(system, JSON.stringify(value), { maxOutputTokens: system === SELECTION ? 500 : 6000, signal }); }
     catch { throw new HttpError(502, 'The assistant could not plan that command right now. Please try again.'); }
@@ -51,16 +61,16 @@ export function createStudioAssistant({ reviews, readState, generate, execute, n
       if (!Array.isArray(selection?.entities) || selection.entities.length > 8) throw new HttpError(400, 'Name a more specific admin area to change.');
       const entities = [...new Set(selection.entities)];
       for (const name of entities) if (!Object.hasOwn(STUDIO_ENTITIES, name) || STUDIO_ENTITIES[name].admin && !ctx.user.isAdmin) throw new HttpError(403, 'You do not have permission for that admin area.');
-      if (!entities.length) return { answer: typeof selection.message === 'string' ? selection.message.slice(0, 1000) : 'Tell me what you would like to read, create, update or delete.', review: null };
+      if (!entities.length) return remember(ctx, message, { answer: typeof selection.message === 'string' && selection.message.trim() ? selection.message.slice(0, 1000) : 'Tell me what you would like to read, create, update or delete.', review: null });
       const state = await readState(ctx, entities), context = studioModelContext(state, entities, ctx.user);
       if (JSON.stringify(context).length > 120000) throw new HttpError(400, 'This command includes too much content. Choose a smaller area or append a short edit.');
       const proposal = await generateSafe(PLANNER, { command: message, history, timeZone, selectedEntities: entities, catalog: catalog.filter(item => entities.includes(item.entity)), snapshot: context, today: new Date(now()).toISOString() }, signal);
       if (Array.isArray(proposal?.actions) && proposal.actions.some(action => !entities.includes(action?.entity))) throw new HttpError(400, 'The assistant needs a new review with the correct target areas. Try a more specific command.');
       const plan = makeStudioPlan(proposal, state, ctx.user);
-      if (!plan.steps.length) return { answer: plan.answer || 'There are no changes to apply.', review: null };
+      if (!plan.steps.length) return remember(ctx, message, { answer: plan.answer || 'There are no changes to apply.', review: null });
       const row = { id: makeId(), command: message, plan, createdAt: new Date(now()).toISOString(), expiresAt: new Date(now() + STUDIO_REVIEW_MS).toISOString() };
       const saved = await reviews.create(ctx, row);
-      return { answer: plan.answer || 'Review the proposed changes below. Nothing is applied until you approve.', review: reviewView(saved) };
+      return remember(ctx, message, { answer: plan.answer || 'Review the proposed changes below. Nothing is applied until you approve.', review: reviewView(saved) });
     },
     async apply(ctx, args = {}) {
       actor(ctx);
@@ -108,8 +118,8 @@ export function createStudioAssistant({ reviews, readState, generate, execute, n
 }
 
 async function service(ctx) {
-  const [{ createStudioReviewRepository }, { readStudioState, executeStudioStep }, { generateJSON }] = await Promise.all([import('./studioReviews.js'), import('./studioOperations.js'), import('./gemini.js')]);
-  return createStudioAssistant({ reviews: createStudioReviewRepository(), readState: readStudioState, execute: executeStudioStep, generate: generateJSON });
+  const [{ createStudioReviewRepository }, { createStudioChatRepository }, { readStudioState, executeStudioStep }, { generateJSON }] = await Promise.all([import('./studioReviews.js'), import('./studioChatHistory.js'), import('./studioOperations.js'), import('./gemini.js')]);
+  return createStudioAssistant({ reviews: createStudioReviewRepository(), history: createStudioChatRepository(), readState: readStudioState, execute: executeStudioStep, generate: generateJSON });
 }
 export const prepareStudioCommand = async (ctx, args) => (await service(ctx)).prepare(ctx, args);
 export const applyStudioCommand = async (ctx, args) => (await service(ctx)).apply(ctx, args);

@@ -8,7 +8,7 @@ const deferred = () => { let resolve, reject; const promise = new Promise((yes, 
 async function fixture(handler, saved = false) {
   const { createStudioSession } = await load(), calls = [], published = [], stored = new Map(saved ? [['studio-review:owner', id]] : []);
   let refreshed = 0;
-  const session = createStudioSession({ userId: 'owner', timeZone: 'Asia/Kolkata', call: async (op, args) => { calls.push({ op, args }); return handler ? handler(op, args, calls.length) : op === 'studio.prepare' ? { answer: 'Review this edit.', review: draft() } : op === 'studio.review' ? { status: 'pending', review: draft(), results: [] } : { status: op === 'studio.discard' ? 'cancelled' : 'applied', results: [] }; }, publish: value => published.push(structuredClone(value)), onApplied: () => { refreshed++; }, storage: { getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value), removeItem: key => stored.delete(key) } });
+  const session = createStudioSession({ userId: 'owner', timeZone: 'Asia/Kolkata', call: async (op, args) => { calls.push({ op, args }); if (op === 'studio.history') return { rows: [], nextBefore: null }; return handler ? handler(op, args, calls.length) : op === 'studio.prepare' ? { answer: 'Review this edit.', review: draft() } : op === 'studio.review' ? { status: 'pending', review: draft(), results: [] } : { status: op === 'studio.discard' ? 'cancelled' : 'applied', results: [] }; }, publish: value => published.push(structuredClone(value)), onApplied: () => { refreshed++; }, storage: { getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value), removeItem: key => stored.delete(key) } });
   return { session, calls, published, stored, refreshed: () => refreshed };
 }
 
@@ -50,7 +50,7 @@ test('discard makes no content mutation and clears only the saved review ID', as
 
 test('reload recovers a saved review without applying it', async () => {
   const f = await fixture(null, true); await f.session.recover();
-  assert.deepEqual(f.calls.map(call => call.op), ['studio.review']); assert.equal(f.session.snapshot().review.status, 'pending'); assert.equal(f.session.snapshot().result, null);
+  assert.deepEqual(f.calls.map(call => call.op), ['studio.history', 'studio.review']); assert.equal(f.session.snapshot().review.status, 'pending'); assert.equal(f.session.snapshot().result, null);
 });
 
 test('lost approval response checks saved status and never retries the mutation', async () => {

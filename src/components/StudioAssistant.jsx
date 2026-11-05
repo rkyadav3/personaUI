@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { STUDIO_SHORTCUTS } from '../../shared/studio.js';
 import { studioCatalog } from '../../shared/studioAssistant.js';
-import { createStudioSession, initialStudioState } from '../lib/studioSession.js';
+import { createStudioSession, initialStudioState, studioMessageGroups } from '../lib/studioSession.js';
 import Icon from './portfolio/Icon.jsx';
 import '../styles/studioAssistant.css';
 
@@ -44,11 +44,30 @@ export function StudioResult({ result, onCheck, busy }) {
 
 const PROMPTS = ['Create a writing template called ', 'Write a draft post about ', 'Update my persona greeting to ', 'Create a folder called '];
 
+export function StudioConversation({ messages, historyBefore, historyBusy, historyError, busy, onLoadOlder }) {
+  const box = useRef(null);
+  const latestId = messages.at(-1)?.id;
+  useEffect(() => { if (box.current) box.current.scrollTop = 0; }, [latestId]);
+  return <section className="studio-chat-history" aria-label="Admin chat history">
+    <header><h2>Chat history</h2><span>Newest first</span></header>
+    {historyError && <div className="studio-assistant-error" role="alert"><p>{historyError}</p><button type="button" className="btn" onClick={onLoadOlder} disabled={historyBusy}>Retry loading history</button></div>}
+    <div ref={box} className="studio-admin-conversation" role="log" aria-label="Admin assistant conversation" aria-live="polite" aria-relevant="additions" aria-busy={historyBusy || busy === 'planning'} tabIndex={0}>
+      {busy === 'planning' && <p className="studio-assistant-wait" role="status">Reading the relevant admin records and preparing your review…</p>}
+      {studioMessageGroups(messages).map((group, index) => <div className="studio-chat-exchange" key={group[0].id || index}>
+        {group.map((message, number) => <article className={message.role} key={message.id || number}><span>{message.role === 'user' ? 'You' : 'Studio assistant'}{message.createdAt && <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString()}</time>}</span><p>{message.text}</p>{message.unsaved && <small className="studio-chat-unsaved">This exchange was not saved to history.</small>}</article>)}
+      </div>)}
+      {historyBusy && <p className="studio-assistant-wait" role="status">Loading chat history…</p>}
+      {!messages.length && !historyBusy && !historyError && busy !== 'planning' && <p className="studio-chat-empty">Your conversations will appear here. Send a message to get started.</p>}
+      {historyBefore && <button type="button" className="btn studio-history-more" onClick={onLoadOlder} disabled={historyBusy}>Load older messages</button>}
+    </div>
+  </section>;
+}
+
 export default function StudioAssistant({ user, focusCommand, onApplied, call = api }) {
   const [state, setState] = useState(() => initialStudioState(user?.id));
   const inputRef = useRef(null), session = useRef(null), applied = useRef(onApplied);
   applied.current = onApplied;
-  const { input, messages, review, result, error, busy } = state.userId === user?.id ? state : initialStudioState(user?.id);
+  const { input, messages, review, result, error, busy, historyBefore, historyBusy, historyError } = state.userId === user?.id ? state : initialStudioState(user?.id);
   const setInput = value => session.current?.setInput(value);
   useEffect(() => { if (focusCommand) inputRef.current?.focus(); }, [focusCommand]);
   useEffect(() => {
@@ -66,8 +85,7 @@ export default function StudioAssistant({ user, focusCommand, onApplied, call = 
     </form>
     <div className="studio-suggestions"><p>Try something like:</p><div>{STUDIO_SHORTCUTS.map((item, index) => <button type="button" key={item.label} className="studio-shortcut" disabled={!!busy} onClick={() => { setInput(PROMPTS[index]); inputRef.current?.focus(); }}><Icon n={item.icon} size={18} /><span>{item.label}</span></button>)}</div></div>
     <div className="studio-assistant-output">
-      {!!messages.length && <div className="studio-admin-conversation" role="log" aria-label="Admin assistant conversation" aria-live="polite">{messages.map((message, index) => <article className={message.role} key={index}><span>{message.role === 'user' ? 'You' : 'Studio assistant'}</span><p>{message.text}</p></article>)}</div>}
-      {busy === 'planning' && <p className="studio-assistant-wait" role="status">Reading the relevant admin records and preparing your review…</p>}
+      <StudioConversation messages={messages} historyBefore={historyBefore} historyBusy={historyBusy} historyError={historyError} busy={busy} onLoadOlder={() => session.current?.loadOlder()} />
       {error && <p className="studio-assistant-error" role="alert">{error}</p>}
       <StudioReview review={review} busy={busy} onApprove={() => session.current?.approve()} onDiscard={() => session.current?.discard()} />
       <StudioResult result={result} busy={busy} onCheck={() => session.current?.checkStatus()} />

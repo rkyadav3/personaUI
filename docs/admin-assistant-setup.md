@@ -6,8 +6,9 @@ The command bar on `/admin` is the owner's admin assistant. A visitor's `/p/:slu
 
 1. Apply this update to the React app and server API together.
 2. In the Supabase SQL Editor, run `supabase/studio-assistant.sql` after the existing `multitenant.sql` and Events/Commerce migrations. It creates `studio_reviews`, an owner-bound table with RLS enabled and no browser permissions. It can be run again.
-3. Keep `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SESSION_SECRET`, `GEMINI_API_KEY` and the optional `GEMINI_MODEL` on the server. They are the existing app settings; no new secret is required. The assistant uses the same Gemini configuration as profile registration.
-4. Restart `npm run dev` (`vercel dev`) locally, or deploy the updated app and API to Vercel. The admin API already allows 60 seconds; planning shares a 45-second Gemini timeout.
+3. Run `supabase/studio-chat.sql` after `studio-assistant.sql`. It creates private, owner-scoped Admin conversation history and can be run again. Apply it before deploying the updated API.
+4. Keep `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SESSION_SECRET`, `GEMINI_API_KEY` and the optional `GEMINI_MODEL` on the server. They are the existing app settings; no new secret is required. The assistant uses the same Gemini configuration as profile registration.
+5. Restart `npm run dev` (`vercel dev`) locally, or deploy the updated app and API to Vercel. The admin API already allows 60 seconds; planning shares a 45-second Gemini timeout.
 
 ## Use commands
 
@@ -29,7 +30,9 @@ Choose **Approve and apply** only after checking the proposed values and deletio
 - Reviews expire after 15 minutes and contain at most eight requested actions. Settings are merged into one save. Dependent deletion/edit batches and knowledge jobs need separate reviews.
 - If any affected data changed after preview, the server refuses approval and asks for a new review. Each review can be claimed once, even when requests overlap.
 - Failed batches stop at the failed step. Completed steps remain applied; the result identifies failures and steps not attempted. Check linked admin pages before preparing a new review when a step's outcome is uncertain.
-- Reloading the same browser tab recovers its last review ID. An unknown or running review must have its status checked before another command is prepared. Reviews do not automatically reapply after a lost response or reload.
+- Completed commands, read answers and clarifications are saved to the owner's account. History shows newest exchanges first inside a bounded scrolling box, with **Load older messages** for pagination. Each question stays above its reply; the typing form stays in its original position. Only the six latest messages are sent to the model for context.
+- Reload restores the account's chat history and the browser tab's last review ID, or the latest exchange's review when no browser ID is available. An unknown or running review must have its status checked before another command is prepared. Reviews do not automatically reapply after a lost response or reload.
+- History errors display a retry control. Failed transcript writes keep the generated reply and its saved review available in the current view, with an unsaved marker. Earlier chats were not stored and cannot be recovered. Only completed exchanges are persisted; failed planning requests remain errors in the current view.
 - The model sees up to 80 records per selected area and safe reference IDs/names. Oversized context is rejected; use focused commands or the existing editor for large replacements. Long text can be appended while preserving the original.
 - Portrait/background cropping and removal support commands. New image and binary uploads use the existing upload controls. Password resets remain in the account editor. Existing invites can be revoked; new accounts register through the normal invitation flow.
 - Purchase commands edit fulfillment and private notes. Paid checkout can be enabled or disabled after the shared Razorpay setup is complete. Credentials, amounts and payment status cannot be changed by the assistant.

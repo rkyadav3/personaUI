@@ -2,7 +2,7 @@
 // insert is stamped with their owner_id. Fails closed: no uid, no client.
 import { raw } from './supabase.js';
 
-export const TENANT_TABLES = new Set(['files', 'folders', 'topics', 'posts', 'templates', 'chunks', 'chat_log', 'profiles', 'contributions', 'offerings', 'profile_submissions', 'site_settings', 'updates', 'enquiries', 'event_responses', 'purchases', 'payment_accounts', 'public_actions', 'studio_reviews']);
+export const TENANT_TABLES = new Set(['files', 'folders', 'topics', 'posts', 'templates', 'chunks', 'chat_log', 'profiles', 'contributions', 'offerings', 'profile_submissions', 'site_settings', 'updates', 'enquiries', 'event_responses', 'purchases', 'payment_accounts', 'public_actions', 'studio_reviews', 'studio_chat']);
 export const TENANT_RPCS = new Set(['hybrid_search', 'chunk_sources', 'save_event_response', 'event_rsvp_summary', 'complete_purchase', 'record_purchase_refund', 'claim_public_action', 'purchase_summary']);   // these get p_owner
 
 export function scoped(uid) {

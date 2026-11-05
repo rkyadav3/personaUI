@@ -30,7 +30,7 @@ The Streamlit admin and the static chat page are now one React app (Vite) with V
 
 ## Setup
 1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql`, `page.sql`, `portfolio.sql`, `engage.sql`, `events-commerce.sql`, `studio-assistant.sql`, and `profile-questions.sql`. If your project already has those tables, compare first and run the migrations it is missing.
-2. **Env vars:** copy `.env.example` to `.env.local` (local) or add them in Vercel. `SESSION_SECRET` is new: any long random string.
+2. **Env vars:** copy `.env.example` to `.env.local` (local) or add them in Vercel. `SESSION_SECRET` is new: any long random string. See [Vercel and Razorpay environment setup](docs/vercel-environment-setup.md) for the exact variable names, value sources and Admin payment settings.
 3. **Run locally:** `npm install`, `npm i -g vercel`, then `npm run dev` (first run asks you to log in and link a Vercel project; put your variables in `.env.local`). `npm run dev:web` runs only the UI and proxies `/api` to a `vercel dev` on port 3000.
 4. **Deploy:** import the repo in Vercel (framework: Vite). Root directory is the repo root. Add the env vars. Deploy.
 5. **First use:** create an account (put your email in `ADMIN_EMAILS` to see Invites), add files, open Knowledge Base and press **Sync now**, then test retrieval and visit `/p/<your-slug>/chat`.
@@ -85,7 +85,11 @@ Try “Change my title to Product Designer”, “Create a published event tomor
 
 Reviews expire after 15 minutes. The server checks the owner, current permissions and whether data changed since the preview, then claims the saved review once. Repeated approval cannot execute it again. A batch runs in sequence and stops on failure, showing completed, failed and unapplied steps. It does not roll back earlier completed steps. Reloading recovers the saved review; an interrupted command checks its status instead of retrying writes.
 
-Run `supabase/studio-assistant.sql` and keep the existing server `GEMINI_API_KEY`/`GEMINI_MODEL` configuration. Dates use the browser's timezone. Uploads and passwords use the existing editors, and commands cannot change financial payment amounts or status. Knowledge sync, embedding and index clearing are separate reviewed jobs; large embedding jobs continue through another review or Knowledge Base.
+Completed Admin questions and replies are saved privately to the owner's account. The conversation box shows the newest exchange first, with each question above its reply; the typing form stays above the box. Reload restores history, and **Load older messages** retrieves earlier exchanges inside that same scrolling box. The model receives only the six most recent messages for context. Loading or saving failures are shown explicitly; a transcript failure preserves the saved command review and marks the live exchange as unsaved. Chats from before this feature were not recorded and cannot be recovered.
+
+Run `supabase/studio-assistant.sql`, then `supabase/studio-chat.sql` for saved Admin conversation history, and keep the existing server `GEMINI_API_KEY`/`GEMINI_MODEL` configuration. Dates use the browser's timezone. Uploads and passwords use the existing editors, and commands cannot change financial payment amounts or status. Knowledge sync, embedding and index clearing are separate reviewed jobs; large embedding jobs continue through another review or Knowledge Base.
+
+Public Portfolio Chat uses a taller conversation panel sized to the visible viewport, including mobile keyboard changes. Suggested questions sit above the multiline typing area near the panel's lower edge. Enter sends; Shift+Enter inserts a new line. New answers scroll the conversation rather than the whole page.
 
 ## Members' home page (`/`)
 A private platform: set `REGISTRATION_MODE=invite` (now the default in `.env.example`) so an account needs a code from **Admin → Invites**. Visitors browse without an account.
