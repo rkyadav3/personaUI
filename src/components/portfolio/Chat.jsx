@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { normalizeBg } from '../../../shared/siteSettings.js';
 import { normalizePage } from '../../../shared/pageSettings.js';
 import { askPersona } from '../../lib/personaChat.js';
-import { chatPanelHeight, shouldSubmitChat } from '../../lib/chatLayout.js';
+import { chatOrbSize, chatPanelHeight, shouldSubmitChat } from '../../lib/chatLayout.js';
 import PersonaBall from '../PersonaBall.jsx';
 import LiquidGlass from '../LiquidGlass.jsx';
 import Icon from './Icon.jsx';
@@ -11,7 +11,7 @@ import Icon from './Icon.jsx';
 export default function Chat({ m, ctx, data }) {
   const page = normalizePage(data.page), bg = normalizeBg(data.bg);
   const [input, setInput] = useState(''), [messages, setMessages] = useState([]), [busy, setBusy] = useState(false), [error, setError] = useState(''), [listening, setListening] = useState(false);
-  const inputRef = useRef(null), controller = useRef(null), recognition = useRef(null), pending = useRef(false), conversationRef = useRef(null), panelRef = useRef(null);
+  const inputRef = useRef(null), controller = useRef(null), recognition = useRef(null), pending = useRef(false), conversationRef = useRef(null), panelRef = useRef(null), dockRef = useRef(null);
   const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
   const name = m.first || m.name || 'this creator';
   const prompts = page.chips.length ? page.chips : [
@@ -35,18 +35,27 @@ export default function Chat({ m, ctx, data }) {
   }, [input]);
   useEffect(() => {
     const panel = panelRef.current;
-    if (!panel || ctx.preview) return;
+    if (!panel) return;
     const viewport = window.visualViewport;
-    const fit = () => panel.style.setProperty('--pf-chat-height', `${chatPanelHeight(panel.getBoundingClientRect().top, { height: viewport?.height || window.innerHeight, offsetTop: viewport?.offsetTop || 0 })}px`);
+    const fit = () => {
+      if (!ctx.preview) {
+        const height = viewport?.height || window.innerHeight;
+        panel.parentElement.classList.toggle('is-compact', height < 500);
+        panel.style.setProperty('--pf-chat-height', `${chatPanelHeight(panel.getBoundingClientRect().top, { height, offsetTop: viewport?.offsetTop || 0 })}px`);
+      }
+      panel.style.setProperty('--pf-chat-orb-size', `${chatOrbSize(page.ball.size, panel.clientHeight, dockRef.current?.offsetHeight || 0)}px`);
+    };
     fit();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
     const heading = panel.parentElement.querySelector('.pf-chat-heading'), header = panel.closest('.pf')?.querySelector('.pf-head');
     if (heading) observer?.observe(heading);
     if (header) observer?.observe(header);
+    if (dockRef.current) observer?.observe(dockRef.current);
+    observer?.observe(panel);
     window.addEventListener('resize', fit);
     viewport?.addEventListener('resize', fit); viewport?.addEventListener('scroll', fit);
     return () => { observer?.disconnect(); window.removeEventListener('resize', fit); viewport?.removeEventListener('resize', fit); viewport?.removeEventListener('scroll', fit); };
-  }, [ctx.preview]);
+  }, [ctx.preview, page.ball.size]);
 
   async function send(event, text) {
     event?.preventDefault();
@@ -89,10 +98,9 @@ export default function Chat({ m, ctx, data }) {
           <h1>{page.headline || `Chat with ${name}`}{page.headlineAccent && <> <em>{page.headlineAccent}</em></>}</h1>
           <p>{page.subtitle || `Ask about ${name}’s work, expertise, and offerings. Answers come from published knowledge.`}</p>
         </header>
-        <div className="pf-chat-panel-shell" ref={panelRef}>
-        <LiquidGlass className="pf-chat-panel" radius={page.theme.radius} refract>
+        <div className="pf-chat-workspace" ref={panelRef} style={{ '--pf-chat-orb-size': `${page.ball.size}px` }}>
+          {page.ball.show && bg.ball && <div className="pf-chat-orb" style={{ opacity: bg.ballOpacity / 100 }} aria-hidden="true"><div className="pf-chat-orb-visual"><PersonaBall width={page.ball.size} height={page.ball.size} mode={busy ? 'thinking' : listening ? 'listening' : 'idle'} /></div></div>}
           <div ref={conversationRef} className={`pf-conversation${messages.length ? ' has-messages' : ''}`} role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-busy={busy} tabIndex={0}>
-            {page.ball.show && bg.ball && <div className="pf-chat-orb" style={{ opacity: bg.ballOpacity / 100 }} aria-hidden="true"><PersonaBall width={page.ball.size} height={page.ball.size} mode={busy ? 'thinking' : listening ? 'listening' : 'idle'} /></div>}
             {!messages.length && <p className="pf-chat-welcome">Start a conversation, or choose a question below.</p>}
             {messages.map((message, index) => <article className={`pf-message ${message.role}`} key={index}>
               <span className="pf-message-name">{message.role === 'user' ? 'You' : name}</span>
@@ -101,17 +109,18 @@ export default function Chat({ m, ctx, data }) {
             </article>)}
             {busy && <p className="pf-chat-working" role="status">Finding an answer…</p>}
           </div>
-          {error && <p className="pf-chat-error" role="alert">{error}</p>}
-          {listening && <p className="pf-chat-working" role="status">Listening… Speak your question, then stop the microphone to edit it.</p>}
-          <div className="pf-chat-prompts" aria-label="Suggested questions">{prompts.map(prompt => <button key={prompt.label} type="button" disabled={busy} onClick={event => send(event, prompt.prompt)}>{prompt.label}</button>)}</div>
-          <form className="pf-chat-composer" onSubmit={send}>
-            <label className="studio-sr-only" htmlFor={`chat-message-${ctx.slug}`}>Message to {name}</label>
-            <textarea id={`chat-message-${ctx.slug}`} ref={inputRef} aria-label={`Message to ${name}`} aria-describedby={`chat-help-${ctx.slug}`} rows={1} value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (shouldSubmitChat(event)) { event.preventDefault(); send(event); } }} maxLength={500} placeholder={page.placeholder || 'Ask me anything about my work…'} autoComplete="off" disabled={busy} />
-            {page.chat.mic && SR && <button type="button" className={`pf-chat-mic${listening ? ' listening' : ''}`} aria-label={listening ? 'Stop microphone' : 'Start microphone'} aria-pressed={listening} disabled={busy} onClick={toggleMicrophone}><Icon n="mic" size={20} /></button>}
-            <button type="submit" className="pf-chat-send" aria-label="Send message" disabled={busy || !input.trim()}><Icon n="send" size={19} /></button>
-          </form>
-          <p className="pf-chat-footnote" id={`chat-help-${ctx.slug}`}>Enter to send · Shift+Enter for a new line. Answers can be imperfect; check the sources.</p>
-        </LiquidGlass>
+          <div className="pf-chat-dock" ref={dockRef}>
+            {error && <p className="pf-chat-error" role="alert">{error}</p>}
+            {listening && <p className="pf-chat-working" role="status">Listening… Speak your question, then stop the microphone to edit it.</p>}
+            <div className="pf-chat-prompts" aria-label="Suggested questions">{prompts.map(prompt => <button key={prompt.label} type="button" disabled={busy} onClick={event => send(event, prompt.prompt)}>{prompt.label}</button>)}</div>
+            <form className="pf-chat-composer" onSubmit={send}>
+              <label className="studio-sr-only" htmlFor={`chat-message-${ctx.slug}`}>Message to {name}</label>
+              <textarea id={`chat-message-${ctx.slug}`} ref={inputRef} aria-label={`Message to ${name}`} aria-describedby={`chat-help-${ctx.slug}`} rows={1} value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (shouldSubmitChat(event)) { event.preventDefault(); send(event); } }} maxLength={500} placeholder={page.placeholder || 'Ask me anything about my work…'} autoComplete="off" disabled={busy} />
+              {page.chat.mic && SR && <button type="button" className={`pf-chat-mic${listening ? ' listening' : ''}`} aria-label={listening ? 'Stop microphone' : 'Start microphone'} aria-pressed={listening} disabled={busy} onClick={toggleMicrophone}><Icon n="mic" size={20} /></button>}
+              <button type="submit" className="pf-chat-send" aria-label="Send message" disabled={busy || !input.trim()}><Icon n="send" size={19} /></button>
+            </form>
+            <p className="pf-chat-footnote" id={`chat-help-${ctx.slug}`}>Enter to send · Shift+Enter for a new line. Answers can be imperfect; check the sources.</p>
+          </div>
         </div>
       </div>
       <LiquidGlass as="aside" className={`pf-chat-profile photo-${page.layout.photo}`} radius={page.theme.radius}>

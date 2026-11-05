@@ -45,6 +45,37 @@ test('public chat has an accessible multiline composer after the suggestions', (
   assert.ok(html.indexOf('pf-conversation') < html.indexOf('pf-chat-composer'));
 });
 
+test('the persona ball stays outside the scrolling conversation and the composer has a separate dock', () => {
+  const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
+  const html = render(React.createElement(PortfolioSite, { data: { name: 'Ravi' }, slug: 'ravi', sub: 'chat', preview: true }));
+  const log = html.match(/<div[^>]*class="pf-conversation[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+  assert.ok(log, 'Conversation remains a labelled scrollable log');
+  assert.doesNotMatch(log[1], /<canvas|pf-chat-orb/);
+  assert.ok(html.indexOf('pf-chat-orb') < html.indexOf('pf-conversation'));
+  assert.ok(html.indexOf('pf-conversation') < html.indexOf('pf-chat-dock'));
+  assert.ok(html.indexOf('pf-chat-dock') < html.indexOf('pf-chat-composer'));
+});
+
+test('the dedicated Chat page has no outer glass chatbot box and honours hidden-ball settings', () => {
+  const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
+  const html = render(React.createElement(PortfolioSite, { data: { name: 'Ravi' }, slug: 'ravi', sub: 'chat', preview: true }));
+  assert.match(html, /pf-chat-workspace/);
+  assert.doesNotMatch(html, /class="[^"]*\blg\b[^"]*pf-chat-(?:panel|workspace)/);
+  for (const data of [{ name: 'Ravi', page: { ball: { show: false } } }, { name: 'Ravi', bg: { ball: false } }]) {
+    const hidden = render(React.createElement(PortfolioSite, { data, slug: 'ravi', sub: 'chat', preview: true }));
+    assert.doesNotMatch(hidden, /<canvas|class="pf-chat-orb"/);
+    assert.match(hidden, /aria-label="Send message"/);
+  }
+});
+
+test('the ball adapts to short viewports while reserving room for messages and typing controls', async () => {
+  const { chatOrbSize } = await import('../src/lib/chatLayout.js');
+  assert.equal(chatOrbSize(220, 664, 120), 220);
+  assert.equal(chatOrbSize(320, 420, 140), 184);
+  assert.equal(chatOrbSize(220, 240, 130), 36);
+  assert.equal(chatOrbSize(140, 600, 180), 140);
+});
+
 test('public chat panel expands to the visible viewport, including the mobile keyboard', async () => {
   const { chatPanelHeight } = await import('../src/lib/chatLayout.js');
   assert.equal(chatPanelHeight(220, { height: 900, offsetTop: 0 }), 664);
