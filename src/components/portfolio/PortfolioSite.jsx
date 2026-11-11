@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { ACCENTS, FONT_STACK, normalizePage } from '../../../shared/pageSettings.js';
 import { splitSchedule } from '../../../shared/engage.js';
-import { SOCIAL_KINDS } from '../../../shared/portfolio.js';
+import { ACTIVITY_SECTIONS, PUBLIC_PAGE_ALIASES, SOCIAL_KINDS } from '../../../shared/portfolio.js';
 import { resolveSite } from '../../lib/portfolioModel.js';
 import EnquiryForm from './EnquiryForm.jsx';
 import Icon from './Icon.jsx';
@@ -27,7 +27,8 @@ function A({ href, className, children, onClick, ...rest }) {
 
 /** Link to another page of the same site (a router link live, a button inside the editor preview). */
 function GoTo({ to, ctx, className, children, ...rest }) {
-  const path = ctx.pages.find(p => p.key === to)?.path || `/p/${ctx.slug}`;
+  const alias = PUBLIC_PAGE_ALIASES[to];
+  const path = (ctx.pages.find(p => p.key === (alias?.page || to))?.path || `/p/${ctx.slug}`) + (alias?.section ? `?section=${alias.section}` : '');
   if (ctx.preview) return <button type="button" className={className} onClick={() => ctx.go(to)} {...rest}>{children}</button>;
   return <Link className={className} to={path} {...rest}>{children}</Link>;
 }
@@ -193,11 +194,11 @@ function PageTop({ kicker, title, children }) {
   return <div className="pf-wrap pf-pagetop"><div className="pf-glow sm" aria-hidden="true" />{kicker && <span className="pf-kicker">{kicker}</span>}<h1>{title}</h1>{children}</div>;
 }
 
-function WorkPage({ m, ctx }) {
+function WorkPage({ m, ctx, embedded = false }) {
   const sorted = [...m.projects].sort((a, b) => (b === m.featured) - (a === m.featured));
   return (
     <>
-      <PageTop kicker={m.projectsKicker} title={m.projectsTitle} />
+      {!embedded && <PageTop kicker={m.projectsKicker} title={m.projectsTitle} />}
       <section className="pf-wrap pf-sec tight"><div className="pf-cards">
         {sorted.map((x, i) => (
           <LiquidGlass as="article" className="pf-card pf-proj" key={i}>
@@ -224,15 +225,17 @@ function ProductsPage({ m, ctx }) {
   return (
     <>
       <PageTop kicker={m.productsKicker} title={m.productsTitle}>{m.productsSubtitle && <p className="pf-lead">{m.productsSubtitle}</p>}</PageTop>
+      {!m.products.length && <p className="pf-wrap pf-muted">No offerings are available right now. Check back soon.</p>}
       <section className="pf-wrap pf-sec tight"><Shop items={m.products} slug={ctx.slug} owner={m.owner} user={ctx.user} preview={ctx.preview} /></section>
     </>
   );
 }
 
-function ExperiencePage({ m }) {
+function ExperiencePage({ m, embedded = false }) {
   return (
     <>
-      <PageTop kicker="Journey" title={m.experienceTitle}>{m.experienceNote && <p className="pf-lead">{m.experienceNote}</p>}</PageTop>
+      {!embedded && <PageTop kicker="Journey" title={m.experienceTitle} />}
+      {m.experienceNote && <p className="pf-wrap pf-lead">{m.experienceNote}</p>}
       <section className="pf-wrap pf-sec tight pf-two">
         {m.experience.length > 0 && (
           <ol className="pf-timeline">
@@ -256,10 +259,10 @@ function ExperiencePage({ m }) {
   );
 }
 
-function TalksPage({ m }) {
+function TalksPage({ m, embedded = false }) {
   return (
     <>
-      <PageTop kicker="On stage & on air" title={m.talksTitle} />
+      {!embedded && <PageTop kicker="On stage & on air" title={m.talksTitle} />}
       <section className="pf-wrap pf-sec tight"><div className="pf-list">
         {m.talks.map((t, i) => (
           <LiquidGlass as="article" className="pf-card pf-talk" key={i}>
@@ -273,11 +276,11 @@ function TalksPage({ m }) {
   );
 }
 
-function UpdatesPage({ m, ctx }) {
+function UpdatesPage({ m, ctx, embedded = false }) {
   const now = Date.now(), { upcoming, past } = splitSchedule(m.schedule, now);
   return (
     <>
-      <PageTop kicker="Stay in the loop" title={m.updatesTitle} />
+      {!embedded && <PageTop kicker="Stay in the loop" title={m.updatesTitle} />}
       {m.events.length > 0 && <section className="pf-wrap pf-sec tight"><h3 className="pf-h3">Events</h3><Events events={m.events} slug={ctx.slug} owner={m.owner} preview={ctx.preview} /></section>}
       <section className="pf-wrap pf-sec tight pf-upd-grid">
         {m.updates.length > 0 && <div><h3 className="pf-h3">Latest updates</h3><div className="pf-stack">{m.updates.map(u => <UpdateCard key={u.id} u={u} now={now} />)}</div></div>}
@@ -293,13 +296,49 @@ function UpdatesPage({ m, ctx }) {
   );
 }
 
+function ActivityRecords({ items, section }) {
+  return <section className="pf-wrap pf-sec tight"><div className="pf-cards">{items.map((item, index) =>
+    <LiquidGlass as="article" className="pf-card pf-activity-record" key={index}>
+      <span className="pf-icon-box"><Icon n={section === 'certificates' ? 'book' : section === 'testimonials' ? 'heart' : 'trophy'} size={22} /></span>
+      {section === 'testimonials' ? <><blockquote>{item.quote}</blockquote><h3>{item.author}</h3>{item.role && <p className="pf-muted">{item.role}</p>}</> : <><h3>{item.title}</h3>{(item.issuer || item.date) && <p className="pf-muted">{[item.issuer, item.date].filter(Boolean).join(' · ')}</p>}{item.summary && <p>{item.summary}</p>}</>}
+      {item.url && <A href={item.url} className="pf-btn sm">{section === 'certificates' ? 'View certificate' : 'View source'} <Icon n="arrow" size={14} /></A>}
+    </LiquidGlass>
+  )}</div></section>;
+}
+
+function ActivityPage({ m, ctx, initialSection }) {
+  const { search } = useLocation();
+  const requested = new URLSearchParams(search).get('section');
+  const [previewSection, setPreviewSection] = useState(initialSection || 'projects');
+  const navRef = useRef(null);
+  useEffect(() => { setPreviewSection(initialSection || 'projects'); }, [initialSection]);
+  const section = Object.hasOwn(ACTIVITY_SECTIONS, ctx.preview ? previewSection : requested) ? (ctx.preview ? previewSection : requested) : 'projects';
+  useEffect(() => {
+    const nav = navRef.current, active = nav?.querySelector('[aria-current="page"]');
+    if (!active || nav.scrollWidth <= nav.clientWidth) return;
+    const parentBox = nav.getBoundingClientRect(), activeBox = active.getBoundingClientRect();
+    if (activeBox.right > parentBox.right - 16) nav.scrollLeft += activeBox.right - parentBox.right + 16;
+    else if (activeBox.left < parentBox.left + 16) nav.scrollLeft -= parentBox.left + 16 - activeBox.left;
+  }, [section]);
+  const items = { projects: m.projects, events: [...m.events, ...m.updates, ...m.schedule], talks: m.talks, recognition: m.recognition, awards: m.activityAwards, certificates: m.certificates, testimonials: m.testimonials, experience: [...m.experience, ...m.education, ...(m.experienceNote ? [m.experienceNote] : [])] }[section];
+  const Body = { projects: WorkPage, events: UpdatesPage, talks: TalksPage, experience: ExperiencePage }[section];
+  return <>
+    <PageTop kicker="Work, milestones & community" title="Activity"><p className="pf-lead">Explore projects, events, talks and the milestones along the way.</p></PageTop>
+    <nav ref={navRef} className="pf-wrap pf-activity-nav" aria-label="Activity sections">{Object.entries(ACTIVITY_SECTIONS).map(([key, label]) => ctx.preview
+      ? <button key={key} type="button" className={section === key ? 'on' : ''} aria-current={section === key ? 'page' : undefined} onClick={() => setPreviewSection(key)}>{label}</button>
+      : <Link key={key} to={`/p/${ctx.slug}/activity?section=${key}`} className={section === key ? 'on' : ''} aria-current={section === key ? 'page' : undefined}>{label}</Link>)}</nav>
+    <div className="pf-wrap pf-activity-heading"><h2>{ACTIVITY_SECTIONS[section]}</h2><span>{items.length} {items.length === 1 ? 'item' : 'items'}</span></div>
+    {items.length ? Body ? <Body m={m} ctx={ctx} embedded /> : <ActivityRecords items={items} section={section} /> : <div className="pf-wrap pf-activity-empty"><Icon n="layers" size={28} /><p>No {ACTIVITY_SECTIONS[section].toLowerCase()} have been published yet.</p></div>}
+  </>;
+}
+
 function ContactPage({ m, ctx }) {
   const c = m.contact;
   return (
     <>
       <PageTop kicker="Get in touch" title={m.contactTitle}>{m.enquiry.intro && <p className="pf-lead">{m.enquiry.intro}</p>}</PageTop>
       <section className="pf-wrap pf-sec tight pf-contact-grid">
-        <EnquiryForm slug={ctx.slug} cfg={m.enquiry} offers={m.offerOptions} owner={m.owner} preview={ctx.preview} />
+        {m.enquiry.enabled ? <EnquiryForm slug={ctx.slug} cfg={m.enquiry} offers={m.offerOptions} owner={m.owner} preview={ctx.preview} /> : <p className="pf-muted">Enquiries are currently closed. You can use the contact details here or visit <GoTo to="chat" ctx={ctx}>Chat</GoTo>.</p>}
         {(c || m.socials.length > 0) && (
           <LiquidGlass as="aside" className="pf-card pf-side">
             <h3 className="pf-h3">Prefer to reach out directly?</h3>
@@ -316,11 +355,11 @@ function ContactPage({ m, ctx }) {
   );
 }
 
-function AboutPage({ m }) {
+function AboutPage({ m, embedded = false }) {
   const c = m.contact;
   return (
     <>
-      <PageTop kicker="About" title={m.aboutTitle} />
+      {embedded ? <div className="pf-wrap pf-sec-head"><h2>{m.aboutTitle}</h2></div> : <PageTop kicker="About" title={m.aboutTitle} />}
       <section className={`pf-wrap pf-sec tight pf-about${m.photo ? ' has-photo' : ''}`}>
         {m.photo && <div className={`pf-photo about${m.photoStyle === 'bw' ? ' bw' : ''}`}><Pic src={m.photo} className="pf-photo-img" /></div>}
         <div>
@@ -364,22 +403,29 @@ function ProjectModal({ x, onClose }) {
 }
 
 // ------------------------------------------------------------------ the site
-export default function PortfolioSite({ data, slug, sub, user, preview = false, heroOverride }) {
+export default function PortfolioSite({ data, slug, sub, user, preview = false, heroOverride, activitySection }) {
+  const location = useLocation();
   const m = useMemo(() => resolveSite(data, slug, heroOverride), [data, slug, heroOverride]);
   const page = useMemo(() => normalizePage(data.page), [data.page]);
   const [pv, setPv] = useState(null), [openProj, setOpenProj] = useState(null);
-  useEffect(() => { if (preview) setPv(null); }, [sub, preview]);
+  useEffect(() => { if (preview) setPv(null); }, [sub, preview, activitySection]);
   const want = preview ? (pv || sub || 'home') : (sub || 'home');
-  const exists = m.pages.some(p => p.key === want);
-  const current = exists ? want : 'home';
+  const alias = PUBLIC_PAGE_ALIASES[want];
+  const exists = m.pages.some(p => p.key === (alias?.page || want));
+  const current = exists ? (alias?.page || want) : 'home';
   useEffect(() => { if (!preview) window.scrollTo?.(0, 0); setOpenProj(null); }, [current, preview]);
 
   if (!preview && !exists) return <Navigate to={`/p/${slug}`} replace />;
+  if (!preview && alias) {
+    const params = new URLSearchParams(location.search);
+    if (alias.section) params.set('section', alias.section);
+    return <Navigate to={`/p/${slug}${alias.page === 'home' ? '' : `/${alias.page}`}${params.size ? `?${params}` : ''}${location.hash}`} replace />;
+  }
 
   const T = page.theme, accent = page.accentHex ? [page.accentHex, `color-mix(in srgb, ${page.accentHex} 55%, #ffffff)`] : (ACCENTS[page.accent] || ACCENTS.violet);
   const dark = T.bg === 'color' && luminance(T.bgColor) < 0.45;
   const ctx = { slug, user, pages: m.pages, preview, live: !preview, email: data.contact?.email || '', enquiry: m.enquiry.enabled, go: setPv, open: setOpenProj };
-  const Body = { home: null, work: WorkPage, products: ProductsPage, experience: ExperiencePage, talks: TalksPage, updates: UpdatesPage, about: AboutPage, contact: ContactPage }[current];
+  const Body = { store: ProductsPage, contact: ContactPage }[current];
 
   return (
     <GlassProvider value={{ ...page.glass, dark, radius: T.radius }}>
@@ -405,8 +451,9 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
             <EventsHome m={m} ctx={ctx} />
             {m.featured && <ProjectsHome m={m} ctx={ctx} />}
             {m.products.length > 0 && <ProductsHome m={m} ctx={ctx} />}
+            {(m.aboutBody || m.skills.length) && <AboutPage m={m} embedded />}
           </>
-        ) : current === 'chat' ? <Chat key={slug} m={m} ctx={ctx} data={data} /> : <Body m={m} ctx={ctx} />}
+        ) : current === 'chat' ? <Chat key={slug} m={m} ctx={ctx} data={data} /> : current === 'activity' ? <ActivityPage m={m} ctx={ctx} initialSection={alias?.section || activitySection} /> : <Body m={m} ctx={ctx} />}
       </main>
 
       <footer className="pf-foot">

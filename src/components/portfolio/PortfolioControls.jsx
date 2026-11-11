@@ -35,7 +35,7 @@ export function StoreControls({ page, setPage }) {
       <Text label="Shop title" value={page.storeTitle} max={40} onChange={value => setPage({ storeTitle: value })} />
       <Text label="Shop subtitle" value={page.storeSubtitle} max={140} onChange={value => setPage({ storeSubtitle: value })} />
       <Text label="Currency for existing prices without one" value={page.currency} max={6} onChange={value => setPage({ currency: value })} />
-      <p className="hint">All visible free and paid products appear on the portfolio home page. Manage prices and access links under Products and Profile &amp; Offerings; buyer records are in <Link to="/admin/purchases">Purchases</Link>.</p>
+      <p className="hint">Visible free and paid products appear on Home and Store. Manage prices and access links under <Link to="/admin/profile?tab=contrib">Offerings &amp; categories</Link> or <Link to="/admin/portfolio?tab=products">Store products</Link>. Buyer records are under <Link to="/admin/purchases">Activity &amp; Orders</Link>.</p>
       <div className="portfolio-checks">{Object.entries(SECTION_LABELS).map(([key, label]) => <label className="toggle" key={key}><input type="checkbox" checked={page.sections[key]} onChange={event => setIn('sections', { [key]: event.target.checked })} /> Show {label === 'Store' ? 'Shop' : label}</label>)}</div>
     </section>
     <section className="card"><h3>Offering categories</h3><p className="hint">Visible categories appear in the shop. You can also show them as questions in the Chat sidebar.</p>

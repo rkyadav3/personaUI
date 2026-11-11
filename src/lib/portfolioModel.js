@@ -1,7 +1,7 @@
 // Turns what the server sent (the visibility-filtered profile + the owner's portfolio text) into exactly what the page draws.
 // This is where "if it isn't there, it isn't shown" is decided: every list is already filtered, `pages` says which
 // sub-pages exist, and each hero block says whether it should render. The components never test raw data themselves.
-import { PAGE_LABELS, ICON_NAMES, normalizePortfolio } from '../../shared/portfolio.js';
+import { PAGE_LABELS, PUBLIC_NAV_PAGES, ICON_NAMES, normalizePortfolio } from '../../shared/portfolio.js';
 import { fmtPrice } from './money.js';
 import { normalizePage } from '../../shared/pageSettings.js';
 
@@ -25,9 +25,9 @@ export function resolveSite(data, slug, heroOverride) {
   const p = normalizePortfolio(data.portfolio), page = normalizePage(data.page), cur = page.currency;
   const name = data.name || '', me = firstWord(name), email = data.contact?.email || '';
   const photo = (heroOverride !== undefined ? heroOverride : data.hero) || '';
-  const label = k => p.navLabels[k] || PAGE_LABELS[k];
+  const label = k => p.navLabels[k] || (k === 'store' ? p.navLabels.products : '') || PAGE_LABELS[k];
 
-  // ---- offerings from "Profile & Offerings" (respecting where the owner hid categories)
+  // ---- offerings from the owner's categories (respecting hidden categories)
   const offers = [], talkOffers = [], offerOptions = [];
   for (const k of data.contributions || []) {
     if ((page.placement || {})[k.category] === 'hidden') continue;
@@ -71,15 +71,7 @@ export function resolveSite(data, slug, heroOverride) {
   const about = page.about || data.purpose || '';
   const aboutBody = p.about.body || about;
 
-  const pages = [{ key: 'home' }];
-  if (projects.length) pages.push({ key: 'work' });
-  if (products.length) pages.push({ key: 'products' });
-  if (experience.length || education.length || experienceNote) pages.push({ key: 'experience' });
-  if (talks.length) pages.push({ key: 'talks' });
-  if (updates.length || schedule.length || events.length) pages.push({ key: 'updates' });
-  if (aboutBody || skills.length || contact || socials.length) pages.push({ key: 'about' });
-  pages.push({ key: 'chat' });
-  if (enquiry.enabled) pages.push({ key: 'contact' });
+  const pages = PUBLIC_NAV_PAGES.map(key => ({ key }));
 
   return {
     slug, name, first: me, initials: initials(name), photo, photoStyle: p.photoStyle, heroPos: page.hero || { x: 50, y: 25, zoom: 1 },
@@ -95,6 +87,9 @@ export function resolveSite(data, slug, heroOverride) {
     projectsKicker: p.projectsKicker || 'Featured work', projectsTitle: p.projectsTitle || 'Selected Projects',
     products, productsKicker: p.productsKicker || 'Free & paid offerings', productsTitle: p.productsTitle || page.storeTitle || 'Shop', productsSubtitle: page.storeSubtitle,
     experience, experienceNote, education, talks, talksTitle: label('talks'), experienceTitle: label('experience'),
+    recognition: p.recognition.filter(item => item.kind === 'recognition'),
+    activityAwards: [...p.awards.map(a => ({ title: a.title || a.sub, summary: a.title ? a.sub : '' })), ...p.recognition.filter(item => item.kind === 'award')],
+    certificates: p.certificates, testimonials: p.testimonials,
     aboutTitle: p.about.title || `About ${me || 'me'}`, aboutBody, skills, expertise, contact,
     footerNote: p.footerNote,
     updates, schedule, events, updatesTitle: label('updates') === PAGE_LABELS.updates ? 'Updates & Schedule' : label('updates'),

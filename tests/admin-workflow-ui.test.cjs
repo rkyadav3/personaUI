@@ -13,24 +13,24 @@ const render = (Component, props, path = '/admin') => renderToStaticMarkup(React
 test('legacy and detail links select the category and the correct secondary page', async () => {
   const { adminLocation } = await import('../src/lib/adminNavigation.js');
   for (const [path, search, group, page] of [
-    ['/admin/portfolio', '?tab=projects', 'profile', 'editor'],
-    ['/admin/profile', '?tab=contrib', 'profile', 'details'],
-    ['/admin/writing/18', '', 'content', 'articles'],
-    ['/admin/writing', '?tab=templates', 'content', 'templates'],
-    ['/admin/templates', '', 'content', 'templates'],
-    ['/admin/topics/7', '', 'content', 'topics'],
-    ['/admin/add', '', 'library', 'files'],
-    ['/admin/knowledge', '', 'library', 'knowledge'],
+    ['/admin/portfolio', '?tab=projects', 'activity', 'projects'],
+    ['/admin/profile', '?tab=contrib', 'offerings', 'categories'],
+    ['/admin/writing/18', '', 'pipelines', 'articles'],
+    ['/admin/writing', '?tab=templates', 'pipelines', 'templates'],
+    ['/admin/templates', '', 'pipelines', 'templates'],
+    ['/admin/topics/7', '', 'pipelines', 'topics'],
+    ['/admin/add', '', 'pipelines', 'files'],
+    ['/admin/knowledge', '', 'pipelines', 'knowledge'],
     ['/admin/questions', '', 'activity', 'questions'],
-    ['/admin/superadmin', '?tab=invites', 'administration', 'invites'],
+    ['/admin/superadmin', '?tab=invites', 'settings', 'invites'],
   ]) assert.deepEqual(adminLocation(path, search), { group, page }, path);
   assert.equal(adminLocation('/admin/writing-other'), null);
 });
 
-test('content shares one navigation with articles, templates and research topics', () => {
+test('data pipelines shares one navigation with articles, templates and research topics', () => {
   const { AdminSectionTabs } = require('../src/components/AdminNavigation.jsx');
   const html = render(AdminSectionTabs, { user: { isAdmin: false } }, '/admin/topics/7');
-  for (const text of ['Articles', 'Templates', 'Research topics', 'Content pages']) assert.ok(html.includes(text), text);
+  for (const text of ['Articles', 'Templates', 'Research topics', 'Data Pipelines pages']) assert.ok(html.includes(text), text);
   assert.match(html, /<a(?=[^>]*href="\/admin\/topics")(?=[^>]*aria-current="page")[^>]*>/);
   assert.doesNotMatch(html, /superadmin/);
 });

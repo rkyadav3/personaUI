@@ -20,17 +20,18 @@ export function StudioSidebar({ user, unread = 0, photo, onLogout, onNavigate, n
   const [badPhoto, setBadPhoto] = useState(false);
   useEffect(() => setBadPhoto(false), [photo]);
   const link = item => {
-    const selected = item.id === 'overview' ? pathname.replace(/\/$/, '') === '/admin' : active?.group === item.id;
+    const selected = active?.group === item.id;
     return <Link key={item.id} to={item.to} className={`studio-nav${selected ? ' active' : ''}`} aria-current={selected ? 'page' : undefined} onClick={onNavigate}><Icon n={item.icon} size={19} /><span>{item.label}</span>{item.id === 'activity' && unread > 0 && <span className="studio-badge" aria-label={`${unread} new enquiries`}>{unread}</span>}</Link>;
   };
   return <aside className="studio-sidebar">
     <div className="studio-brand-row"><Link to="/admin" className="studio-brand" onClick={onNavigate}><StudioMark />Studio</Link><button type="button" className="studio-menu-toggle" aria-label={navOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navOpen} aria-controls="studio-navigation" onClick={onToggleNav}><Icon n="menu" /></button></div>
     <nav id="studio-navigation" className="studio-navigation" aria-label="Studio">
-      <div className="studio-primary-nav">{link({ id: 'overview', to: '/admin', label: 'Overview', icon: 'home' })}{ADMIN_SECTIONS.filter(section => !section.adminOnly || user.isAdmin).map(section => link({ ...section, to: section.pages[0].to }))}</div>
+      <div className="studio-primary-nav">{ADMIN_SECTIONS.map(section => link({ ...section, to: section.pages[0].to }))}</div>
     </nav>
     <details className="studio-account"><summary><span className="studio-account-avatar">{photo && !badPhoto ? <img src={photo} alt="" onError={() => setBadPhoto(true)} /> : String(user.name || user.email || 'S').slice(0, 1).toUpperCase()}</span><span className="studio-account-name"><strong>{user.name || user.email}</strong><small>{user.isAdmin ? 'Admin' : 'Creator'}</small></span><Icon n="chevron" size={14} /></summary>
-      <div className="studio-account-menu">{user.slug && <a href={`/p/${user.slug}`} target="_blank" rel="noreferrer">View live portfolio ↗</a>}<Link to="/admin/portfolio?tab=hero" onClick={onNavigate}>Edit portfolio</Link><button type="button" onClick={onLogout}>Sign out</button>{logoutError && <p role="alert">{logoutError}</p>}</div>
+      <div className="studio-account-menu">{user.slug && <a href={`/p/${user.slug}`} target="_blank" rel="noreferrer">View live portfolio ↗</a>}<Link to="/admin/portfolio?tab=hero" onClick={onNavigate}>Edit portfolio</Link></div>
     </details>
+    <div className="studio-logout"><button type="button" className="studio-nav" onClick={onLogout}><Icon n="logout" size={19} /><span>Logout</span></button>{logoutError && <p role="alert">{logoutError}</p>}</div>
   </aside>;
 }
 

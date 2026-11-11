@@ -1,5 +1,6 @@
 // Small stroke icons, inline so the page needs no icon font or extra request.
 const P = {
+  logout: <><path d="M9 4H4v16h5M9 12h12m-4-4 4 4-4 4" /></>,
   file: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h6" /></>,
   upload: <><path d="M12 16V3M7 8l5-5 5 5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" /></>,
   download: <><path d="M12 3v13M7 11l5 5 5-5M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" /></>,

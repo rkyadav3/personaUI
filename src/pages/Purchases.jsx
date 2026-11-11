@@ -53,7 +53,7 @@ export function SharedPaymentSettings() {
     <Notice kind={data.configured ? 'success' : 'info'}>{data.configured ? `Payments are configured${data.testMode ? ' in test mode' : ''}.` : 'The platform administrator needs to configure Razorpay credentials and the payment encryption key.'}</Notice>
     {!data.webhookConfigured && <Notice kind="info">Set the shared Razorpay webhook secret to receive payment and refund updates.</Notice>}
     <label className="toggle"><input type="checkbox" checked={enabled ?? data.enabled} onChange={e => setEnabled(e.target.checked)} disabled={busy} />Enable paid checkout on my profile</label>
-    <p className="hint">Free claims work without Razorpay. Add an access or download link in Public profile → Profile &amp; offerings, or in Page editor → Store.</p>
+    <p className="hint">Free claims work without Razorpay. Add access or download links under Offerings → Offerings &amp; categories or Store products.</p>
     <button className="btn primary" disabled={busy || enabled === null} onClick={save}>{busy ? 'Saving…' : 'Save payment preference'}</button>
     <Notice kind={msg?.kind}>{msg?.t}</Notice>
   </section>;

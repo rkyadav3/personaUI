@@ -10,7 +10,7 @@ export function AdminSectionTabs({ user, unread = 0 }) {
   return <section className="admin-section-header">
     <div className="admin-section-context"><span>{section.label}</span><p>{section.description}</p></div>
     <nav className="admin-section-tabs" aria-label={`${section.label} pages`}>
-      {section.pages.map(page => <Link key={page.id} to={page.to} aria-current={active.page === page.id ? 'page' : undefined} className={active.page === page.id ? 'active' : ''}>
+      {section.pages.filter(page => !page.adminOnly || user?.isAdmin).map(page => <Link key={page.id} to={page.to} aria-current={active.page === page.id ? 'page' : undefined} className={active.page === page.id ? 'active' : ''}>
         <Icon n={page.icon} size={18} />{page.label}{page.id === 'enquiries' && unread > 0 && <span className="studio-badge">{unread}</span>}
       </Link>)}
     </nav>

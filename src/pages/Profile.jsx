@@ -147,7 +147,7 @@ export function ProfileManager({ data, reload }) {
     <>
       <div className="head" style={{ marginBottom: 8 }}>
         <div>
-          <h1>Profile & offerings</h1>
+          <h1>{tab === 'contrib' ? 'Offerings & categories' : tab === 'visibility' ? 'Privacy & visibility' : 'Profile'}</h1>
           <p className="muted" style={{ margin: 0 }}>
             Manage your personal identity, bio, public visibility controls, and paid/free contributions.
           </p>

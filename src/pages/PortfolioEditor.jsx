@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PAGE_DEFAULTS, normalizePage } from '../../shared/pageSettings.js';
-import { ICON_NAMES, PAGE_LABELS, PORTFOLIO_DEFAULTS, PORTFOLIO_PAGES, PRODUCT_STATUS, SOCIAL_KINDS, normalizePortfolio } from '../../shared/portfolio.js';
+import { ICON_NAMES, PAGE_LABELS, PORTFOLIO_DEFAULTS, PUBLIC_NAV_PAGES, PRODUCT_STATUS, SOCIAL_KINDS, normalizePortfolio } from '../../shared/portfolio.js';
+import { ENQUIRY_TYPES } from '../../shared/enquiryTypes.js';
 import { BG_BUCKET, normalizeBg } from '../../shared/siteSettings.js';
 import PortfolioSite from '../components/portfolio/PortfolioSite.jsx';
 import { Field, Loading, Notice } from '../components/Ui.jsx';
@@ -63,9 +64,14 @@ function Repeater({ items, onChange, blank, max, noun, title, children }) {
   );
 }
 
-const CONTENT_TABS = { hero: 'Home top', numbers: 'Numbers', projects: 'Projects', products: 'Products', experience: 'Experience', talks: 'Talks', about: 'About', design: 'Navigation' };
-const AREAS = { content: 'Portfolio content', look: 'Look & Store', persona: 'Persona settings' };
-const TAB_PAGE = { hero: 'home', numbers: 'home', projects: 'work', products: 'products', experience: 'experience', talks: 'talks', about: 'about', design: 'home', look: 'home', store: 'products', persona: 'chat' };
+const AREA_TABS = {
+  home: { hero: 'Introduction', numbers: 'Numbers', about: 'About' },
+  activity: { projects: 'Projects', talks: 'Talks', recognition: 'Recognition & awards', certificates: 'Certificates', testimonials: 'Testimonials', experience: 'Experience' },
+  store: { products: 'Products', store: 'Store settings' },
+  chat: { persona: 'Chat settings' }, contact: { contact: 'Contact settings' }, settings: { look: 'Appearance', design: 'Navigation & footer' },
+};
+const AREAS = { home: 'Home', activity: 'Activity', store: 'Store', chat: 'Chat', contact: 'Contact', settings: 'Appearance' };
+const TAB_PAGE = { hero: 'home', numbers: 'home', projects: 'work', products: 'store', experience: 'experience', talks: 'talks', recognition: 'activity', certificates: 'activity', testimonials: 'activity', about: 'home', design: 'home', look: 'home', store: 'store', persona: 'chat', contact: 'contact' };
 
 function Tabs({ items, active, onChange, prefix, label, controls = 'portfolio-area-panel' }) {
   const entries = Object.entries(items);
@@ -92,7 +98,7 @@ export default function PortfolioEditor() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
   const tab = Object.hasOwn(TAB_PAGE, params.get('tab')) ? params.get('tab') : 'hero';
-  const area = tab === 'persona' ? 'persona' : ['look', 'store'].includes(tab) ? 'look' : 'content';
+  const area = Object.keys(AREA_TABS).find(key => Object.hasOwn(AREA_TABS[key], tab));
   const setTab = value => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next, { replace: true }); };
   const [saved, setSaved] = useState(null), [page, setPage] = useState(PAGE_DEFAULTS), [pf, setPf] = useState(PORTFOLIO_DEFAULTS), [data, setData] = useState(undefined);
   const [previewError, setPreviewError] = useState('');
@@ -163,15 +169,23 @@ export default function PortfolioEditor() {
         </div>
       </div>
       <Notice kind={msg?.kind}>{msg?.t}</Notice>
-      <div className="portfolio-areas"><Tabs items={AREAS} active={area} prefix="portfolio-area" label="Portfolio settings" onChange={key => setTab(key === 'content' ? 'hero' : key)} /></div>
+      <div className="portfolio-areas"><Tabs items={AREAS} active={area} prefix="portfolio-area" label="Portfolio settings" onChange={key => setTab(Object.keys(AREA_TABS[key])[0])} /></div>
       <div className="pp-editor">
         <div className="pp-form" id="portfolio-area-panel" role="tabpanel" aria-labelledby={`portfolio-area-${area}`}>
-          {area === 'content' && <Tabs items={CONTENT_TABS} active={tab} prefix="portfolio-content" controls="portfolio-content-panel" label="Portfolio content pages" onChange={setTab} />}
-          {area === 'look' && <Tabs items={{ look: 'Look', store: 'Store & sections' }} active={tab} prefix="portfolio-content" controls="portfolio-content-panel" label="Look and Store" onChange={setTab} />}
-          <div className="pp-content" id="portfolio-content-panel" role={area !== 'persona' ? 'tabpanel' : undefined} aria-labelledby={area !== 'persona' ? `portfolio-content-${tab}` : undefined}>
+          <Tabs items={AREA_TABS[area]} active={tab} prefix="portfolio-content" controls="portfolio-content-panel" label={`${AREAS[area]} settings`} onChange={setTab} />
+          {area === 'activity' && <p className="hint">Publish events and updates in <Link to="/admin/updates">Events &amp; updates</Link>. All these sections appear under Activity on your public page.</p>}
+          <div className="pp-content" id="portfolio-content-panel" role="tabpanel" aria-labelledby={`portfolio-content-${tab}`}>
           {tab === 'look' && <LookControls page={normPage} setPage={setPg} imageUrl={background} />}
           {tab === 'store' && <StoreControls page={{ ...normPage, storeTitle: normPf.productsTitle || normPage.storeTitle }} setPage={setPg} />}
           {tab === 'persona' && <PersonaControls page={page} bg={bg} setPage={setPg} setBg={patch => setBg(b => ({ ...b, ...patch }))} imageUrl={background} onChooseBackground={chooseBackground} onRemoveBackground={() => { setPendingBg(null); setRemovedBg(true); }} />}
+          {tab === 'contact' && <section className="card"><h3>Contact page</h3>
+            <label className="toggle"><input type="checkbox" checked={pf.enquiry.enabled} onChange={e => setIn('enquiry', { enabled: e.target.checked })} />Accept visitor enquiries</label>
+            <Txt label="Page heading" value={pf.enquiry.title} max={60} onChange={v => setIn('enquiry', { title: v })} />
+            <Txt label="Introduction" value={pf.enquiry.intro} max={300} rows={3} onChange={v => setIn('enquiry', { intro: v })} />
+            <Txt label="Message after submission" value={pf.enquiry.thanks} max={200} onChange={v => setIn('enquiry', { thanks: v })} />
+            <p className="hint">Choose the enquiry types you accept. Leave all unchecked to accept every type. Public contact details are managed in <Link to="/admin/profile?tab=visibility">Privacy</Link>.</p>
+            {Object.entries(ENQUIRY_TYPES).map(([key, label]) => <label className="toggle" key={key}><input type="checkbox" checked={pf.enquiry.types.includes(key)} onChange={e => setIn('enquiry', { types: e.target.checked ? [...pf.enquiry.types, key] : pf.enquiry.types.filter(type => type !== key) })} />{label}</label>)}
+          </section>}
 
           {tab === 'hero' && <>
             <section className="card"><h3>Photo</h3>
@@ -286,7 +300,7 @@ export default function PortfolioEditor() {
 
           {tab === 'talks' && (
             <section className="card"><h3>Talks, podcasts &amp; interviews</h3>
-              <p className="hint">Your “Talk Shows” offerings also appear here. The Talks page shows once there is at least one.</p>
+              <p className="hint">Your “Talk Shows” offerings also appear here, under Activity → Talks.</p>
               <Repeater items={pf.talks} onChange={talks => set({ talks })} blank={{ title: '' }} max={24} noun="Talk" title={t => t.title || 'New talk'}>
                 {(t, p) => <>
                   <Txt label="Title" value={t.title} max={100} onChange={v => p({ title: v })} />
@@ -298,8 +312,28 @@ export default function PortfolioEditor() {
             </section>
           )}
 
+          {['recognition', 'certificates'].includes(tab) && <section className="card"><h3>{tab === 'recognition' ? 'Recognition & awards' : 'Certificates'}</h3>
+            <p className="hint">These entries are published on your Activity page. Awards highlighted on Home also appear under Activity → Awards.</p>
+            <Repeater items={pf[tab]} onChange={items => set({ [tab]: items })} blank={{ title: '', ...(tab === 'recognition' ? { kind: 'recognition' } : {}) }} max={24} noun={tab === 'recognition' ? 'Recognition' : 'Certificate'} title={item => item.title || 'New entry'}>
+              {(item, patch) => <>
+                {tab === 'recognition' && <Field label="Type"><select value={item.kind} onChange={e => patch({ kind: e.target.value })}><option value="recognition">Recognition</option><option value="award">Award</option></select></Field>}
+                <Txt label="Title" value={item.title} max={100} onChange={v => patch({ title: v })} />
+                <div className="cols c2"><Txt label="Issued by" value={item.issuer} max={100} onChange={v => patch({ issuer: v })} /><Txt label="Date" value={item.date} max={30} onChange={v => patch({ date: v })} /></div>
+                <Txt label="Description" value={item.summary} max={500} rows={3} onChange={v => patch({ summary: v })} />
+                <Txt label={tab === 'certificates' ? 'Certificate link' : 'Source link'} value={item.url} ph="https://…" onChange={v => patch({ url: v })} />
+              </>}
+            </Repeater>
+          </section>}
+
+          {tab === 'testimonials' && <section className="card"><h3>Testimonials</h3>
+            <p className="hint">Publish testimonials you have permission to share under Activity → Testimonials.</p>
+            <Repeater items={pf.testimonials} onChange={testimonials => set({ testimonials })} blank={{ author: '', quote: '' }} max={24} noun="Testimonial" title={item => item.author || 'New testimonial'}>
+              {(item, patch) => <><Txt label="Name" value={item.author} max={100} onChange={v => patch({ author: v })} /><Txt label="Role or organisation" value={item.role} max={100} onChange={v => patch({ role: v })} /><Txt label="Testimonial" value={item.quote} max={1200} rows={5} onChange={v => patch({ quote: v })} /><Txt label="Source link" value={item.url} ph="https://…" onChange={v => patch({ url: v })} /></>}
+            </Repeater>
+          </section>}
+
           {tab === 'about' && (
-            <section className="card"><h3>About page</h3>
+            <section className="card"><h3>About section on Home</h3>
               <Txt label="Page heading" value={pf.about.title} max={60} ph={`About ${real.name?.split(' ')[0] || 'me'}`} onChange={v => setIn('about', { title: v })} />
               <Txt label="Your story (blank line = new paragraph)" value={pf.about.body} max={3000} rows={9} hint={`Empty = your “purpose” from Profile & Offerings.`} onChange={v => setIn('about', { body: v })} />
               <Txt label="Extra skills (comma separated)" value={pf.about.skills} max={400} ph="Python, React, Arduino" hint="Added to your expertise from Profile & Offerings." onChange={v => setIn('about', { skills: v })} />
@@ -308,8 +342,8 @@ export default function PortfolioEditor() {
 
           {tab === 'design' && <>
             <section className="card"><h3>Menu names</h3>
-              <p className="hint">Only pages that have content appear in the menu. Rename them here.</p>
-              <div className="cols c2">{PORTFOLIO_PAGES.map(k => <Txt key={k} label={PAGE_LABELS[k]} value={pf.navLabels[k]} max={16} ph={PAGE_LABELS[k]} onChange={v => setIn('navLabels', { [k]: v })} />)}</div>
+              <p className="hint">Your menu has five pages: Home, Activity, Store, Chat and Contact. Rename them here.</p>
+              <div className="cols c2">{PUBLIC_NAV_PAGES.map(k => <Txt key={k} label={PAGE_LABELS[k]} value={pf.navLabels[k]} max={16} ph={PAGE_LABELS[k]} onChange={v => setIn('navLabels', { [k]: v })} />)}</div>
             </section>
             <section className="card"><h3>Footer</h3>
               <Txt label="Footer line" value={pf.footerNote} max={120} ph="Building things that matter." onChange={v => set({ footerNote: v })} />
@@ -319,7 +353,7 @@ export default function PortfolioEditor() {
         </div>
 
         <div className="pp-prev"><div className="pp-prev-label">Live preview · {PAGE_LABELS[TAB_PAGE[tab]]}</div>
-          {preview ? <ScaledPreview><PortfolioSite data={preview} slug={user.slug} sub={TAB_PAGE[tab]} preview heroOverride={hero} /></ScaledPreview> : <PortfolioPreviewState error={previewError} onRetry={retryPreview} />}</div>
+          {preview ? <ScaledPreview><PortfolioSite data={preview} slug={user.slug} sub={TAB_PAGE[tab]} activitySection={['recognition', 'certificates', 'testimonials'].includes(tab) ? tab : undefined} preview heroOverride={hero} /></ScaledPreview> : <PortfolioPreviewState error={previewError} onRetry={retryPreview} />}</div>
       </div>
     </div>
   );

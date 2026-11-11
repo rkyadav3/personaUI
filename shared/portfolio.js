@@ -4,8 +4,11 @@
 // Shared by the editor, the page and the server. Whatever comes in, what comes out is safe to store and render.
 import { ENQUIRY_TYPES } from './enquiryTypes.js';
 
-export const PORTFOLIO_PAGES = ['home', 'work', 'products', 'experience', 'talks', 'updates', 'about', 'chat', 'contact'];
-export const PAGE_LABELS = { home: 'Home', work: 'Work', products: 'Shop', experience: 'Experience', talks: 'Talks', updates: 'Updates', about: 'About', chat: 'Chat', contact: 'Contact' };
+export const PUBLIC_NAV_PAGES = ['home', 'activity', 'store', 'chat', 'contact'];
+export const PORTFOLIO_PAGES = [...PUBLIC_NAV_PAGES, 'work', 'products', 'experience', 'talks', 'updates', 'about'];
+export const PAGE_LABELS = { home: 'Home', activity: 'Activity', store: 'Store', work: 'Projects', products: 'Store', experience: 'Experience', talks: 'Talks', updates: 'Events & updates', about: 'About', chat: 'Chat', contact: 'Contact' };
+export const ACTIVITY_SECTIONS = { projects: 'Projects', events: 'Events & updates', talks: 'Talks', recognition: 'Recognition', awards: 'Awards', certificates: 'Certificates', testimonials: 'Testimonials', experience: 'Experience' };
+export const PUBLIC_PAGE_ALIASES = { work: { page: 'activity', section: 'projects' }, updates: { page: 'activity', section: 'events' }, talks: { page: 'activity', section: 'talks' }, experience: { page: 'activity', section: 'experience' }, products: { page: 'store' }, about: { page: 'home' } };
 export const SOCIAL_KINDS = { github: 'GitHub', linkedin: 'LinkedIn', x: 'X (Twitter)', instagram: 'Instagram', youtube: 'YouTube', email: 'Email', website: 'Website' };
 export const ICON_NAMES = ['spark', 'cpu', 'box', 'layers', 'cloud', 'code', 'chart', 'book', 'mic', 'users', 'globe', 'shield', 'pen', 'briefcase', 'heart', 'trophy'];
 export const PRODUCT_STATUS = ['', 'Live', 'Beta', 'In progress', 'Concept'];
@@ -18,7 +21,7 @@ export const PORTFOLIO_DEFAULTS = {
   stats: [],
   projectsKicker: '', projectsTitle: '', projects: [],
   productsKicker: '', productsTitle: '', products: [],
-  experience: [], talks: [],
+  experience: [], talks: [], recognition: [], certificates: [], testimonials: [],
   about: { title: '', body: '', skills: '' },
   navLabels: {}, footerNote: '',
   enquiry: { enabled: true, title: '', intro: '', thanks: '', types: [] },   // the contact form on /p/<slug>/contact
@@ -83,6 +86,9 @@ export function normalizePortfolio(input) {
     })).filter(p => p.title),
     experience: list(i.experience, 20).map(e => ({ role: clean(e?.role, 80), company: clean(e?.company, 80), period: clean(e?.period, 40), summary: clean(e?.summary, 500) })).filter(e => e.role || e.company),
     talks: list(i.talks, 24).map(t => ({ title: clean(t?.title, 100), event: clean(t?.event, 100), date: clean(t?.date, 30), summary: clean(t?.summary, 300), url: cleanUrl(t?.url) })).filter(t => t.title),
+    recognition: list(i.recognition, 24).map(r => ({ kind: pick(r?.kind, ['recognition', 'award'], 'recognition'), title: clean(r?.title, 100), issuer: clean(r?.issuer, 100), date: clean(r?.date, 30), summary: clean(r?.summary, 500), url: cleanUrl(r?.url) })).filter(r => r.title),
+    certificates: list(i.certificates, 24).map(c => ({ title: clean(c?.title, 100), issuer: clean(c?.issuer, 100), date: clean(c?.date, 30), summary: clean(c?.summary, 500), url: cleanUrl(c?.url) })).filter(c => c.title),
+    testimonials: list(i.testimonials, 24).map(t => ({ author: clean(t?.author, 100), role: clean(t?.role, 100), quote: long(t?.quote, 1200), url: cleanUrl(t?.url) })).filter(t => t.author && t.quote),
     about: { title: clean(i.about?.title, 60), body: long(i.about?.body, 3000), skills: clean(i.about?.skills, 400) },
     navLabels: Object.fromEntries(PORTFOLIO_PAGES.map(k => [k, clean(i.navLabels?.[k], 16)]).filter(([, v]) => v)),
     footerNote: clean(i.footerNote, 120),
