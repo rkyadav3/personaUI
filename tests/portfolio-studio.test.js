@@ -17,9 +17,9 @@ test('saved Classic settings resolve to the single portfolio while retaining cus
 
 test('every portfolio has an internal Chat page and its AI buttons use that page', () => {
   const model = resolveSite({ name: 'Ravi Yadav', portfolio: { enquiry: { enabled: false } } }, 'ravi');
-  assert.ok(model.pages.some(page => page.key === 'chat' && page.path === '/p/ravi/chat'));
-  assert.equal(model.intro.url, '/p/ravi/chat');
-  assert.equal(model.cta.url, '/p/ravi/chat');
+  assert.ok(model.pages.some(page => page.key === 'chat' && page.path === '/p/ravi'));
+  assert.equal(model.intro.url, '/p/ravi');
+  assert.equal(model.cta.url, '/p/ravi');
   assert.equal(normalizePortfolio({ navLabels: { chat: 'Ask Ravi' } }).navLabels.chat, 'Ask Ravi');
 });
 

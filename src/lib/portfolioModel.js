@@ -66,7 +66,7 @@ export function resolveSite(data, slug, heroOverride) {
   const socials = [...p.socials];
   if (email && !socials.some(s => s.kind === 'email')) socials.push({ kind: 'email', url: `mailto:${email}` });
   const updates = data.updates || [], schedule = data.schedule || [], events = data.events || [], enquiry = p.enquiry;
-  const chatUrl = `/p/${slug}/chat`;
+  const chatUrl = `/p/${slug}`;
   const ctaUrl = p.cta.url || (enquiry.enabled ? `/p/${slug}/contact` : email ? `mailto:${email}` : chatUrl);
   const about = page.about || data.purpose || '';
   const aboutBody = p.about.body || about;
@@ -76,7 +76,7 @@ export function resolveSite(data, slug, heroOverride) {
   return {
     slug, name, first: me, initials: initials(name), photo, photoStyle: p.photoStyle, heroPos: page.hero || { x: 50, y: 25, zoom: 1 },
     brand: p.brand || name || 'Portfolio',
-    pages: pages.map(x => ({ ...x, label: label(x.key), path: x.key === 'home' ? `/p/${slug}` : `/p/${slug}/${x.key}` })),
+    pages: pages.map(x => ({ ...x, label: label(x.key), path: x.key === 'chat' ? `/p/${slug}` : `/p/${slug}/${x.key}` })),
     navCta: { label: p.navCta.label || 'Let’s Connect', url: p.navCta.url || ctaUrl },
     greeting: p.greeting || 'Hi I’m', heroName: p.heroName || me || name, titleLine: p.titleLine || page.tagline || data.designation || '',
     bio: p.bio || clip(about, 230), awards: p.awards, availability: p.availability.show ? (p.availability.text || 'Available for new opportunities') : '',

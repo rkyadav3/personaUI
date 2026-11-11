@@ -8,7 +8,37 @@ Module._extensions['.css'] = () => {};
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const { MemoryRouter } = require('react-router-dom');
-const render = element => renderToStaticMarkup(React.createElement(MemoryRouter, {}, element));
+const render = (element, path = '/') => renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [path] }, element));
+
+test('opening the public profile root shows Chat and keeps the portfolio Home link available', () => {
+  const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
+  const html = render(React.createElement(PortfolioSite, { data: { name: 'Ravi' }, slug: 'ravi' }), '/p/ravi');
+  assert.match(html, /aria-label="Message to Ravi"/);
+  assert.match(html, /class="pf-chat-workspace"/);
+  assert.match(html, /<a(?=[^>]*href="\/p\/ravi")(?=[^>]*aria-current="page")[^>]*>Chat<\/a>/);
+  assert.match(html, /href="\/p\/ravi\/home"[^>]*>Home<\/a>/);
+  assert.match(html, /href="\/p\/ravi\/home"[^>]*>View portfolio/);
+  assert.doesNotMatch(html, /class="pf-hero"/);
+});
+
+test('the explicit Home page still renders the portfolio and links Chat to the profile root', () => {
+  const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
+  const html = render(React.createElement(PortfolioSite, { data: { name: 'Ravi', portfolio: { bio: 'My public introduction' } }, slug: 'ravi', sub: 'home' }), '/p/ravi/home');
+  assert.match(html, /My public introduction/);
+  assert.match(html, /class="pf-hero"/);
+  assert.match(html, /<a(?=[^>]*href="\/p\/ravi\/home")(?=[^>]*aria-current="page")[^>]*>Home<\/a>/);
+  assert.match(html, /href="\/p\/ravi"[^>]*>Chat<\/a>/);
+  assert.doesNotMatch(html, /aria-label="Message to Ravi"/);
+});
+
+test('existing explicit Chat links still open Chat and the editor still previews Home by default', () => {
+  const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
+  const props = { data: { name: 'Ravi' }, slug: 'ravi' };
+  assert.match(render(React.createElement(PortfolioSite, { ...props, sub: 'chat' }), '/p/ravi/chat'), /aria-label="Message to Ravi"/);
+  const preview = render(React.createElement(PortfolioSite, { ...props, preview: true }));
+  assert.match(preview, /class="pf-hero"/);
+  assert.doesNotMatch(preview, /aria-label="Message to Ravi"/);
+});
 
 test('Admin displays newest exchanges first, with the question above its reply', () => {
   const { StudioConversation } = require('../src/components/StudioAssistant.jsx');

@@ -409,7 +409,7 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
   const page = useMemo(() => normalizePage(data.page), [data.page]);
   const [pv, setPv] = useState(null), [openProj, setOpenProj] = useState(null);
   useEffect(() => { if (preview) setPv(null); }, [sub, preview, activitySection]);
-  const want = preview ? (pv || sub || 'home') : (sub || 'home');
+  const want = preview ? (pv || sub || 'home') : (sub || 'chat');
   const alias = PUBLIC_PAGE_ALIASES[want];
   const exists = m.pages.some(p => p.key === (alias?.page || want));
   const current = exists ? (alias?.page || want) : 'home';
@@ -419,7 +419,8 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
   if (!preview && alias) {
     const params = new URLSearchParams(location.search);
     if (alias.section) params.set('section', alias.section);
-    return <Navigate to={`/p/${slug}${alias.page === 'home' ? '' : `/${alias.page}`}${params.size ? `?${params}` : ''}${location.hash}`} replace />;
+    const path = m.pages.find(page => page.key === alias.page).path;
+    return <Navigate to={`${path}${params.size ? `?${params}` : ''}${location.hash}`} replace />;
   }
 
   const T = page.theme, accent = page.accentHex ? [page.accentHex, `color-mix(in srgb, ${page.accentHex} 55%, #ffffff)`] : (ACCENTS[page.accent] || ACCENTS.violet);
@@ -434,7 +435,7 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
       {T.bg === 'image' && data.bgImage && <div className="pf-backdrop" aria-hidden="true"><BackgroundLayer imageUrl={data.bgImage} bg={preview ? { ...data.bg, parallax: false } : data.bg} /><div className="pf-background-wash" style={{ opacity: T.wash / 100 }} /></div>}
       <header className="pf-head">
         <div className="pf-wrap pf-head-in">
-          <GoTo to="home" ctx={ctx} className="pf-brand">{m.brand}</GoTo>
+          <GoTo to="chat" ctx={ctx} className="pf-brand">{m.brand}</GoTo>
           <nav className="pf-nav" aria-label="Pages">{m.pages.map(p => <GoTo key={p.key} to={p.key} ctx={ctx} className={p.key === current ? 'on' : ''} aria-current={p.key === current ? 'page' : undefined}>{p.label}</GoTo>)}</nav>
           <div className="pf-head-act">
             {user && !preview && <Link className="pf-round" to="/admin" aria-label="Dashboard" title="Dashboard"><Icon n="briefcase" size={16} /></Link>}
@@ -451,7 +452,7 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
             <EventsHome m={m} ctx={ctx} />
             {m.featured && <ProjectsHome m={m} ctx={ctx} />}
             {m.products.length > 0 && <ProductsHome m={m} ctx={ctx} />}
-            {(m.aboutBody || m.skills.length) && <AboutPage m={m} embedded />}
+            {!!(m.aboutBody || m.skills.length) && <AboutPage m={m} embedded />}
           </>
         ) : current === 'chat' ? <Chat key={slug} m={m} ctx={ctx} data={data} /> : current === 'activity' ? <ActivityPage m={m} ctx={ctx} initialSection={alias?.section || activitySection} /> : <Body m={m} ctx={ctx} />}
       </main>

@@ -131,7 +131,7 @@ export default function Chat({ m, ctx, data }) {
         {(page.about || m.bio) && <p className="pf-chat-bio">{page.about || m.bio}</p>}
         {m.expertise.length > 0 && <div className="pf-chips">{m.expertise.slice(0, 6).map(skill => <span key={skill}>{skill}</span>)}</div>}
         {data.contributions?.filter(group => page.placement[group.category] === 'side').map(group => <div key={group.id || group.category} className="pf-chat-offers"><h3>{group.category}</h3>{group.offerings?.map(offering => <button key={offering.id} type="button" disabled={busy} onClick={event => send(event, `Tell me about "${offering.title}"`)}>{offering.title}<Icon n="chat" size={14} /></button>)}</div>)}
-        {ctx.preview ? <button type="button" className="pf-btn sm" onClick={() => ctx.go('home')}>{page.openLabel === 'Open persona' ? 'View portfolio' : page.openLabel} <Icon n="arrow" size={15} /></button> : <Link className="pf-btn sm" to={`/p/${ctx.slug}`}>{page.openLabel === 'Open persona' ? 'View portfolio' : page.openLabel} <Icon n="arrow" size={15} /></Link>}
+        {ctx.preview ? <button type="button" className="pf-btn sm" onClick={() => ctx.go('home')}>{page.openLabel === 'Open persona' ? 'View portfolio' : page.openLabel} <Icon n="arrow" size={15} /></button> : <Link className="pf-btn sm" to={`/p/${ctx.slug}/home`}>{page.openLabel === 'Open persona' ? 'View portfolio' : page.openLabel} <Icon n="arrow" size={15} /></Link>}
       </LiquidGlass>
     </section>
   );
