@@ -1,4 +1,5 @@
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useParams } from 'react-router-dom';
+import { settingsHref } from '../lib/publicPageSettings.js';
 
 // Preserve old shared links without keeping a second public page or settings editor.
 export function LegacyPersonaRedirect() {
@@ -6,5 +7,8 @@ export function LegacyPersonaRedirect() {
   return <Navigate to={`/p/${encodeURIComponent(slug || '')}/chat`} replace />;
 }
 
-export function LegacyLookRedirect() { return <Navigate to="/admin/portfolio?tab=look" replace />; }
-export function LegacySettingsRedirect() { return <Navigate to="/admin/portfolio?tab=persona" replace />; }
+export function LegacyPortfolioRedirect({ tab }) {
+  const { search } = useLocation();
+  return <Navigate to={settingsHref(search, tab)} replace />;
+}
+export function LegacyLookRedirect() { return <LegacyPortfolioRedirect tab="look" />; }

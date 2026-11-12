@@ -1,7 +1,7 @@
 .directory {
   --dir-green: #116326; --dir-ink: #111711; --dir-muted: #505b65; --dir-line: #e8eee9; --dir-soft: #ebf7e9;
   min-height: 100vh; color: var(--dir-ink); padding: 0 max(24px, calc((100vw - 1280px) / 2));
-  background: radial-gradient(ellipse at 11% 49%, #f1faf2 0, transparent 43%), radial-gradient(ellipse at 94% 11%, #f8fafb 0, transparent 45%), #fff;
+  background: radial-gradient(ellipse at 11% 49%, #f1faf2 0, transparent 43%), radial-gradient(ellipse at 94% 11%, #f8fafb 0, transparent 45%), var(--dir-background, #fff);
   font-family: 'Figtree', system-ui, sans-serif;
 }
 .directory a { color: inherit; text-decoration: none; }
@@ -158,3 +158,7 @@
   .directory-products-head { padding-inline: 3px; } .directory-products-head button { font-size: 11px; } .directory-footer { font-size: 9px; padding-top: 24px; }
 }
 @media (prefers-reduced-motion: reduce) { .directory * { scroll-behavior: auto !important; transition: none !important; } }
+
+.directory-columns.profiles-only { grid-template-columns: minmax(0,1fr); }
+.directory-profile-cta, .directory-buy { background: var(--dir-green); }
+.directory-brand span, .directory-profile-cta:hover, .directory-buy:hover { background: var(--dir-green); }

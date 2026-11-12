@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { normalizePage } from '../shared/pageSettings.js';
 import { normalizePortfolio } from '../shared/portfolio.js';
 import { resolveSite } from '../src/lib/portfolioModel.js';
-import { savePage } from '../server/site.js';
+import { savePage, saveSettings } from '../server/site.js';
 import { scriptedDatabase, step } from './support/database.js';
 
 test('saved Classic settings resolve to the single portfolio while retaining customization', () => {
@@ -78,10 +78,10 @@ test('overview commands open the requested studio tool without performing change
   const cases = [
     ['Create a new template for a conference talk', '/admin/templates'],
     ['Write a post', '/admin/writing'],
-    ['Update my persona', '/admin/portfolio?tab=persona'],
+    ['Update my persona', '/admin/settings?tab=persona'],
     ['Organize my files', '/admin/files'],
-    ['Edit my shop', '/admin/portfolio?tab=store'],
-    ['Add a project', '/admin/portfolio?tab=projects'],
+    ['Edit my shop', '/admin/settings?tab=store'],
+    ['Add a project', '/admin/settings?tab=projects'],
     ['See my purchases', '/admin/purchases'],
   ];
   for (const [query, target] of cases) assert.equal(resolveStudioAction(query)?.to, target, query);
@@ -126,6 +126,16 @@ test('missing uploads and failed writes preserve the existing images', async () 
   const db = pageDatabase({ id: 4, bg_path: 'owner/old-bg.webp' }, { error: { message: 'write failed' } });
   let removed = false;
   await assert.rejects(savePage(db, { path: null }, { remove: async () => { removed = true; } }), /write failed/);
+  assert.equal(removed, false);
+});
+
+test('legacy background saves also preserve images on failed writes or while retained as the portrait', async () => {
+  const failed = pageDatabase({ id: 4, bg_path: 'owner/old-bg.webp' }, { error: { message: 'write failed' } });
+  let removed = false;
+  await assert.rejects(saveSettings(failed, { path: null }, { remove: async () => { removed = true; } }), /write failed/);
+  assert.equal(removed, false);
+  const shared = pageDatabase({ id: 4, bg_path: 'owner/shared.webp', hero_path: 'owner/shared.webp' });
+  await saveSettings(shared, { path: null }, { remove: async () => { removed = true; } });
   assert.equal(removed, false);
 });
 

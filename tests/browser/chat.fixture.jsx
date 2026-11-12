@@ -24,8 +24,18 @@ async function call(op, args) {
   throw new Error('Unexpected test operation');
 }
 const originalFetch = window.fetch;
-window.fetch = (url, options) => url === '/api/chat' ? Promise.resolve(new Response(JSON.stringify({ reply: `Reply to: ${JSON.parse(options.body).message}`, sources: ['Published notes'] }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : originalFetch(url, options);
+window.fetch = (url, options) => {
+  if (url === '/api/chat') return Promise.resolve(new Response(JSON.stringify({ reply: `Reply to: ${JSON.parse(options.body).message}`, sources: ['Published notes'] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  if (url === '/api/track') return Promise.resolve(new Response(JSON.stringify({ avg: 4.8, count: 5 }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  return originalFetch(url, options);
+};
+const productData = params.get('products') === '1' ? { purpose: 'Designer sharing practical tools and guides for thoughtful products.', contributions: [{ category: 'Books', offerings: [
+  { id: 'fixture-guide', title: 'Free design guide', description: 'A practical guide to making your next product easier to use.', pricing: 'free', views: 20, clicks: 2, accessReady: true },
+  { id: 'fixture-course', title: 'Popular paid course', description: 'Learn the design process from discovery to a polished launch.', pricing: 'paid', price: 499, currency: 'INR', views: 10, clicks: 12, accessReady: true, ratingAvg: 4.8, ratingCount: 5 },
+  { id: 'fixture-kit', title: 'Starter toolkit', description: 'Templates and checklists for your next project.', pricing: 'free', views: 3, clicks: 1, accessReady: true },
+  { id: 'fixture-fourth', title: 'Fourth product', pricing: 'free', views: 1, clicks: 0, accessReady: true },
+] }] } : {};
 const view = params.get('mode') === 'admin'
   ? <div className="studio-overview" style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}><StudioAssistant user={{ id: 'fixture-owner' }} call={call} /></div>
-  : <PortfolioSite data={{ name: 'Ravi', expertise: ['Design'], page: { chat: { mic: false }, glass: { on: false } } }} slug="fixture-ravi" sub="chat" />;
+  : <PortfolioSite data={{ name: 'Ravi', expertise: ['Design'], ...productData, page: { chat: { mic: false }, glass: { on: false }, layout: { sidebar: params.get('sidebar') === 'left' ? 'left' : 'right' } } }} slug="fixture-ravi" sub="chat" />;
 createRoot(document.getElementById('root')).render(<MemoryRouter>{view}</MemoryRouter>);

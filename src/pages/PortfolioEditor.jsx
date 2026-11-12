@@ -12,6 +12,7 @@ import { prepareImage } from '../lib/image.js';
 import { uploadToSigned } from '../lib/storage.js';
 import { CHECKOUT_CURRENCIES } from '../../shared/commerce.js';
 import { LookControls, PersonaControls, StoreControls } from '../components/portfolio/PortfolioControls.jsx';
+import { EDITOR_AREAS as AREAS, EDITOR_TABS as AREA_TABS, EDITOR_PREVIEW as TAB_PAGE } from '../lib/publicPageSettings.js';
 import '../styles/portfolioEditor.css';
 
 const W = 1320;   // the page is drawn at this width and scaled down into the preview column
@@ -63,15 +64,6 @@ function Repeater({ items, onChange, blank, max, noun, title, children }) {
     </>
   );
 }
-
-const AREA_TABS = {
-  home: { hero: 'Introduction', numbers: 'Numbers', about: 'About' },
-  activity: { projects: 'Projects', talks: 'Talks', recognition: 'Recognition & awards', certificates: 'Certificates', testimonials: 'Testimonials', experience: 'Experience' },
-  store: { products: 'Products', store: 'Store settings' },
-  chat: { persona: 'Chat settings' }, contact: { contact: 'Contact settings' }, settings: { look: 'Appearance', design: 'Navigation & footer' },
-};
-const AREAS = { home: 'Home', activity: 'Activity', store: 'Store', chat: 'Chat', contact: 'Contact', settings: 'Appearance' };
-const TAB_PAGE = { hero: 'home', numbers: 'home', projects: 'work', products: 'store', experience: 'experience', talks: 'talks', recognition: 'activity', certificates: 'activity', testimonials: 'activity', about: 'home', design: 'home', look: 'home', store: 'store', persona: 'chat', contact: 'contact' };
 
 function Tabs({ items, active, onChange, prefix, label, controls = 'portfolio-area-panel' }) {
   const entries = Object.entries(items);
@@ -162,7 +154,7 @@ export default function PortfolioEditor() {
   return (
     <div className="portfolio-editor">
       <div className="head" style={{ marginBottom: 8 }}>
-        <div><h1>Public page editor</h1><p className="muted" style={{ margin: 0 }}>Edit the page visitors see: your introduction, work, shop, appearance and AI chat.</p></div>
+        <div><h1>Public page editor</h1><p className="muted" style={{ margin: 0 }}>All your public pages in one place. Choose a page below, edit its content and preview your changes before saving.</p></div>
         <div className="row">
           {user.slug && <a className="btn" href={`/p/${user.slug}`} target="_blank" rel="noreferrer">View live ↗</a>}
           <button className="btn primary" disabled={!dirty || busy} onClick={save}>{busy ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}</button>
@@ -172,9 +164,9 @@ export default function PortfolioEditor() {
       <div className="portfolio-areas"><Tabs items={AREAS} active={area} prefix="portfolio-area" label="Portfolio settings" onChange={key => setTab(Object.keys(AREA_TABS[key])[0])} /></div>
       <div className="pp-editor">
         <div className="pp-form" id="portfolio-area-panel" role="tabpanel" aria-labelledby={`portfolio-area-${area}`}>
-          <Tabs items={AREA_TABS[area]} active={tab} prefix="portfolio-content" controls="portfolio-content-panel" label={`${AREAS[area]} settings`} onChange={setTab} />
+          {Object.keys(AREA_TABS[area]).length > 1 && <Tabs items={AREA_TABS[area]} active={tab} prefix="portfolio-content" controls="portfolio-content-panel" label={`${AREAS[area]} settings`} onChange={setTab} />}
           {area === 'activity' && <p className="hint">Publish events and updates in <Link to="/admin/updates">Events &amp; updates</Link>. All these sections appear under Activity on your public page.</p>}
-          <div className="pp-content" id="portfolio-content-panel" role="tabpanel" aria-labelledby={`portfolio-content-${tab}`}>
+          <div className="pp-content" id="portfolio-content-panel" role={Object.keys(AREA_TABS[area]).length > 1 ? 'tabpanel' : undefined} aria-labelledby={Object.keys(AREA_TABS[area]).length > 1 ? `portfolio-content-${tab}` : undefined}>
           {tab === 'look' && <LookControls page={normPage} setPage={setPg} imageUrl={background} />}
           {tab === 'store' && <StoreControls page={{ ...normPage, storeTitle: normPf.productsTitle || normPage.storeTitle }} setPage={setPg} />}
           {tab === 'persona' && <PersonaControls page={page} bg={bg} setPage={setPg} setBg={patch => setBg(b => ({ ...b, ...patch }))} imageUrl={background} onChooseBackground={chooseBackground} onRemoveBackground={() => { setPendingBg(null); setRemovedBg(true); }} />}
@@ -183,7 +175,7 @@ export default function PortfolioEditor() {
             <Txt label="Page heading" value={pf.enquiry.title} max={60} onChange={v => setIn('enquiry', { title: v })} />
             <Txt label="Introduction" value={pf.enquiry.intro} max={300} rows={3} onChange={v => setIn('enquiry', { intro: v })} />
             <Txt label="Message after submission" value={pf.enquiry.thanks} max={200} onChange={v => setIn('enquiry', { thanks: v })} />
-            <p className="hint">Choose the enquiry types you accept. Leave all unchecked to accept every type. Public contact details are managed in <Link to="/admin/profile?tab=visibility">Privacy</Link>.</p>
+            <p className="hint">Choose the enquiry types you accept. Leave all unchecked to accept every type. Manage public contact details in <Link to="/admin/settings?tab=privacy">Settings → Privacy</Link>.</p>
             {Object.entries(ENQUIRY_TYPES).map(([key, label]) => <label className="toggle" key={key}><input type="checkbox" checked={pf.enquiry.types.includes(key)} onChange={e => setIn('enquiry', { types: e.target.checked ? [...pf.enquiry.types, key] : pf.enquiry.types.filter(type => type !== key) })} />{label}</label>)}
           </section>}
 
@@ -205,8 +197,7 @@ export default function PortfolioEditor() {
               {pf.availability.show && <Txt label="Badge text" value={pf.availability.text} max={60} ph="Available for new opportunities" onChange={v => setIn('availability', { text: v })} />}
             </section>
             <section className="card"><h3>Buttons</h3>
-              <div className="cols c2"><Txt label="Top-bar button" value={pf.navCta.label} max={24} ph="Let’s Connect" onChange={v => setIn('navCta', { label: v })} /><Txt label="…opens (link)" value={pf.navCta.url} ph="default: your email" onChange={v => setIn('navCta', { url: v })} /></div>
-              <div className="cols c2"><Txt label="Main button" value={pf.cta.label} max={24} ph="Work with me" onChange={v => setIn('cta', { label: v })} /><Txt label="…opens (link)" value={pf.cta.url} ph="default: your email" onChange={v => setIn('cta', { url: v })} /></div>
+              <p className="hint">Visitors can reach you through the Contact page in your navigation.</p>
               <div className="cols c2"><Txt label="Second button" value={pf.intro.label} max={24} ph="Watch Introduction" onChange={v => setIn('intro', { label: v })} /><Txt label="…opens (video link)" value={pf.intro.url} ph="empty = “Chat with my AI”" onChange={v => setIn('intro', { url: v })} /></div>
             </section>
             <section className="card"><h3>Awards &amp; recognition (up to 3)</h3>

@@ -33,13 +33,13 @@ test('approved steps dispatch through existing admin services with the same owne
   }
 });
 
-test('account and invite actions recheck Super Admin permission at execution', async () => {
+test('account actions recheck SuperAdmin permission and invites retain their creator scope', async () => {
   const { createStudioOperations } = await operations(), calls = [];
   const service = createStudioOperations({ invites: new Proxy({}, { get: (_, method) => async (...args) => { calls.push({ method, args }); return { ok: true }; } }) });
   const cases = [['users.update', 'users', 'updateUser'], ['users.setLock', 'users', 'setUserLock'], ['users.delete', 'users', 'deleteUser'], ['invites.create', 'invites', 'createInvite'], ['invites.revoke', 'invites', 'revokeInvite']];
   for (const [op, entity, method] of cases) {
-    await assert.rejects(service.execute(ctx(), { op, entity, args: { id: 'other', locked: true } }), /admin|permission/i);
-    await service.execute({ ...ctx(), user: { ...ctx().user, isAdmin: true } }, { op, entity, args: { id: 'other', locked: true } });
+    if (entity === 'users') await assert.rejects(service.execute(ctx(), { op, entity, args: { id: 'other', locked: true } }), /admin|permission/i);
+    await service.execute({ ...ctx(), user: { ...ctx().user, isAdmin: true, isSuperAdmin: true } }, { op, entity, args: { id: 'other', locked: true } });
     assert.equal(calls.at(-1).method, method);
     if (['users.delete', 'users.setLock'].includes(op)) assert.equal(calls.at(-1).args.at(-1), 'owner');
     if (op === 'invites.create') assert.equal(calls.at(-1).args[0], 'owner');
@@ -138,7 +138,7 @@ test('knowledge jobs report remaining work so a completed slice does not imply a
 
 test('Super Admin read views contain account metadata and invitation details without secrets', async () => {
   const { createStudioOperations } = await operations();
-  const service = createStudioOperations({ invites: { listUsersDetailed: async () => [{ id: 'other', name: 'User', email: 'user@example.test', isAdmin: false, password_hash: 'private' }], listInvites: async () => [{ id: 3, code: 'TEAMCODE', max_uses: 2, uses: 1, revoked: false, created_by: 'private' }] } });
-  const state = await service.read({ ...ctx(), user: { ...ctx().user, isAdmin: true } }, ['users', 'invites']);
+  const service = createStudioOperations({ invites: { listUsersDetailed: async () => [{ id: 'other', name: 'User', email: 'user@example.test', isAdmin: false, password_hash: 'private' }], listInviteHistory: async () => ({ codes: [{ id: 3, code: 'TEAMCODE', max_uses: 2, uses: 1, revoked: false, created_by: 'private' }] }) } });
+  const state = await service.read({ ...ctx(), user: { ...ctx().user, isAdmin: true, isSuperAdmin: true } }, ['users', 'invites']);
   assert.equal(state.users[0].email, 'user@example.test'); assert.equal(state.invites[0].maxUses, 2); assert.doesNotMatch(JSON.stringify(state), /private/);
 });

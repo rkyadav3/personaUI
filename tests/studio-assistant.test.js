@@ -65,6 +65,16 @@ test('read commands answer without creating a mutation review', async () => {
   assert.equal(f.writes.length, 0);
 });
 
+test('analytics answers include factual data panels and metric definitions without write proposals', async () => {
+  const { createStudioAssistant } = await module();
+  const f = fixture({ answer: 'You have 3 paid sales. Net earnings exclude fees and payouts.', actions: [] }, { entities: ['analytics'] });
+  f.change(data => { data.analytics = { snapshot: { sales: 3, views: 25, exchanges: 8, enquiries: 2, revenue: [{ currency: 'INR', net: 3000 }] }, dailySales: [{ day: '2026-11-12', sales: 2 }], asOf: '2026-11-12T12:00:00Z' }; });
+  const value = await createStudioAssistant(f.dependencies).prepare(actor, { message: 'Explain my sales and persona conversations' });
+  assert.equal(value.review, null); assert.equal(value.insights.metrics[0].value, 3); assert.equal(f.writes.length, 0);
+  assert.match(f.modelCalls[1].message, /Lifetime visitor question-and-answer pairs/);
+  assert.match(f.modelCalls[1].message, /minor currency units/);
+});
+
 test('completed command, read and clarification replies are saved to account history', async () => {
   const { createStudioAssistant } = await module();
   for (const mode of ['command', 'read', 'clarification']) {
@@ -114,7 +124,7 @@ test('parallel approval requests cannot both claim the same review', async () =>
 test('another owner cannot approve or cancel the review', async () => {
   const { createStudioAssistant } = await module(), f = fixture(), service = createStudioAssistant(f.dependencies);
   await service.prepare(actor, { message: 'Create a project' });
-  const other = { user: { id: 'other', isAdmin: true }, db: { uid: 'other' } };
+  const other = { user: { id: 'other', isAdmin: true, isSuperAdmin: true }, db: { uid: 'other' } };
   await assert.rejects(service.apply(other, { reviewId, approved: true }), /review.*not found/i);
   await assert.rejects(service.discard(other, { reviewId }), /review.*not found/i);
   assert.equal(f.writes.length, 0);
@@ -254,7 +264,7 @@ test('administrator privileges are checked again and self-deletion is refused', 
   const { makeStudioPlan } = await plans(), data = state();
   data.users.push({ id: 'owner', name: 'Ravi' });
   assert.throws(() => makeStudioPlan({ actions: [{ entity: 'users', action: 'delete', id: 'someone' }] }, data, actor.user), /admin|permission/i);
-  assert.throws(() => makeStudioPlan({ actions: [{ entity: 'users', action: 'delete', id: 'owner' }] }, data, { ...actor.user, isAdmin: true }), /own account/i);
+  assert.throws(() => makeStudioPlan({ actions: [{ entity: 'users', action: 'delete', id: 'owner' }] }, data, { ...actor.user, isAdmin: true, isSuperAdmin: true }), /own account/i);
 });
 
 test('ambiguous repeated targets and oversized batches require a more specific command', async () => {
@@ -267,7 +277,7 @@ test('AI context omits private delivery links and never exposes password or paym
   const { studioModelContext } = await plans(), data = state();
   data.users[0].password_hash = 'private-password-hash';
   data.payments.keySecret = 'private-payment-secret';
-  const text = JSON.stringify(studioModelContext(data, ['products', 'users', 'payments'], { ...actor.user, isAdmin: true }));
+  const text = JSON.stringify(studioModelContext(data, ['products', 'users', 'payments'], { ...actor.user, isAdmin: true, isSuperAdmin: true }));
   assert.ok(!text.includes('https://example.test/private'));
   assert.ok(!text.includes('private-password-hash'));
   assert.ok(!text.includes('private-payment-secret'));
@@ -310,7 +320,7 @@ test('read context includes buyer details and knowledge counts that the user req
 
 test('revoked administrator permission prevents execution of an existing privileged review', async () => {
   const { createStudioAssistant } = await module(), f = fixture({ answer: 'Review the removal.', actions: [{ entity: 'users', action: 'delete', id: 'someone' }] }, { entities: ['users'] }), service = createStudioAssistant(f.dependencies);
-  await service.prepare({ ...actor, user: { ...actor.user, isAdmin: true } }, { message: 'Delete the other account' });
+  await service.prepare({ ...actor, user: { ...actor.user, isAdmin: true, isSuperAdmin: true } }, { message: 'Delete the other account' });
   await assert.rejects(service.apply(actor, { reviewId, approved: true }), /admin|permission/i);
   assert.equal(f.writes.length, 0);
 });

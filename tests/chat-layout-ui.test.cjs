@@ -40,6 +40,56 @@ test('existing explicit Chat links still open Chat and the editor still previews
   assert.doesNotMatch(preview, /aria-label="Message to Ravi"/);
 });
 
+test('Chat displays the profile owner’s popular products below the profile overview with Store actions', () => {
+  const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
+  const html = render(React.createElement(PortfolioSite, { slug: 'ravi', data: { name: 'Ravi', purpose: 'Profile introduction', contributions: [{ category: 'Books', offerings: [
+    { id: 1, title: 'Free design guide', pricing: 'free', views: 20, clicks: 2, accessReady: true },
+    { id: 2, title: 'Popular paid course', pricing: 'paid', price: 499, currency: 'INR', views: 10, clicks: 12, accessReady: true, ratingAvg: 4.8, ratingCount: 5 },
+    { id: 3, title: 'Third product', pricing: 'free', views: 3, clicks: 1, accessReady: true },
+    { id: 4, title: 'Fourth product', pricing: 'free', views: 1, clicks: 0, accessReady: true },
+  ] }] } }), '/p/ravi');
+  assert.match(html, /aria-label="Popular products"/);
+  assert.ok(html.indexOf('Profile introduction') < html.indexOf('Popular products'));
+  assert.ok(html.indexOf('Popular paid course') < html.indexOf('Free design guide'));
+  assert.doesNotMatch(html, /Fourth product/);
+  assert.match(html, /Buy now/); assert.match(html, /Get free/);
+  assert.match(html, /Rate this offering/);
+  assert.match(html, /href="\/p\/ravi\/store"/);
+  assert.match(html, /aria-label="Message to Ravi"/);
+});
+
+test('Chat popular products honours hidden categories and a disabled Store', () => {
+  const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
+  for (const data of [
+    { name: 'Ravi' },
+    { name: 'Ravi', page: { sections: { store: false } }, portfolio: { products: [{ title: 'Private product' }] } },
+    { name: 'Ravi', page: { placement: { Books: 'hidden' } }, contributions: [{ category: 'Books', offerings: [{ id: 1, title: 'Private product', clicks: 1000 }] }] },
+  ]) {
+    const html = render(React.createElement(PortfolioSite, { data, slug: 'ravi' }), '/p/ravi');
+    assert.doesNotMatch(html, /Popular products|Private product/);
+    assert.match(html, /aria-label="Message to Ravi"/);
+  }
+});
+
+test('Chat can recommend Store products without interaction data and explains unavailable checkout', () => {
+  const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
+  const html = render(React.createElement(PortfolioSite, { data: { name: 'Ravi', portfolio: { products: [{ id: 'guide', title: 'New guide', pricing: 'free', accessReady: false }] } }, slug: 'ravi' }), '/p/ravi');
+  assert.match(html, /Popular products/); assert.match(html, /New guide/);
+  assert.match(html, /Access link coming soon/);
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Get free<\/button>/);
+});
+
+test('Chat popularity ranks by real clicks then views without changing the Store ordering', async () => {
+  const { popularChatProducts } = await import('../src/lib/chatProducts.js');
+  const items = [
+    { id: 'untracked' }, { id: 'viewed', views: 200 }, { id: 'clicked', clicks: 10 },
+    { id: 'clicked-viewed', clicks: 10, views: 30 },
+  ];
+  assert.deepEqual(popularChatProducts(items).map(item => item.id), ['clicked-viewed', 'clicked', 'viewed']);
+  assert.deepEqual(items.map(item => item.id), ['untracked', 'viewed', 'clicked', 'clicked-viewed']);
+  assert.deepEqual(popularChatProducts([{ id: 'first' }, { id: 'second' }]).map(item => item.id), ['first', 'second']);
+});
+
 test('Admin displays newest exchanges first, with the question above its reply', () => {
   const { StudioConversation } = require('../src/components/StudioAssistant.jsx');
   const messages = [{ id: '1:q', role: 'user', text: 'Older question' }, { id: '1:a', role: 'assistant', text: 'Older answer' }, { id: '2:q', role: 'user', text: 'Newest question' }, { id: '2:a', role: 'assistant', text: 'Newest answer' }];

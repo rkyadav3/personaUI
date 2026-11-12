@@ -1,10 +1,10 @@
 import { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { AuthProvider } from './lib/auth.jsx';
 const Layout = lazy(() => import('./components/Layout.jsx'));
 import Home from './pages/Home.jsx';
 import { Loading } from './components/Ui.jsx';
-import { LegacyLookRedirect, LegacyPersonaRedirect, LegacySettingsRedirect } from './pages/LegacyRedirects.jsx';
+import { LegacyLookRedirect, LegacyPersonaRedirect, LegacyPortfolioRedirect } from './pages/LegacyRedirects.jsx';
 const Overview = lazy(() => import('./pages/Overview.jsx'));
 const FileManager = lazy(() => import('./pages/FileManager.jsx'));
 const AddFiles = lazy(() => import('./pages/AddFiles.jsx'));
@@ -13,14 +13,22 @@ const Writing = lazy(() => import('./pages/Writing.jsx'));
 const Templates = lazy(() => import('./pages/Templates.jsx'));
 const KnowledgeIndex = lazy(() => import('./pages/KnowledgeIndex.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
-const PortfolioEditor = lazy(() => import('./pages/PortfolioEditor.jsx'));
+const Settings = lazy(() => import('./pages/Settings.jsx'));
 const PublicProfile = lazy(() => import('./pages/PublicProfile.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
+const Invites = lazy(() => import('./pages/Invites.jsx'));
+const Suggestions = lazy(() => import('./pages/Suggestions.jsx'));
+const PlatformPayments = lazy(() => import('./pages/PlatformPayments.jsx'));
+const MainSiteSettings = lazy(() => import('./pages/MainSiteSettings.jsx'));
 const Register = lazy(() => import('./pages/Register.jsx'));
 const Updates = lazy(() => import('./pages/Updates.jsx'));
 const Enquiries = lazy(() => import('./pages/Enquiries.jsx'));
 const Purchases = lazy(() => import('./pages/Purchases.jsx'));
 const Questions = lazy(() => import('./pages/Questions.jsx'));
+function LegacySuperAdmin() {
+  const [params] = useSearchParams();
+  return <Navigate to={params.get('tab') === 'invites' ? '/superadmin/invites' : '/superadmin/customers'} replace />;
+}
 
 export default function App() {
   return (
@@ -38,7 +46,7 @@ export default function App() {
       <Route path="/admin" element={<Layout />}>
         <Route index element={<Overview />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="settings" element={<LegacySettingsRedirect />} />
+        <Route path="settings" element={<Settings />} />
         <Route path="files" element={<FileManager />} />
         <Route path="add" element={<AddFiles />} />
         <Route path="topics" element={<Topics />} />
@@ -47,16 +55,26 @@ export default function App() {
         <Route path="writing/:id" element={<Writing />} />
         <Route path="templates" element={<Templates />} />
         <Route path="knowledge" element={<KnowledgeIndex />} />
-        <Route path="superadmin" element={<SuperAdmin />} />
+        <Route path="superadmin" element={<LegacySuperAdmin />} />
         <Route path="page" element={<LegacyLookRedirect />} />
-        <Route path="portfolio" element={<PortfolioEditor />} />
+        <Route path="portfolio" element={<LegacyPortfolioRedirect />} />
         <Route path="updates" element={<Updates />} />
         <Route path="enquiries" element={<Enquiries />} />
         <Route path="questions" element={<Questions />} />
         <Route path="purchases" element={<Purchases />} />
-        <Route path="invites" element={<Navigate to="/admin/superadmin?tab=invites" replace />} />
-        <Route path="users" element={<Navigate to="/admin/superadmin" replace />} />
+        <Route path="invites" element={<Invites />} />
+        <Route path="suggestions" element={<Suggestions />} />
+        <Route path="users" element={<Navigate to="/superadmin/customers" replace />} />
       </Route>
+      <Route path="/superadmin" element={<Layout superadmin />}>
+        <Route index element={<SuperAdmin />} />
+        <Route path="customers" element={<SuperAdmin />} />
+        <Route path="invites" element={<Invites />} />
+        <Route path="suggestions" element={<Suggestions />} />
+        <Route path="sales" element={<PlatformPayments />} />
+        <Route path="settings" element={<MainSiteSettings />} />
+      </Route>
+      <Route path="/superadmin/payments" element={<Navigate to="/superadmin/sales" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </Suspense>

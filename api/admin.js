@@ -17,8 +17,32 @@ import { listQuestions } from '../server/chatHistory.js';
 import { listStudioHistory } from '../server/studioChatHistory.js';
 import { scoped } from '../server/tenant.js';
 import { HttpError } from '../server/http.js';
+import { createSuggestionService, needSuperAdmin } from '../server/governance.js';
+import { createTagService } from '../server/tags.js';
+import { createActivityService } from '../server/adminActivity.js';
+import { createPlatformService } from '../server/platform.js';
 
-const needAdmin = ({ user }) => { if (!user.isAdmin) throw new HttpError(403, 'This page is for admins. Add your email to ADMIN_EMAILS.'); };
+export function createPlatformOperations({ invitesService = invites, suggestionsService = createSuggestionService(), platformService = createPlatformService(), tagsService = createTagService() } = {}) {
+  return {
+    'invites.list': ({ user }) => invitesService.listInviteHistory(user),
+    'invites.create': async ({ user }, args) => ({ code: await invitesService.createInvite(user.id, args) }),
+    'invites.revoke': async ({ user }, args) => { await invitesService.revokeInvite(args.id, user); return { ok: true }; },
+    'users.list': async ctx => { needSuperAdmin(ctx); return { users: (await invitesService.listUsersDetailed()).filter(user => !user.isSuperAdmin), tags: await tagsService.list() }; },
+    'users.update': (ctx, args) => { needSuperAdmin(ctx); return invitesService.updateUser(args.id, args); },
+    'users.setLock': (ctx, args) => { needSuperAdmin(ctx); if (typeof args.locked !== 'boolean') throw new HttpError(400, 'Choose lock or unlock.'); return invitesService.setUserLock(args.id, args.locked, ctx.user.id); },
+    'users.resetPassword': (ctx, args) => { needSuperAdmin(ctx); return invitesService.resetUserPassword(args.id, args.password); },
+    'users.delete': (ctx, args) => { needSuperAdmin(ctx); return invitesService.deleteUser(args.id, ctx.user.id); },
+    'suggestions.list': async ({ user }) => ({ rows: await suggestionsService.list(user) }),
+    'suggestions.create': ({ user }, args) => suggestionsService.create(user, args),
+    'suggestions.update': ({ user }, args) => suggestionsService.update(user, args),
+    'platform.tags.list': async () => ({ tags: await tagsService.list() }),
+    'platform.tags.create': async ({ user }, args) => ({ tag: await tagsService.create(user, args) }),
+    'platform.sales': ({ user }) => platformService.sales(user),
+    'platform.payments.setEnabled': ({ user }, args) => platformService.setCheckout(user, args),
+    'platform.home.get': async ctx => { needSuperAdmin(ctx); return { settings: await platformService.home() }; },
+    'platform.home.save': async ({ user }, args) => ({ settings: await platformService.saveHome(user, args) }),
+  };
+}
 
 // Public ops (no session needed)
 const PUBLIC = {
@@ -39,7 +63,11 @@ const PUBLIC = {
 };
 
 // Signed-in ops. `db` is the tenant-scoped client; `s` is the store module bound to it.
+const activityService = createActivityService();
 const OPS = {
+  'activity.resume': ctx => activityService.resume(ctx),
+  'activity.touch': ctx => activityService.touch(ctx),
+  'activity.report': ctx => activityService.report(ctx),
   'studio.history': (ctx, a) => listStudioHistory(ctx, a),
   'studio.prepare': (ctx, a) => assistant.prepareStudioCommand(ctx, a),
   'studio.apply': (ctx, a) => assistant.applyStudioCommand(ctx, a),
@@ -139,33 +167,7 @@ const OPS = {
   'index.log': ({ db }) => store.chatLog(db),
   'index.settings': async () => ({ model: await model(), minSimilarity: env('MIN_SIMILARITY', 0.6), minKeywordRank: env('MIN_KEYWORD_RANK', 0.2) }),
 
-  // invites (admin only)
-  'invites.list': async ctx => { needAdmin(ctx); const [codes, users] = await Promise.all([invites.listInvites(), invites.listUsers()]); return { codes, users }; },
-  'invites.create': async (ctx, a) => { needAdmin(ctx); return { code: await invites.createInvite(ctx.user.id, a) }; },
-  'invites.revoke': async (ctx, a) => { needAdmin(ctx); await invites.revokeInvite(a.id); return { ok: true }; },
-
-  // superadmin user management (admin only)
-  'users.list': async ctx => {
-    needAdmin(ctx);
-    const [users, codes] = await Promise.all([invites.listUsersDetailed(), invites.listInvites()]);
-    return { users, codes };
-  },
-  'users.update': async (ctx, a) => {
-    needAdmin(ctx);
-    return invites.updateUser(a.id, a);
-  },
-  'users.setLock': async (ctx, a) => {
-    needAdmin(ctx);
-    return invites.setUserLock(a.id, a.locked, ctx.user.id);
-  },
-  'users.resetPassword': async (ctx, a) => {
-    needAdmin(ctx);
-    return invites.resetUserPassword(a.id, a.password);
-  },
-  'users.delete': async (ctx, a) => {
-    needAdmin(ctx);
-    return invites.deleteUser(a.id, ctx.user.id);
-  },
+  ...createPlatformOperations(),
 };
 
 export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: tenantScope = scoped, operations = OPS } = {}) {
@@ -179,7 +181,9 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
       const user = await sessionUser(req);
       if (!user) throw new HttpError(401, 'Not signed in.');
-      return res.status(200).json(await fn({ db: tenantScope(user.id), user }, args));
+      const platformOp = /^(users\.|invites\.|suggestions\.|platform\.)/.test(op);
+      if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
+      return res.status(200).json(await fn({ db: platformOp ? null : tenantScope(user.id), user }, args));
     } catch (e) {
       const studio = typeof op === 'string' && op.startsWith('studio.');
       if (!(e instanceof HttpError)) console.error(op, studio ? e.name || 'error' : e);

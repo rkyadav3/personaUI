@@ -81,14 +81,15 @@ test('history rejects malformed request arguments before querying the database',
 });
 
 let visitor = 0;
-function chatFixture(t, { rows = [], generated = 'My answer [1].', embedFails = false, generateFails = false, logFails = false, logThrows = false, ownerFails = false, searchFails = false, owner = 'owner', serviceKey = 'fixture' } = {}) {
+function chatFixture(t, { rows = [], generated = 'My answer [1].', embedFails = false, generateFails = false, logFails = false, logThrows = false, ownerFails = false, searchFails = false, owner = 'owner', ownerTags = [], published = true, serviceKey = 'fixture' } = {}) {
   const previous = { url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_KEY };
   process.env.SUPABASE_URL = 'https://db.example.test'; process.env.SUPABASE_SERVICE_KEY = serviceKey;
   t.after(() => { for (const [key, value] of [['SUPABASE_URL', previous.url], ['SUPABASE_SERVICE_KEY', previous.key]]) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } });
   const logs = [];
   t.mock.method(console, 'error', () => {});
   t.mock.method(globalThis, 'fetch', async (url, options) => {
-    if (url.includes('/users?')) return new Response(JSON.stringify(owner ? [{ id: owner }] : []), { status: ownerFails ? 500 : 200 });
+    if (url.includes('/users?')) return new Response(JSON.stringify(owner ? [{ id: owner, tags: ownerTags }] : []), { status: ownerFails ? 500 : 200 });
+    if (url.includes('/profiles?')) return new Response(JSON.stringify(published ? [{ id: 1 }] : []), { status: 200 });
     if (url.includes(':embedContent')) return new Response(JSON.stringify({ embedding: { values: [1] } }), { status: embedFails ? 500 : 200 });
     if (url.includes('/rpc/hybrid_search')) return new Response(JSON.stringify(rows), { status: searchFails ? 500 : 200 });
     if (url.includes(':generateContent')) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: generated }] } }] }), { status: generateFails ? 500 : 200 });
@@ -99,6 +100,18 @@ function chatFixture(t, { rows = [], generated = 'My answer [1].', embedFails = 
   return { logs, res, run: async (body = { slug: 'owner', message: 'What do you work on?' }) => { await chat({ method: 'POST', headers: { 'x-forwarded-for': `visitor-${++visitor}` }, body }, res); return res; } };
 }
 const passage = { source_name: 'Notes', content: 'I build useful tools. I teach others.', similarity: 0.9 };
+
+test('private profiles refuse anonymous chat before searching or writing history', async t => {
+  const f = chatFixture(t, { ownerTags: ['private'], rows: [passage] });
+  await f.run(); assert.equal(f.res.code, 404); assert.equal(f.logs.length, 0);
+  assert.equal(globalThis.fetch.mock.calls.length, 1);
+});
+
+test('unpublished profiles refuse anonymous knowledge requests', async t => {
+  const f = chatFixture(t, { published: false, rows: [passage] });
+  await f.run(); assert.equal(f.res.code, 404); assert.equal(f.logs.length, 0);
+  assert.equal(globalThis.fetch.mock.calls.length, 2);
+});
 
 test('public chat records the exact answer, cited sources, question and owner', async t => {
   const f = chatFixture(t, { rows: [passage, { ...passage }] }); await f.run();

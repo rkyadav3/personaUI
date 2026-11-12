@@ -1,0 +1,31 @@
+.admin-glimpse { position: fixed; right: 26px; bottom: 26px; z-index: 80; width: min(440px,calc(100vw - 36px)); padding: 22px; border: 1px solid #cbded0; border-radius: 16px; background: #f6fcf7; color: #183d25; box-shadow: 0 12px 36px #193b2518; animation: glimpse-in .35s ease-out both; }
+.admin-glimpse header { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+.admin-glimpse h2 { margin: 0 0 5px; font-size: 20px !important; }
+.admin-glimpse header p { margin: 0 0 18px; font-size: 12px; }
+.admin-glimpse header button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; background: transparent; color: inherit; border-radius: 8px; }
+.admin-glimpse header button:hover { background: #dfeee2; }
+.admin-glimpse-metrics, .assistant-insight-metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; margin: 14px 0; }
+.admin-glimpse-metrics a { display: grid; gap: 4px; text-decoration: none; color: inherit; }
+.admin-glimpse strong { display: flex; gap: 8px; align-items: center; font-size: 24px; font-variant-numeric: tabular-nums; }
+.admin-glimpse-metrics span { font-size: 13px; }
+.admin-glimpse small { font-size: 11px; line-height: 1.5; color: #48654f; }
+.admin-glimpse-revenue { margin: 12px 0; font-variant-numeric: tabular-nums; }
+.admin-glimpse.leaving { animation: glimpse-out .5s ease-out forwards; pointer-events: none; }
+.assistant-insights { margin-top: 18px; border-top: 1px solid #d6e4da; padding-top: 16px; overflow-wrap: anywhere; }
+.assistant-insight-metrics strong { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+.assistant-insight-metrics span { font-size: 12px; }
+.assistant-insights table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.assistant-insights :is(th,td) { text-align: left; border-bottom: 1px solid #d6e4da; padding: 10px; }
+.assistant-insights caption { text-align: left; font-size: 12px; margin: 12px 0; }
+.assistant-insights > small { display: block; margin-top: 14px; font-size: 11px; }
+.studio-insight-prompts { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+.assistant-readable-text p { white-space: pre-wrap; line-height: 1.65; }
+.assistant-readable-text ul { padding-left: 20px; line-height: 1.7; }
+.assistant-sales-bars { height: 120px; display: flex; align-items: end; gap: 5px; overflow-x: auto; margin: 16px 0; }
+.assistant-sales-bars > div { height: 100%; min-width: 24px; flex: 1; display: flex; flex-direction: column; justify-content: end; align-items: center; }
+.assistant-sales-bars span { background: #187541; width: 75%; min-height: 4px; border-radius: 4px 4px 0 0; }
+.assistant-sales-bars small { font-size: 9px; padding-top: 6px; }
+@keyframes glimpse-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes glimpse-out { to { opacity: 0; transform: translateY(8px); } }
+@media (max-width: 600px) { .admin-glimpse { right: 18px; bottom: 18px; max-height: 75vh; overflow-y: auto; } }
+@media (prefers-reduced-motion: reduce) { .admin-glimpse, .admin-glimpse.leaving { animation: none; } .admin-glimpse.leaving { opacity: 0; } }

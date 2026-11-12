@@ -32,6 +32,11 @@ export const isAdminEmail = email => {
   const all = [...new Set([...adminList, ...superList])];
   return all.includes((email || '').toLowerCase());
 };
+export const isSuperAdminEmail = email => {
+  const configured = String(env('SUPERADMIN_EMAILS', '')).trim();
+  const list = (configured || String(env('ADMIN_EMAILS', ''))).split(',').map(value => value.trim().toLowerCase());
+  return Boolean(email) && list.includes(String(email).trim().toLowerCase());
+};
 
 export const normCode = code => String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -61,18 +66,21 @@ export const publicUser = u => ({
   email: u.email,
   name: u.name || null,
   slug: u.slug || null,
-  isAdmin: isAdminEmail(u.email),
-  isSuperAdmin: isAdminEmail(u.email)
+  isAdmin: !isSuperAdminEmail(u.email),
+  isSuperAdmin: isSuperAdminEmail(u.email),
+  role: isSuperAdminEmail(u.email) ? 'superadmin' : 'admin',
+  tags: u.tags || []
 });
 
 export async function register({ name, email, password = '', confirm, invite }) {
   email = (email || '').trim().toLowerCase();
   const mode = registrationMode();
   if (mode === 'closed') return { error: 'Registration is currently closed.' };
-  if (mode === 'invite' || !invite) {
+  if (mode === 'invite') {
     if (!invite) return { error: 'Registration is by invitation only. Please use the invite link provided by the administrator.' };
   }
   if (!EMAIL_RE.test(email)) return { error: 'Enter a valid email address.' };
+  if (isSuperAdminEmail(email)) return { error: 'This email is reserved for a platform owner. Owner accounts must be provisioned by the platform operator.' };
   if (password.length < 8) return { error: 'Use at least 8 characters for your password.' };
   if (Buffer.byteLength(password) > 72) return { error: 'Your password is too long (72 characters max).' };
   if (password !== confirm) return { error: "The passwords don't match." };
@@ -86,15 +94,10 @@ export async function register({ name, email, password = '', confirm, invite }) 
   if ((await run(db.from('users').select('id').eq('email', email))).length) return { error: 'An account with that email already exists. Sign in instead.' };
   let row;
   try {
-    [row] = await run(db.from('users').insert({ email, name: (name || '').trim() || null, slug: slugFor(email), password_hash: bcrypt.hashSync(password, 12) }).select());
-  } catch { return { error: "Couldn't create the account. Try again." }; }
-  if (inv) {
-    if (!(await consumeInvite(inv))) {                       // someone used the last slot a moment ago
-      await run(db.from('users').delete().eq('id', row.id));
-      return { error: 'That invite code was just used up. Ask for a new one.' };
-    }
-    await run(db.from('users').update({ invite_code_id: inv.id }).eq('id', row.id));
-  }
+    const values = { email, name: (name || '').trim() || null, slug: slugFor(email), password_hash: bcrypt.hashSync(password, 12) };
+    if (inv) [row] = await run(db.rpc('register_with_invite', { p_code: inv.code, p_email: values.email, p_name: values.name, p_slug: values.slug, p_password_hash: values.password_hash }));
+    else [row] = await run(db.from('users').insert(values).select());
+  } catch { return { error: "Couldn't create the account. The invite may have expired or been used up. Try again or request a new link." }; }
   return { user: publicUser(row) };
 }
 

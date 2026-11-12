@@ -10,24 +10,28 @@ const { renderToStaticMarkup } = require('react-dom/server');
 const { MemoryRouter } = require('react-router-dom');
 const render = (Component, props, path) => renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(Component, props)));
 
-test('payment setting links from the assistant open payment settings, including the legacy settings alias', () => {
-  const Purchases = require('../src/pages/Purchases.jsx').default;
-  for (const tab of ['settings', 'payments']) {
-    const html = render(Purchases, {}, `/admin/purchases?tab=${tab}`);
-    assert.match(html, /aria-pressed="true"[^>]*>[\s\S]*?Payment settings/);
-    assert.doesNotMatch(html, /aria-pressed="true"[^>]*>[\s\S]*?<span>Receipts &amp; fulfillment/);
-  }
+test('payment preferences appear in Settings with the matching navigation selected', () => {
+  const Settings = require('../src/pages/Settings.jsx').default;
+  const { AdminSectionTabs } = require('../src/components/AdminNavigation.jsx');
+  const html = render(Settings, {}, '/admin/settings?tab=payments');
+  assert.match(html, /<h1>Payment settings<\/h1>/);
+  assert.doesNotMatch(html, /Receipts &amp; fulfillment|Purchase tools/);
+  const nav = render(AdminSectionTabs, { user: { isAdmin: false } }, '/admin/settings?tab=payments');
+  assert.match(nav, /<a(?=[^>]*href="\/admin\/settings\?tab=payments")(?=[^>]*aria-current="page")[^>]*>/);
 });
 
-test('offering links select categories and visibility links select privacy controls', () => {
+test('offering links select categories and privacy controls have one Settings editor', () => {
   const { ProfileManager } = require('../src/pages/Profile.jsx');
   const props = { data: { profile: { name: 'Owner', status: 'published', visibility: { contact: {} } }, contributions: [] }, reload() {} };
   const offerings = render(ProfileManager, props, '/admin/profile?tab=contrib');
   assert.match(offerings, /Offerings &amp; categories/);
   assert.match(offerings, /Add category/);
   assert.doesNotMatch(offerings, /Save Profile Changes/);
-  const visibility = render(ProfileManager, props, '/admin/profile?tab=visibility');
-  assert.match(visibility, /Save Visibility/);
+  assert.doesNotMatch(offerings, /Profile sections|Privacy &amp; visibility/);
+  const { PrivacyPreferences } = require('../src/pages/Settings.jsx');
+  const visibility = render(PrivacyPreferences, { value: { contact: {} }, onChange() {}, onSave() {}, busy: false }, '/admin/settings?tab=privacy');
+  assert.match(visibility, /Save visibility/);
+  assert.match(visibility, /Contact details/);
   assert.doesNotMatch(visibility, /Save Profile Changes/);
 });
 

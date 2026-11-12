@@ -35,7 +35,7 @@ export function resolveSite(data, slug, heroOverride) {
       const item = { kind: 'offering', id: o.id, title: o.title, summary: o.description || '', icon: CAT_ICON[k.category] || 'spark', status: k.subtype || SINGULAR[k.category] || k.category,
         price: fmtPrice(o, cur), pricing: o.pricing, amount: o.pricing === 'free' ? 0 : o.price, currency: String(o.currency || cur).toUpperCase(), accessReady: o.accessReady,
         checkout: ['free', 'paid'].includes(o.pricing) ? { kind: 'offering', id: String(o.id) } : null,
-        image: o.image || '', url: o.link || '', linkLabel: o.pricing === 'paid' ? 'Buy / book' : 'Open', ratingAvg: o.ratingAvg || 0, ratingCount: o.ratingCount || 0 };
+        image: o.image || '', url: o.link || '', linkLabel: o.pricing === 'paid' ? 'Buy / book' : 'Open', views: o.views || 0, clicks: o.clicks || 0, ratingAvg: o.ratingAvg || 0, ratingCount: o.ratingCount || 0 };
       offerOptions.push({ id: o.id, title: o.title });   // the contact form lets a visitor pick one of these
       if (k.category === 'Talk Shows') talkOffers.push(item); else offers.push(item);
     }

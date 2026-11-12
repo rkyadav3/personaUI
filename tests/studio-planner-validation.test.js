@@ -6,7 +6,7 @@ import { normalizePortfolio } from '../shared/portfolio.js';
 import { normalizePage } from '../shared/pageSettings.js';
 import { normalizeBg } from '../shared/siteSettings.js';
 
-const owner = { id: 'owner', isAdmin: true };
+const owner = { id: 'owner', isAdmin: true, isSuperAdmin: true };
 function snapshot() {
   return {
     settings: { page: normalizePage(), portfolio: normalizePortfolio({ projects: [{ title: 'Project' }], socials: [{ kind: 'github', url: 'https://example.test' }] }), bg: normalizeBg(), heroUrl: 'https://example.test/photo', imageUrl: 'https://example.test/bg' },
@@ -22,6 +22,12 @@ function snapshot() {
   };
 }
 const plan = (actions, state = snapshot()) => makeStudioPlan({ actions }, state, owner);
+
+test('activity analytics can never become an assistant write action', () => {
+  for (const action of ['create', 'update', 'delete']) {
+    assert.throws(() => plan([{ entity: 'analytics', action, id: 'current', values: { sales: 999 } }]), /unsupported/);
+  }
+});
 
 test('every Portfolio list can be created and deleted through a reviewed unified save', () => {
   const cases = { projects: { title: 'Project' }, products: { title: 'Product', pricing: 'free' }, experience: { role: 'Designer' }, talks: { title: 'Talk' }, awards: { title: 'Award' }, domains: { label: 'Design' }, socials: { kind: 'website', url: 'https://example.test/new' }, stats: { value: '10', label: 'Projects' } };

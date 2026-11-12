@@ -32,7 +32,7 @@ export default function Login() {
     try {
       const r = await api('auth.login', f);
       if (r.error) setErr(r.error);
-      else setUser(r.user);
+      else { setUser(r.user); if (r.user?.isSuperAdmin) navigate('/superadmin', { replace: true }); }
     } catch (ex) {
       setErr(ex.message || 'Login failed.');
     }

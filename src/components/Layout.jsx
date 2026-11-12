@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import { useAdminActivity } from '../lib/useAdminActivity.js';
 import { useAuth } from '../lib/auth.jsx';
 import GlassShell from './GlassShell.jsx';
 import Icon from './portfolio/Icon.jsx';
 import Login from '../pages/Login.jsx';
 import { Loading } from './Ui.jsx';
 import { AdminSectionTabs } from './AdminNavigation.jsx';
-import { ADMIN_SECTIONS, adminLocation } from '../lib/adminNavigation.js';
+import { ADMIN_SECTIONS, SUPERADMIN_SECTION, adminLocation } from '../lib/adminNavigation.js';
+import '../styles/governance.css';
 import '../styles/studio.css';
 
 function StudioMark() {
@@ -17,6 +19,7 @@ function StudioMark() {
 export function StudioSidebar({ user, unread = 0, photo, onLogout, onNavigate, navOpen = false, onToggleNav, logoutError }) {
   const { pathname, search } = useLocation();
   const active = adminLocation(pathname, search);
+  const platform = pathname.startsWith('/superadmin') && user?.isSuperAdmin;
   const [badPhoto, setBadPhoto] = useState(false);
   useEffect(() => setBadPhoto(false), [photo]);
   const link = item => {
@@ -24,24 +27,26 @@ export function StudioSidebar({ user, unread = 0, photo, onLogout, onNavigate, n
     return <Link key={item.id} to={item.to} className={`studio-nav${selected ? ' active' : ''}`} aria-current={selected ? 'page' : undefined} onClick={onNavigate}><Icon n={item.icon} size={19} /><span>{item.label}</span>{item.id === 'activity' && unread > 0 && <span className="studio-badge" aria-label={`${unread} new enquiries`}>{unread}</span>}</Link>;
   };
   return <aside className="studio-sidebar">
-    <div className="studio-brand-row"><Link to="/admin" className="studio-brand" onClick={onNavigate}><StudioMark />Studio</Link><button type="button" className="studio-menu-toggle" aria-label={navOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navOpen} aria-controls="studio-navigation" onClick={onToggleNav}><Icon n="menu" /></button></div>
-    <nav id="studio-navigation" className="studio-navigation" aria-label="Studio">
-      <div className="studio-primary-nav">{ADMIN_SECTIONS.map(section => link({ ...section, to: section.pages[0].to }))}</div>
+    <div className="studio-brand-row"><Link to={platform ? '/superadmin' : '/admin'} className="studio-brand" onClick={onNavigate}><StudioMark />{platform ? 'Platform' : 'Studio'}</Link><button type="button" className="studio-menu-toggle" aria-label={navOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navOpen} aria-controls="studio-navigation" onClick={onToggleNav}><Icon n="menu" /></button></div>
+    <nav id="studio-navigation" className="studio-navigation" aria-label={platform ? "Platform" : "Studio"}>
+      <div className="studio-primary-nav">{platform ? SUPERADMIN_SECTION.pages.map(page => <Link key={page.id} to={page.to} className={`studio-nav${active?.page === page.id ? ' active' : ''}`} aria-current={active?.page === page.id ? 'page' : undefined} onClick={onNavigate}><Icon n={page.icon} size={19} /><span>{page.label}</span></Link>) : ADMIN_SECTIONS.map(section => link({ ...section, to: section.pages[0].to }))}</div>
+      <div className="studio-community-nav">{platform ? <Link className="studio-nav" to="/" onClick={onNavigate}><Icon n="home" size={19} /><span>Main site</span></Link> : <><Link className="studio-nav" to="/admin/invites" onClick={onNavigate}><Icon n="email" size={19} /><span>Invite links</span></Link><Link className="studio-nav" to="/admin/suggestions" onClick={onNavigate}><Icon n="spark" size={19} /><span>Suggestions</span></Link>{user?.isSuperAdmin && <Link className="studio-nav" to="/superadmin" onClick={onNavigate}><Icon n="shield" size={19} /><span>SuperAdmin dashboard</span></Link>}</>}</div>
     </nav>
-    <details className="studio-account"><summary><span className="studio-account-avatar">{photo && !badPhoto ? <img src={photo} alt="" onError={() => setBadPhoto(true)} /> : String(user.name || user.email || 'S').slice(0, 1).toUpperCase()}</span><span className="studio-account-name"><strong>{user.name || user.email}</strong><small>{user.isAdmin ? 'Admin' : 'Creator'}</small></span><Icon n="chevron" size={14} /></summary>
-      <div className="studio-account-menu">{user.slug && <a href={`/p/${user.slug}`} target="_blank" rel="noreferrer">View live portfolio ↗</a>}<Link to="/admin/portfolio?tab=hero" onClick={onNavigate}>Edit portfolio</Link></div>
+    <details className="studio-account"><summary><span className="studio-account-avatar">{photo && !badPhoto ? <img src={photo} alt="" onError={() => setBadPhoto(true)} /> : String(user.name || user.email || 'S').slice(0, 1).toUpperCase()}</span><span className="studio-account-name"><strong>{user.name || user.email}</strong><small>{user.isSuperAdmin ? 'SuperAdmin' : 'Admin'}</small></span><Icon n="chevron" size={14} /></summary>
+      <div className="studio-account-menu">{platform ? <Link to="/superadmin/settings" onClick={onNavigate}>Main site settings</Link> : <>{user.slug && <a href={`/p/${user.slug}`} target="_blank" rel="noreferrer">View live portfolio ↗</a>}<Link to="/admin/settings?tab=hero" onClick={onNavigate}>Edit portfolio</Link></>}</div>
     </details>
     <div className="studio-logout"><button type="button" className="studio-nav" onClick={onLogout}><Icon n="logout" size={19} /><span>Logout</span></button>{logoutError && <p role="alert">{logoutError}</p>}</div>
   </aside>;
 }
 
-export default function Layout() { return <GlassShell studio><Inner /></GlassShell>; }
+export default function Layout({ superadmin = false }) { return <GlassShell studio><Inner superadmin={superadmin} /></GlassShell>; }
 
-function Inner() {
+function Inner({ superadmin }) {
   const { user, logout } = useAuth(), { pathname } = useLocation(), navigate = useNavigate();
+  const activity = useAdminActivity(user);
   const [needs, setNeeds] = useState(null), [unread, setUnread] = useState(0), [photo, setPhoto] = useState(null), [navOpen, setNavOpen] = useState(false), [logoutError, setLogoutError] = useState('');
   useEffect(() => {
-    if (!user) return undefined;
+    if (!user || superadmin || user.isSuperAdmin) return undefined;
     let active = true; setPhoto(null); setNeeds(null);
     const load = () => {
       api('profile.get').then(result => { if (active) setNeeds(!result.profile); }, () => { if (active) setNeeds(false); });
@@ -49,30 +54,32 @@ function Inner() {
     };
     load(); window.addEventListener('studio-changed', load);
     return () => { active = false; window.removeEventListener('studio-changed', load); };
-  }, [user?.id]);
+  }, [user?.id, user?.isSuperAdmin, superadmin]);
   useEffect(() => {
-    if (!user) return undefined;
+    if (!user || superadmin || user.isSuperAdmin) return undefined;
     let active = true;
     const load = () => api('enquiries.count').then(result => { if (active) setUnread(result.new || 0); }, () => {});
     load(); window.addEventListener('enquiries-changed', load);
     return () => { active = false; window.removeEventListener('enquiries-changed', load); };
-  }, [user?.id, pathname]);
+  }, [user?.id, user?.isSuperAdmin, pathname, superadmin]);
   useEffect(() => {
-    const shortcut = event => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); navigate('/admin?focus=command'); } if (event.key === 'Escape') setNavOpen(false); };
+    const shortcut = event => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); navigate(user?.isSuperAdmin ? '/superadmin' : '/admin?focus=command'); } if (event.key === 'Escape') setNavOpen(false); };
     window.addEventListener('keydown', shortcut); return () => window.removeEventListener('keydown', shortcut);
-  }, [navigate]);
+  }, [navigate, user?.isSuperAdmin]);
   if (user === undefined) return <Loading label="Loading Studio…" />;
   if (!user) return <Login />;
-  if (needs === null) return <Loading label="Opening your workspace…" />;
-  if (needs && !['/admin/profile', '/admin/superadmin', '/admin/invites'].includes(pathname)) return <Navigate to="/admin/profile" replace />;
+  if (!superadmin && user.isSuperAdmin) return <Navigate to="/superadmin" replace />;
+  if (superadmin && !user.isSuperAdmin) return <Navigate to="/admin" replace />;
+  if (!superadmin && needs === null) return <Loading label="Opening your workspace…" />;
+  if (!superadmin && needs && !['/admin/profile', '/admin/superadmin', '/admin/users', '/admin/invites', '/admin/suggestions'].includes(pathname)) return <Navigate to="/admin/profile" replace />;
   const overview = pathname.replace(/\/$/, '') === '/admin';
   return <div className={`studio-shell${navOpen ? ' nav-open' : ''}`}>
     <a className="studio-skip" href="#studio-main">Skip to content</a>
     <StudioSidebar user={user} unread={unread} photo={photo} navOpen={navOpen} onToggleNav={() => setNavOpen(value => !value)} onNavigate={() => setNavOpen(false)} onLogout={async () => { try { await logout(); } catch { setLogoutError('Could not sign out. Please try again.'); } }} logoutError={logoutError} />
     <div className={`studio-stage${overview ? ' is-overview' : ''}`}>
       {overview && <svg className="studio-scenery" viewBox="0 0 1000 800" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0H360C224 100 208 141 114 180C72 200 31 210 0 215Z" fill="#18bd61" opacity=".08" /><path d="M0 0H210C117 110 78 161 0 172Z" fill="#8de5b3" opacity=".12" /><path d="M378 800C670 774 644 627 831 566C902 536 955 530 1000 525V800Z" fill="#19b960" opacity=".07" /><path d="M463 800C738 773 725 640 886 619C932 611 970 607 1000 607V800Z" fill="#27cf72" opacity=".09" /></svg>}
-      <header className="studio-toolbar"><Link to="/admin?focus=command" className="studio-tool" aria-label="Search studio tools" title="Search studio tools (Ctrl/⌘ K)"><Icon n="search" size={21} /></Link><Link to="/admin/enquiries" className="studio-tool" aria-label={unread ? `${unread} new enquiries` : 'Open enquiries'} title="Enquiries"><Icon n="bell" size={21} />{unread > 0 && <span className="studio-notification-dot" />}</Link></header>
-      <main id="studio-main" className={`studio-main${overview ? ' overview-main' : ''}`} tabIndex={-1}><AdminSectionTabs user={user} unread={unread} /><Outlet context={{ setNeeds }} /></main>
+      <header className="studio-toolbar">{superadmin ? <Link to="/" className="studio-tool" aria-label="Public directory" title="Public directory"><Icon n="home" size={21} /></Link> : <><Link to="/admin?focus=command" className="studio-tool" aria-label="Search studio tools" title="Search studio tools (Ctrl/⌘ K)"><Icon n="search" size={21} /></Link><Link to="/admin/enquiries" className="studio-tool" aria-label={unread ? `${unread} new enquiries` : 'Open enquiries'} title="Enquiries"><Icon n="bell" size={21} />{unread > 0 && <span className="studio-notification-dot" />}</Link></>}</header>
+      <main id="studio-main" className={`studio-main${overview ? ' overview-main' : ''}`} tabIndex={-1}><AdminSectionTabs user={user} unread={unread} /><Outlet context={{ setNeeds, activity }} /></main>
     </div>
   </div>;
 }

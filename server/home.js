@@ -1,12 +1,13 @@
 // The members' home page: one public, read-only feed with a card per published profile and every public offering.
 // Everything goes through buildPublic, so a hidden section, a switched-off category or an inactive offering never leaves the server.
 import { env } from './config.js';
-import { registrationMode } from './auth.js';
+import { registrationMode, isSuperAdminEmail } from './auth.js';
 import { buildPublic, safeUrl } from './profile.js';
 import { publicUrl } from './site.js';
 import { raw, run } from './supabase.js';
 import { normalizePage } from '../shared/pageSettings.js';
 import { publicPortfolio } from '../shared/portfolio.js';
+import { canViewProfile } from '../shared/governance.js';
 const MAX_MEMBERS = 200,
   MAX_OFFERS = 300;
 const cut = (s, n) => {
@@ -27,7 +28,7 @@ export async function homeFeed(db = raw()) {
   };
   if (!profiles.length) return base;
   const owners = ids(profiles);
-  const [users, cs, os, sites] = await Promise.all([run(db.from('users').select('id,slug').in('id', owners)), run(db.from('contributions').select('*').in('owner_id', owners).order('id')), run(db.from('offerings').select('*').in('owner_id', owners).order('id')), run(db.from('site_settings').select('owner_id,bg_path,hero_path,page,portfolio').in('owner_id', owners))]);
+  const [users, cs, os, sites] = await Promise.all([run(db.from('users').select('id,email,slug,tags,profile_private,locked_until').in('id', owners)), run(db.from('contributions').select('*').in('owner_id', owners).order('id')), run(db.from('offerings').select('*').in('owner_id', owners).order('id')), run(db.from('site_settings').select('owner_id,bg_path,hero_path,page,portfolio').in('owner_id', owners))]);
   return buildHomeFeed({
     profiles,
     users,
@@ -62,6 +63,8 @@ export function buildHomeFeed({
     offers = [],
     products = [];
   for (const p of profiles.filter(profile => profile.status === 'published')) {
+    const account = users.find(user => user.id === p.owner_id);
+    if (isSuperAdminEmail(account?.email) || !canViewProfile(account)) continue;
     const slug = slugOf.get(p.owner_id);
     if (!slug || !p.name) continue;
     const site = settings.get(p.owner_id),
@@ -134,6 +137,7 @@ export function buildHomeFeed({
     products.push(...mineOffers, ...extraProducts);
     members.push({
       slug,
+      tags: account.tags || [],
       name: pub.name,
       designation: pub.designation,
       purpose: cut(pub.purpose, 240),

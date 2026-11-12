@@ -1,7 +1,7 @@
 import { HttpError } from './http.js';
 
-const columns = 'id,question,answer,review_id,created_at';
-const view = row => ({ id: String(row.id), question: row.question, answer: row.answer, reviewId: row.review_id || null, createdAt: row.created_at });
+const columns = 'id,question,answer,review_id,insights,created_at';
+const view = row => ({ id: String(row.id), question: row.question, answer: row.answer, reviewId: row.review_id || null, createdAt: row.created_at, ...(row.insights ? { insights: row.insights } : {}) });
 const identity = ctx => {
   if (!ctx?.user?.id || ctx.db?.uid !== ctx.user.id) throw new HttpError(401, 'Not signed in.');
   return ctx.user.id;
@@ -18,9 +18,9 @@ async function result(query) {
 /** Only the authenticated command service writes replies; owners can read their own exchanges. */
 export function createStudioChatRepository() {
   return {
-    async record(ctx, { question, answer, reviewId = null }) {
+    async record(ctx, { question, answer, reviewId = null, insights = null }) {
       const ownerId = identity(ctx);
-      const rows = await result(ctx.db.from('studio_chat').insert({ owner_id: ownerId, question, answer, review_id: reviewId }).select(columns));
+      const rows = await result(ctx.db.from('studio_chat').insert({ owner_id: ownerId, question, answer, review_id: reviewId, insights }).select(columns));
       if (!rows[0]) throw new HttpError(503, 'Admin chat history could not be saved.');
       return view(rows[0]);
     },

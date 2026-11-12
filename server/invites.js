@@ -2,28 +2,47 @@
 import { randomInt } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { BUCKET } from './config.js';
-import { isAdminEmail, normCode } from './auth.js';
-import { raw, run } from './supabase.js';
+import { isSuperAdminEmail, normCode } from './auth.js';
+import { raw, run, paged } from './supabase.js';
+import { HttpError } from './http.js';
+import { createTagService } from './tags.js';
+import { normalizeTags } from '../shared/governance.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no 0/O/1/I
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-async function makeCode() {
+async function makeCode(db) {
   for (;;) {
     const c = Array.from({ length: 8 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
-    if (!(await run(raw().from('invite_codes').select('id').eq('code', c))).length) return c;
+    if (!(await run(db.from('invite_codes').select('id').eq('code', c))).length) return c;
   }
 }
 
-export async function createInvite(uid, { label, maxUses = 1, days = 14 }) {
-  const code = await makeCode();
+export async function createInvite(uid, { label, maxUses = 1, days = 14 } = {}, db) {
+  if (!Number.isInteger(Number(maxUses)) || Number(maxUses) < 1 || Number(maxUses) > 1000 || !Number.isInteger(Number(days)) || Number(days) < 0 || Number(days) > 365) throw new HttpError(400, 'Use 1–1000 invite uses and an expiry of 0–365 days.');
+  db ||= raw();
+  const [creator] = await run(db.from('users').select('id,name,email').eq('id', uid).limit(1));
+  if (!creator) throw new HttpError(404, 'Creator account not found.');
+  const code = await makeCode(db);
   const expires = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
-  await run(raw().from('invite_codes').insert({ code, label: (label || '').trim() || null, max_uses: Math.max(1, Math.min(1000, +maxUses || 1)), expires_at: expires, created_by: uid }));
+  await run(db.from('invite_codes').insert({ code, label: String(label || '').trim().slice(0, 200) || null, max_uses: Number(maxUses), expires_at: expires, created_by: uid, creator_name: creator.name || null, creator_email: creator.email }));
   return code;
 }
 
-export const listInvites = () => run(raw().from('invite_codes').select('*').order('created_at', { ascending: false }));
-export const revokeInvite = id => run(raw().from('invite_codes').update({ revoked: true }).eq('id', id));
+export const listInvites = () => paged(raw(), 'invite_codes', '*', q => q.order('created_at', { ascending: false }).order('id', { ascending: false }));
+export async function listInviteHistory(user, db = raw()) {
+  const codes = await paged(db, 'invite_codes', '*', q => (user.isSuperAdmin ? q : q.eq('created_by', user.id)).order('created_at', { ascending: false }).order('id', { ascending: false }));
+  const redemptions = await paged(db, 'invite_redemptions', '*', q => (user.isSuperAdmin ? q : q.eq('created_by', user.id)).order('joined_at', { ascending: false }).order('id', { ascending: false }));
+  const creatorIds = [...new Set(codes.map(code => code.created_by).filter(Boolean))];
+  const creators = creatorIds.length ? await run(db.from('users').select('id,name,email').in('id', creatorIds)) : [];
+  return { codes: codes.map(code => ({ ...code, creator: code.creator_email ? { name: code.creator_name, email: code.creator_email } : creators.find(creator => creator.id === code.created_by) || null })), redemptions };
+}
+export async function revokeInvite(id, user, db = raw()) {
+  if (!Number.isSafeInteger(Number(id)) || Number(id) < 1) throw new HttpError(400, 'Invalid invite.');
+  let query = db.from('invite_codes').update({ revoked: true }).eq('id', id);
+  if (!user.isSuperAdmin) query = query.eq('created_by', user.id);
+  if (!(await run(query.select('id'))).length) throw new HttpError(404, 'Invite not found or it belongs to another user.');
+}
 export const listUsers = () => run(raw().from('users').select('email,name,slug,created_at,invite_code_id').order('created_at', { ascending: false }));
 
 export async function validateInvite(code) {
@@ -48,7 +67,7 @@ export async function validateInvite(code) {
 export async function listUsersDetailed() {
   const db = raw();
   const [users, codes, profiles] = await Promise.all([
-    run(db.from('users').select('id,email,name,slug,created_at,invite_code_id,failed_attempts,locked_until').order('created_at', { ascending: false })),
+    paged(db, 'users', 'id,email,name,slug,tags,profile_private,created_at,invite_code_id,failed_attempts,locked_until', q => q.order('created_at', { ascending: false }).order('id', { ascending: false })),
     run(db.from('invite_codes').select('id,code,label')),
     run(db.from('profiles').select('owner_id,status,name,designation')).catch(() => []),
   ]);
@@ -74,17 +93,23 @@ export async function listUsersDetailed() {
       invite_label: inv?.label || null,
       profile_status: p?.status || 'none',
       designation: p?.designation || null,
-      isAdmin: isAdminEmail(u.email)
+      isAdmin: !isSuperAdminEmail(u.email),
+      isSuperAdmin: isSuperAdminEmail(u.email),
+      tags: u.tags || [], profile_private: u.profile_private
     };
   });
 }
 
-export async function updateUser(targetUserId, { name, email, slug }) {
+export async function updateUser(targetUserId, { name, email, slug, tags }) {
   const db = raw();
   const [user] = await run(db.from('users').select('*').eq('id', targetUserId));
   if (!user) throw new Error('User not found.');
 
   const updates = {};
+  if (tags !== undefined) {
+    const definitions = await createTagService(() => db).list();
+    try { updates.tags = normalizeTags(tags, definitions); } catch (error) { throw new HttpError(400, error.message); }
+  }
   if (name !== undefined) updates.name = (name || '').trim() || null;
   if (email !== undefined) {
     const cleanEmail = (email || '').trim().toLowerCase();

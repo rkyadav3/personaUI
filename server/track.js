@@ -6,6 +6,7 @@ import { sessionUser } from './auth.js';
 import { raw, run } from './supabase.js';
 import { normalizePage } from '../shared/pageSettings.js';
 import { normalizeVisibility } from './profile.js';
+import { canViewProfile } from '../shared/governance.js';
 const SLUG = s => String(s || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
 const intId = v => {
   const n = Number(v);
@@ -26,8 +27,8 @@ export function createTracker({
     const kind = body?.kind;
     const me = await getUser(req).catch(() => null);
     if (kind === 'profile') {
-      const [u] = await run(db.from('users').select('id').eq('slug', SLUG(body.slug)).limit(1));
-      if (u && u.id !== me?.id) await run(db.rpc('bump_profile_view', {
+      const [u] = await run(db.from('users').select('id,tags,profile_private,locked_until').eq('slug', SLUG(body.slug)).limit(1));
+      if (canViewProfile(u) && u.id !== me?.id) await run(db.rpc('bump_profile_view', {
         p_owner: u.id
       }));
       return {
@@ -57,8 +58,8 @@ export function createTracker({
     };
 
     // An active offering is public only while its profile, category and shop are also public.
-    const [profile] = await run(db.from('profiles').select('id,visibility').eq('owner_id', o.owner_id).eq('status', 'published').limit(1));
-    if (!profile || !normalizeVisibility(profile.visibility).contributions) return {
+    const [profile] = await run(db.from('profiles').select('id,visibility,users!inner(id,tags,profile_private,locked_until)').eq('owner_id', o.owner_id).eq('status', 'published').limit(1));
+    if (!profile || !canViewProfile(profile.users) || !normalizeVisibility(profile.visibility).contributions) return {
       ok: true
     };
     const [category] = await run(db.from('contributions').select('category').eq('id', o.contribution_id).eq('owner_id', o.owner_id).eq('enabled', true).eq('visible', true).limit(1));

@@ -8,6 +8,7 @@ import Icon from './portfolio/Icon.jsx';
 import AdminDialog from './AdminDialog.jsx';
 import { Loading } from './Ui.jsx';
 import '../styles/studioAssistant.css';
+import { AnalyticsPanels } from './AdminActivity.jsx';
 
 function Value({ value }) {
   const text = value === null || value === undefined ? '—' : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
@@ -64,6 +65,9 @@ export function StudioResult({ result, onCheck, busy }) {
   </section>;
 }
 
+function AssistantText({ text = '' }) {
+  return <div className="assistant-readable-text">{String(text).split(/\n\s*\n/).map((paragraph, index) => { const lines = paragraph.split('\n'); return lines.every(line => /^\s*[-*]\s/.test(line)) ? <ul key={index}>{lines.map((line, n) => <li key={n}>{line.replace(/^\s*[-*]\s/, '')}</li>)}</ul> : <p key={index}>{paragraph}</p>; })}</div>;
+}
 const PROMPTS = ['Create a writing template called ', 'Write a draft post about ', 'Update my persona greeting to ', 'Create a folder called '];
 
 export function StudioConversation({ messages, historyBefore, historyBusy, historyError, busy, onLoadOlder }) {
@@ -76,7 +80,7 @@ export function StudioConversation({ messages, historyBefore, historyBusy, histo
     <div ref={box} className="studio-admin-conversation" role="log" aria-label="Admin assistant conversation" aria-live="polite" aria-relevant="additions" aria-busy={historyBusy || busy === 'planning'} tabIndex={0}>
       {busy === 'planning' && <p className="studio-assistant-wait" role="status">Reading the relevant admin records and preparing your review…</p>}
       {studioMessageGroups(messages).map((group, index) => <div className="studio-chat-exchange" key={group[0].id || index}>
-        {group.map((message, number) => <article className={message.role} key={message.id || number}><span>{message.role === 'user' ? 'You' : 'Studio assistant'}{message.createdAt && <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString()}</time>}</span><p>{message.text}</p>{message.unsaved && <small className="studio-chat-unsaved">This exchange was not saved to history.</small>}</article>)}
+        {group.map((message, number) => <article className={message.role} key={message.id || number}><span>{message.role === 'user' ? 'You' : 'Studio assistant'}{message.createdAt && <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString()}</time>}</span><AssistantText text={message.text} /><AnalyticsPanels data={message.insights} />{message.unsaved && <small className="studio-chat-unsaved">This exchange was not saved to history.</small>}</article>)}
       </div>)}
       {historyBusy && <Loading compact label="Loading chat history…" />}
       {!messages.length && !historyBusy && !historyError && busy !== 'planning' && <p className="studio-chat-empty">Your conversations will appear here. Send a message to get started.</p>}
@@ -106,6 +110,7 @@ export default function StudioAssistant({ user, focusCommand, onApplied, call = 
       <button type="submit" className="studio-command-send" disabled={!!busy || !input.trim()} aria-label="Plan changes"><Icon n="send" size={20} /></button>
     </form>
     <div className="studio-suggestions"><p>Try something like:</p><div>{STUDIO_SHORTCUTS.map((item, index) => <button type="button" key={item.label} className="studio-shortcut" disabled={!!busy} onClick={() => { setInput(PROMPTS[index]); inputRef.current?.focus(); }}><Icon n={item.icon} size={18} /><span>{item.label}</span></button>)}</div></div>
+    <div className="studio-insight-prompts"><button type="button" className="btn small" disabled={!!busy} onClick={() => { setInput('Explain my sales, earnings, views and persona conversations'); inputRef.current?.focus(); }}>Explain my activity</button><button type="button" className="btn small" disabled={!!busy} onClick={() => { setInput('Show my paid sales trend for the last 30 days and explain what it means'); inputRef.current?.focus(); }}>Show sales trend</button></div>
     <div className="studio-assistant-output">
       <StudioConversation messages={messages} historyBefore={historyBefore} historyBusy={historyBusy} historyError={historyError} busy={busy} onLoadOlder={() => session.current?.loadOlder()} />
       {error && <p className="studio-assistant-error" role="alert">{error}</p>}

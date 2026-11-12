@@ -67,9 +67,12 @@ export async function signUploads(db, names) {
 }
 
 /** Step 2: the file is in storage; extract its text and create the row. */
-export async function registerFile(db, { path, name, folderId, folderParts = [], topicId, status = 'published', size }) {
-  if (!path.startsWith(`${db.uid}/`)) throw new Error('Bad storage path.');
-  const dl = await raw().storage.from(BUCKET).download(path);
+export async function registerFile(db, { path, name, folderId, folderParts = [], topicId, status = 'published', size }, storageOverride) {
+  // Accept only the single generated object name issued by signUploads. Storage URLs
+  // normalize traversal segments, so checking the owner prefix alone is insufficient.
+  const filename = typeof path === 'string' && path.startsWith(`${db.uid}/`) ? path.slice(db.uid.length + 1) : '';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\.[a-z0-9]+)?$/i.test(filename)) throw new Error('Bad storage path.');
+  const dl = await (storageOverride || raw().storage.from(BUCKET)).download(path);
   if (dl.error) throw new Error(`Upload not found: ${dl.error.message}`);
   const buf = Buffer.from(await dl.data.arrayBuffer());
   const text = await extractText(name, buf);

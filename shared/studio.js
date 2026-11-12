@@ -2,7 +2,7 @@
 export const STUDIO_SHORTCUTS = [
   { label: 'Create a new template', to: '/admin/templates', icon: 'template' },
   { label: 'Write a post', to: '/admin/writing', icon: 'pen' },
-  { label: 'Update my persona', to: '/admin/portfolio?tab=persona', icon: 'spark' },
+  { label: 'Update my persona', to: '/admin/settings?tab=persona', icon: 'spark' },
   { label: 'Organize my files', to: '/admin/files', icon: 'folder' },
 ];
 
@@ -11,9 +11,9 @@ const ACTIONS = [
   { words: /\b(posts?|articles?|writing|write|essays?)\b/i, ...STUDIO_SHORTCUTS[1] },
   { words: /\b(persona|chat|background|sphere|orb)\b/i, ...STUDIO_SHORTCUTS[2] },
   { words: /\b(files?|folders?|upload|storage|documents?)\b/i, ...STUDIO_SHORTCUTS[3] },
-  { words: /\b(shop|store|products?|offerings?)\b/i, label: 'Edit your shop', to: '/admin/portfolio?tab=store' },
-  { words: /\b(projects?|portfolio)\b/i, label: 'Edit your projects', to: '/admin/portfolio?tab=projects' },
-  { words: /\b(look|appearance|design|font|colou?r|theme|customiz\w*)\b/i, label: 'Customize your portfolio', to: '/admin/portfolio?tab=look' },
+  { words: /\b(shop|store|products?|offerings?)\b/i, label: 'Edit your shop', to: '/admin/settings?tab=store' },
+  { words: /\b(projects?|portfolio)\b/i, label: 'Edit your projects', to: '/admin/settings?tab=projects' },
+  { words: /\b(look|appearance|design|font|colou?r|theme|customiz\w*)\b/i, label: 'Customize your portfolio', to: '/admin/settings?tab=look' },
   { words: /\b(purchases?|payments?|orders?|revenue)\b/i, label: 'View purchases', to: '/admin/purchases' },
   { words: /\b(events?|updates?|schedule|attendees?|rsvp)\b/i, label: 'Manage updates and Events', to: '/admin/updates' },
   { words: /\b(enquiries|enquiry|inquiries|inquiry|inbox|messages?)\b/i, label: 'Open your enquiries', to: '/admin/enquiries' },

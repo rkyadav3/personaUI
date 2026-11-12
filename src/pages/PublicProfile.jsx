@@ -18,7 +18,7 @@ export default function PublicProfile() {
       .then(d => { if (!controller.signal.aborted) { setData(d); if (d?.name) document.title = `${d.name} · Portfolio`; } }, () => { if (!controller.signal.aborted) setData(null); });
     track({ kind: 'profile', slug });
     return () => controller.abort();
-  }, [slug]);
+  }, [slug, auth?.user?.id]);
 
   if (data === undefined) return <Loading label="Loading profile…" />;
   if (!data) return (

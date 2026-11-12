@@ -11,6 +11,12 @@ const { StaticRouter } = require('react-router-dom/server');
 const render = element => renderToStaticMarkup(React.createElement(StaticRouter, {}, element));
 const feed = { name: 'Persona', members: [{ slug: 'ravi', name: 'Ravi Kumar Yadav', designation: 'Technology & Product Development Enthusiast', expertise: ['AI/ML', 'IoT'], purpose: 'Builds useful tools.', photo: 'https://public.test/ravi.png', views: 12400, ratingAvg: 4.9, ratingCount: 128, engagements: 98 }], products: [{ id: 1, slug: 'ravi', member: 'Ravi Kumar Yadav', kind: 'offering', title: 'Building AI Products', typeLabel: 'Book', pricing: 'paid', price: 499, currency: 'INR', accessReady: true }] };
 
+test('custom tag labels appear on featured profiles and directory cards', () => {
+  const { HomeDirectory } = require('../src/pages/Home.jsx');
+  const html = render(React.createElement(HomeDirectory, { feed: { ...feed, tagDefinitions: [{ key: 'custom-creative-partner', label: 'Creative Partner', visibility: 'public' }], members: [{ ...feed.members[0], tags: ['custom-creative-partner'] }] } }));
+  assert.equal((html.match(/>Creative Partner</g) || []).length, 2);
+});
+
 test('main home renders the reference layout with a featured profile, real metrics and products', () => {
   const { HomeDirectory } = require('../src/pages/Home.jsx');
   const html = render(React.createElement(HomeDirectory, { feed }));
@@ -24,8 +30,9 @@ test('main home renders the reference layout with a featured profile, real metri
 test('the home account control leads to the admin and supports invitation-only joining', () => {
   const { HomeDirectory } = require('../src/pages/Home.jsx');
   const html = render(React.createElement(HomeDirectory, { feed: { ...feed, mode: 'invite' }, user: { name: 'Owner' } }));
-  assert.match(html, /aria-label="Open dashboard"/);
-  assert.match(html, /href="\/admin"/);
+  assert.match(html, /aria-label="Account options"/);
+  assert.match(html, /href="\/admin\?tab=dashboard"/);
+  assert.match(html, /Logout/);
   assert.match(html, /href="\/invite"/);
 });
 

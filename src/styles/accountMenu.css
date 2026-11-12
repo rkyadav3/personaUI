@@ -1,0 +1,8 @@
+.account-dropdown { position: relative; color: #172b22; }
+.account-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; min-width: 40px; padding: 9px; border: 1px solid #d5e1da; border-radius: 50px; background: #fff; color: #24392d; cursor: pointer; text-decoration: none; font: inherit; font-size: .85rem; }
+.account-trigger:focus-visible, .account-options a:focus-visible, .account-options button:focus-visible { outline: 3px solid #159b52; outline-offset: 3px; }
+.account-options { position: absolute; z-index: 80; right: 0; top: calc(100% + 9px); min-width: 180px; padding: 8px; background: #fff; border: 1px solid #d5e1da; border-radius: 14px; box-shadow: 0 14px 35px #16392726; }
+.account-options[hidden] { display: none; }
+.account-options a, .account-options button { display: flex; align-items: center; gap: 9px; padding: 10px; width: 100%; border: 0; border-radius: 8px; color: #24392d; background: transparent; text-decoration: none; font: inherit; font-size: .9rem; cursor: pointer; text-align: left; }
+.account-options a:hover, .account-options button:hover { background: #eef7f1; }
+.account-options p { color: #aa2525; padding: 0 10px; font-size: .8rem; }

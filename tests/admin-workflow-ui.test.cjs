@@ -13,7 +13,7 @@ const render = (Component, props, path = '/admin') => renderToStaticMarkup(React
 test('legacy and detail links select the category and the correct secondary page', async () => {
   const { adminLocation } = await import('../src/lib/adminNavigation.js');
   for (const [path, search, group, page] of [
-    ['/admin/portfolio', '?tab=projects', 'activity', 'projects'],
+    ['/admin/portfolio', '?tab=projects', 'settings', 'editor'],
     ['/admin/profile', '?tab=contrib', 'offerings', 'categories'],
     ['/admin/writing/18', '', 'pipelines', 'articles'],
     ['/admin/writing', '?tab=templates', 'pipelines', 'templates'],
@@ -22,7 +22,7 @@ test('legacy and detail links select the category and the correct secondary page
     ['/admin/add', '', 'pipelines', 'files'],
     ['/admin/knowledge', '', 'pipelines', 'knowledge'],
     ['/admin/questions', '', 'activity', 'questions'],
-    ['/admin/superadmin', '?tab=invites', 'settings', 'invites'],
+    ['/admin/superadmin', '?tab=invites', 'platform', 'invites'],
   ]) assert.deepEqual(adminLocation(path, search), { group, page }, path);
   assert.equal(adminLocation('/admin/writing-other'), null);
 });

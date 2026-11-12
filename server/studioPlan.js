@@ -148,7 +148,8 @@ const redact = value => Array.isArray(value) ? value.map(redact) : object(value)
 export function studioModelContext(state, entities, user) {
   return Object.fromEntries(entities.map(name => {
     const spec = STUDIO_ENTITIES[name];
-    if (!spec || spec.admin && !user?.isAdmin) throw new HttpError(403, 'You do not have permission for that admin area.');
+    if (!spec || spec.admin && !user?.isSuperAdmin) throw new HttpError(403, 'You do not have permission for that admin area.');
+      if (name === 'analytics') return [name, { report: redact(state.analytics), definitions: { sales: 'Lifetime paid orders including subsequently refunded orders', views: 'Lifetime profile views', exchanges: 'Lifetime visitor question-and-answer pairs, not unique visitors', enquiries: 'Lifetime contact enquiries', revenue: 'Lifetime net after refunds, before gateway fees and payouts; minor currency units', dailySales: 'Paid orders per UTC day during the last 30 days' } }];
     const rows = studioRecords(state, name);
     const referenceRoots = { files: ['folders', 'topics'], folders: ['folders'], posts: ['topics', 'templates'], offerings: ['contributions'], contributions: ['offerings'], responses: ['updates'] };
     const references = Object.fromEntries((referenceRoots[name] || []).map(root => [root, (state[root] || []).slice(0, 80).map(row => fieldsOf(row, ['id', 'name', 'title', 'category', 'subtype', 'eventId']))]));
@@ -234,7 +235,7 @@ export function makeStudioPlan(proposal, input, user) {
     if (!object(action) || Object.keys(action).some(key => !['entity', 'action', 'id', 'values'].includes(key))) fail('Unknown operation or unexpected plan field.');
     const { entity: name, action: mode, id } = action, spec = STUDIO_ENTITIES[name];
     if (!spec || !spec.modes.includes(mode) || mode === 'read') fail('Unknown or unsupported change operation.');
-    if (spec.admin && !user?.isAdmin) throw new HttpError(403, 'Super Admin permission is required.');
+    if (spec.admin && !user?.isSuperAdmin) throw new HttpError(403, 'Super Admin permission is required.');
     const values = action.values || {};
     if (!object(values) || Object.keys(values).some(key => !spec.fields.includes(key))) fail(`Uneditable field for ${spec.label}.`);
     safeTree(values); validateValues(name, values); urls(values);
@@ -408,8 +409,8 @@ export function makeStudioPlan(proposal, input, user) {
   if (settingsTouched) {
     const before = input.settings, after = state.settings, fields = studioDiff(before, after);
     if (fields.length) {
-      changed.unshift({ id: 'settings', title: 'Update Portfolio, Look & Store and Persona', kind: 'update', entity: 'portfolio', href: '/admin/portfolio', before, after, fields, warning: fields.some(field => field.after === null) ? 'Removed images and deleted items are published when you approve.' : '', affected: [] });
-      steps.unshift({ op: 'page.save', entity: 'portfolio', title: 'Save Portfolio and Persona', href: '/admin/portfolio', args: { page: after.page, portfolio: after.portfolio, bg: after.bg, ...(heroPath === null ? { heroPath: null } : {}), ...(path === null ? { path: null } : {}) } });
+      changed.unshift({ id: 'settings', title: 'Update Portfolio, Look & Store and Persona', kind: 'update', entity: 'portfolio', href: '/admin/settings', before, after, fields, warning: fields.some(field => field.after === null) ? 'Removed images and deleted items are published when you approve.' : '', affected: [] });
+      steps.unshift({ op: 'page.save', entity: 'portfolio', title: 'Save Portfolio and Persona', href: '/admin/settings', args: { page: after.page, portfolio: after.portfolio, bg: after.bg, ...(heroPath === null ? { heroPath: null } : {}), ...(path === null ? { path: null } : {}) } });
     }
   }
   if (steps.some(step => step.entity === 'knowledge') && steps.length > 1) fail('Run knowledge index jobs in their own review.');

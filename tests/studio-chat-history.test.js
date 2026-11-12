@@ -29,7 +29,7 @@ test('history records exact completed exchanges under the authenticated owner', 
   const { createStudioChatRepository } = await repository(), db = scriptedDatabase({ table: 'studio_chat', data: [row()] }); db.uid = 'owner';
   const saved = await createStudioChatRepository().record(ctx(db), { question: 'Question 26', answer: 'Answer 26', reviewId: null });
   assert.deepEqual(saved, turn());
-  assert.deepEqual(step(db.calls[0], 'insert')[0], { owner_id: 'owner', question: 'Question 26', answer: 'Answer 26', review_id: null });
+  assert.deepEqual(step(db.calls[0], 'insert')[0], { owner_id: 'owner', question: 'Question 26', answer: 'Answer 26', review_id: null, insights: null });
 });
 
 test('newest-first keyset pagination is stable when new messages arrive', async () => {

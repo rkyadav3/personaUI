@@ -4,6 +4,8 @@ import { normalizeBg } from '../../../shared/siteSettings.js';
 import { normalizePage } from '../../../shared/pageSettings.js';
 import { askPersona } from '../../lib/personaChat.js';
 import { chatOrbSize, chatPanelHeight, shouldSubmitChat } from '../../lib/chatLayout.js';
+import { popularChatProducts } from '../../lib/chatProducts.js';
+import Shop from '../commerce/Shop.jsx';
 import PersonaBall from '../PersonaBall.jsx';
 import LiquidGlass from '../LiquidGlass.jsx';
 import Icon from './Icon.jsx';
@@ -14,6 +16,7 @@ export default function Chat({ m, ctx, data }) {
   const inputRef = useRef(null), controller = useRef(null), recognition = useRef(null), pending = useRef(false), conversationRef = useRef(null), panelRef = useRef(null), dockRef = useRef(null);
   const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
   const name = m.first || m.name || 'this creator';
+  const popularProducts = popularChatProducts(m.products);
   const prompts = page.chips.length ? page.chips : [
     { label: 'About me', prompt: 'Tell me about yourself and your work' },
     ...(m.products.length ? [{ label: 'Explore the shop', prompt: 'What products and services do you offer?' }] : []),
@@ -123,16 +126,22 @@ export default function Chat({ m, ctx, data }) {
           </div>
         </div>
       </div>
-      <LiquidGlass as="aside" className={`pf-chat-profile photo-${page.layout.photo}`} radius={page.theme.radius}>
-        <div className="pf-chat-person">
-          {page.layout.photo !== 'none' && <div className="pf-chat-avatar"><span>{m.initials}</span>{m.photo && <img src={m.photo} alt="" style={{ objectPosition: `${m.heroPos.x}% ${m.heroPos.y}%`, transform: `scale(${m.heroPos.zoom})` }} onError={event => { event.currentTarget.style.display = 'none'; }} />}</div>}
-          <div><h2>{m.name}</h2>{(page.tagline || m.titleLine) && <p>{page.tagline || m.titleLine}</p>}</div>
-        </div>
-        {(page.about || m.bio) && <p className="pf-chat-bio">{page.about || m.bio}</p>}
-        {m.expertise.length > 0 && <div className="pf-chips">{m.expertise.slice(0, 6).map(skill => <span key={skill}>{skill}</span>)}</div>}
-        {data.contributions?.filter(group => page.placement[group.category] === 'side').map(group => <div key={group.id || group.category} className="pf-chat-offers"><h3>{group.category}</h3>{group.offerings?.map(offering => <button key={offering.id} type="button" disabled={busy} onClick={event => send(event, `Tell me about "${offering.title}"`)}>{offering.title}<Icon n="chat" size={14} /></button>)}</div>)}
-        {ctx.preview ? <button type="button" className="pf-btn sm" onClick={() => ctx.go('home')}>{page.openLabel === 'Open persona' ? 'View portfolio' : page.openLabel} <Icon n="arrow" size={15} /></button> : <Link className="pf-btn sm" to={`/p/${ctx.slug}/home`}>{page.openLabel === 'Open persona' ? 'View portfolio' : page.openLabel} <Icon n="arrow" size={15} /></Link>}
-      </LiquidGlass>
+      <aside className="pf-chat-sidebar" aria-label="Profile overview and products" tabIndex={0}>
+        <LiquidGlass as="section" className={`pf-chat-profile photo-${page.layout.photo}`} radius={page.theme.radius} aria-label="Profile overview">
+          <div className="pf-chat-person">
+            {page.layout.photo !== 'none' && <div className="pf-chat-avatar"><span>{m.initials}</span>{m.photo && <img src={m.photo} alt="" style={{ objectPosition: `${m.heroPos.x}% ${m.heroPos.y}%`, transform: `scale(${m.heroPos.zoom})` }} onError={event => { event.currentTarget.style.display = 'none'; }} />}</div>}
+            <div><h2>{m.name}</h2>{(page.tagline || m.titleLine) && <p>{page.tagline || m.titleLine}</p>}</div>
+          </div>
+          {(page.about || m.bio) && <p className="pf-chat-bio">{page.about || m.bio}</p>}
+          {m.expertise.length > 0 && <div className="pf-chips">{m.expertise.slice(0, 6).map(skill => <span key={skill}>{skill}</span>)}</div>}
+          {data.contributions?.filter(group => page.placement[group.category] === 'side').map(group => <div key={group.id || group.category} className="pf-chat-offers"><h3>{group.category}</h3>{group.offerings?.map(offering => <button key={offering.id} type="button" disabled={busy} onClick={event => send(event, `Tell me about "${offering.title}"`)}>{offering.title}<Icon n="chat" size={14} /></button>)}</div>)}
+          {ctx.preview ? <button type="button" className="pf-btn sm" onClick={() => ctx.go('home')}>{page.openLabel === 'Open persona' ? 'View portfolio' : page.openLabel} <Icon n="arrow" size={15} /></button> : <Link className="pf-btn sm" to={`/p/${ctx.slug}/home`}>{page.openLabel === 'Open persona' ? 'View portfolio' : page.openLabel} <Icon n="arrow" size={15} /></Link>}
+        </LiquidGlass>
+        {popularProducts.length > 0 && <section className="pf-chat-popular" aria-label="Popular products">
+          <header><h2>Popular products</h2>{ctx.preview ? <button type="button" onClick={() => ctx.go('store')}>View Store <Icon n="arrow" size={14} /></button> : <Link to={`/p/${ctx.slug}/store`}>View Store <Icon n="arrow" size={14} /></Link>}</header>
+          <Shop items={popularProducts} slug={ctx.slug} owner={m.owner} user={ctx.user} preview={ctx.preview} />
+        </section>}
+      </aside>
     </section>
   );
 }

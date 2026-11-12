@@ -21,7 +21,7 @@ function RegisterInner() {
 
   // If already logged in, redirect to admin
   useEffect(() => {
-    if (user) navigate('/admin', { replace: true });
+    if (user) navigate(user.isSuperAdmin ? '/superadmin' : '/admin', { replace: true });
   }, [user, navigate]);
 
   const rawParamCode = params.code || searchParams.get('invite') || '';
@@ -84,7 +84,7 @@ function RegisterInner() {
         setErr(r.error);
       } else {
         setUser(r.user);
-        navigate('/admin', { replace: true });
+        navigate(r.user?.isSuperAdmin ? '/superadmin' : '/admin', { replace: true });
       }
     } catch (ex) {
       setErr(ex.message || 'Registration failed.');

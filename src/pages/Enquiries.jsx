@@ -1,24 +1,15 @@
-import AdminTabs from '../components/AdminTabs.jsx';
 // Admin → Enquiries. Everything a visitor sends through the contact form on this member's profile arrives here, and only here.
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ENQUIRY_STATUS, ENQUIRY_TYPES } from '../../shared/enquiryTypes.js';
 import { api } from '../lib/api.js';
 import { useAdminTab } from '../lib/adminTabs.js';
-import { useAuth } from '../lib/auth.jsx';
+import { LegacyPortfolioRedirect } from './LegacyRedirects.jsx';
 import { useOp } from '../lib/hooks.js';
 import { fmtStamp } from '../lib/when.js';
 import { Confirm, Field, Loading, Notice } from '../components/Ui.jsx';
 
 const LABEL = { new: 'New', read: 'Read', replied: 'Replied', archived: 'Archived' };
 const digits = s => String(s || '').replace(/\D/g, '');
-
-/** What a visitor fills in, shown to the admin as a read-only summary so there are no surprises in the inbox. */
-const FORM_SUMMARY = [
-  ['About the visitor', 'Full name, email, phone or WhatsApp, organisation, city and country'],
-  ['The enquiry', 'What it is about (kind of enquiry), related book or offering, subject, message'],
-  ['Timing and budget', 'Preferred date, time of day, online or in person, budget. Only asked for bookings, meetings, speaking and collaboration'],
-  ['Reply and consent', 'Preferred way to be contacted and a consent tick-box'],
-];
 
 const csvCell = v => { let s = String(v ?? ''); if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`; return `"${s.replace(/"/g, '""')}"`; };   // a leading = or + is neutralised so spreadsheets never run it as a formula
 function exportCsv(rows) {
@@ -98,49 +89,13 @@ function Inbox() {
   );
 }
 
-function FormSettings() {
-  const { user } = useAuth();
-  const [saved, setSaved] = useState(null), [f, setF] = useState(null), [msg, setMsg] = useState(null), [busy, setBusy] = useState(false);
-  useEffect(() => { api('site.get').then(s => { setSaved(s); setF(s.portfolio.enquiry); }, e => setMsg({ kind: 'error', t: e.message })); }, []);
-  if (!f) return <Loading error={msg?.t} />;
-  const set = (k, v) => setF(p => ({ ...p, [k]: v }));
-  const types = f.types.length ? f.types : Object.keys(ENQUIRY_TYPES);
-  const flip = t => { const on = types.includes(t) ? types.filter(x => x !== t) : [...types, t]; set('types', on.length === Object.keys(ENQUIRY_TYPES).length ? [] : on); };
-  async function save() {
-    setBusy(true); setMsg(null);
-    try {
-      if (!types.length) throw new Error('Keep at least one kind of enquiry ticked.');
-      const r = await api('page.save', { portfolio: { ...saved.portfolio, enquiry: f } });
-      setSaved(r); setF(r.portfolio.enquiry); setMsg({ kind: 'success', t: 'Saved. Visitors see the change within about 30 seconds.' });
-    } catch (e) { setMsg({ kind: 'error', t: e.message }); }
-    setBusy(false);
-  }
-  return (
-    <section className="card">
-      <label className="toggle"><input type="checkbox" checked={f.enabled} onChange={e => set('enabled', e.target.checked)} /> <b>Show the contact form on my profile</b> (<code>/p/{user.slug}/contact</code>)</label>
-      {!f.enabled && <p className="hint">While this is off, the Contact page and the form are hidden and no new enquiries can be sent.</p>}
-      <div className="cols c2" style={{ marginTop: 14 }}>
-        <Field label="Page title"><input type="text" maxLength={60} value={f.title} placeholder="Contact me" onChange={e => set('title', e.target.value)} /></Field>
-        <Field label="Thank-you message after sending"><input type="text" maxLength={200} value={f.thanks} placeholder="I will reply within two working days." onChange={e => set('thanks', e.target.value)} /></Field>
-      </div>
-      <Field label="Short introduction above the form"><textarea rows={2} maxLength={300} value={f.intro} placeholder="Tell me what you need and I will get back to you." onChange={e => set('intro', e.target.value)} /></Field>
-      <h3 style={{ margin: '14px 0 4px' }}>Kinds of enquiry you accept</h3>
-      <div className="cols c2">{Object.entries(ENQUIRY_TYPES).map(([k, l]) => <label className="toggle" key={k}><input type="checkbox" checked={types.includes(k)} onChange={() => flip(k)} /> {l}</label>)}</div>
-      <h3 style={{ margin: '14px 0 4px' }}>What visitors fill in</h3>
-      <ul className="enq-sum">{FORM_SUMMARY.map(([h, t]) => <li key={h}><b>{h}.</b> {t}</li>)}</ul>
-      <Notice kind={msg?.kind}>{msg?.t}</Notice>
-      <div className="row"><button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save form settings'}</button><a className="btn" href={`/p/${user.slug}/contact`} target="_blank" rel="noreferrer">Open the form ↗</a></div>
-    </section>
-  );
-}
-
 export default function Enquiries() {
-  const [tab, setTab] = useAdminTab({ values: ['inbox', 'form'], defaultValue: 'inbox' });
+  const [tab] = useAdminTab({ values: ['inbox', 'form'], defaultValue: 'inbox' });
+  if (tab === 'form') return <LegacyPortfolioRedirect tab="contact" />;
   return (
     <>
       <div className="head"><div><h1>Enquiries</h1><p className="muted" style={{ margin: 0 }}>Messages sent through the contact form on your profile arrive here and nowhere else.</p></div></div>
-      <AdminTabs label="Enquiry tools" value={tab} onChange={setTab} items={[{ id: 'inbox', label: 'Inbox', icon: 'email' }, { id: 'form', label: 'Contact form settings', icon: 'template' }]} />
-      {tab === 'inbox' ? <Inbox /> : <FormSettings />}
+      <Inbox />
     </>
   );
 }

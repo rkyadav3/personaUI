@@ -6,6 +6,7 @@ import { ENQUIRY_STATUS } from '../shared/enquiryTypes.js';
 import { normalizeEnquiry, normalizeEventForm, normalizeUpdate, shapeEngage, updateProblem } from '../shared/engage.js';
 import { normalizePortfolio } from '../shared/portfolio.js';
 import { raw, run } from './supabase.js';
+import { canViewProfile } from '../shared/governance.js';
 
 const MAX_UPDATES = 300, MAX_PER_HOUR = 5;
 const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
@@ -39,8 +40,8 @@ export const deleteUpdate = guard((db, id) => run(db.from('updates').delete().eq
 
 // ------------------------------------------------------------------ what visitors see
 /** Published rows only, shaped by shapeEngage. A missing table just means "nothing posted yet", never a broken page. */
-export async function publicEngage(ownerId) {
-  const rows = await run(raw().from('updates').select('*').eq('owner_id', ownerId).eq('status', 'published')).catch(() => []);
+export async function publicEngage(ownerId, db = raw()) {
+  const rows = await run(db.from('updates').select('*').eq('owner_id', ownerId).eq('status', 'published')).catch(() => []);
   return shapeEngage(rows);
 }
 export async function previewEngage(db) {
@@ -82,13 +83,13 @@ export const deleteEnquiry = guard((db, id) => run(db.from('enquiries').delete()
 const ipHash = ip => createHash('sha256').update(`${process.env.SESSION_SECRET || ''}|enquiry|${ip}`).digest('hex').slice(0, 32);
 
 /** Returns { ok:true } or { ok:false, status, error, errors? }. Nothing is stored unless every check passes. */
-export async function submitEnquiry(body, { ip }) {
+export async function submitEnquiry(body, { ip }, db = raw()) {
   if (body?.website) return { ok: true };   // the hidden "website" box: only bots fill it, so pretend it worked
   const slug = String(body?.slug || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return { ok: false, status: 400, error: 'Something went wrong. Please reload the page.' };
-  const db = raw();
   try {
-    const [u] = await run(db.from('users').select('id').eq('slug', slug).limit(1));
+    const [u] = await run(db.from('users').select('id,tags,profile_private,locked_until').eq('slug', slug).limit(1));
+    if (!canViewProfile(u)) return { ok: false, status: 404, error: 'This profile is not available.' };
     const [p] = u ? await run(db.from('profiles').select('id').eq('owner_id', u.id).eq('status', 'published').limit(1)) : [];
     if (!u || !p) return { ok: false, status: 404, error: 'This profile is not available.' };
 

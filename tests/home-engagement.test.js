@@ -5,7 +5,7 @@ import * as api from '../api/track.js';
 import { scriptedDatabase, step, hasEq } from './support/database.js';
 
 const offering = { id: 1, owner_id: 'owner', contribution_id: 2, active: true };
-const visible = () => [{ table: 'offerings', data: [offering] }, { table: 'profiles', data: [{ id: 1 }] }, { table: 'contributions', data: [{ id: 2, category: 'Books' }] }, { table: 'site_settings', data: [{ page: {} }] }];
+const visible = () => [{ table: 'offerings', data: [offering] }, { table: 'profiles', data: [{ id: 1, users: { id: 'owner', tags: [] } }] }, { table: 'contributions', data: [{ id: 2, category: 'Books' }] }, { table: 'site_settings', data: [{ page: {} }] }];
 const meta = { req: {}, ip: '192.0.2.1', ua: 'Test visitor' };
 const response = () => ({ setHeader() {}, status(code) { this.code = code; return this; }, json(value) { this.value = value; return this; } });
 
@@ -43,6 +43,14 @@ test('owners cannot rate themselves and malformed votes do not mutate ratings', 
   }
 });
 
+test('private, suspended and missing account records cannot receive public offering ratings', async () => {
+  for (const account of [null, { id: 'owner', tags: ['private'] }, { id: 'owner', locked_until: '2099-01-01' }]) {
+    const db = scriptedDatabase({ table: 'offerings', data: [offering] }, { table: 'profiles', data: [{ id: 1, users: account }] });
+    const result = await tracker.createTracker({ db, sessionUser: async () => null })({ kind: 'rate', id: 1, stars: 5 }, meta);
+    assert.equal(result.count, undefined); assert.equal(db.calls.length, 2);
+  }
+});
+
 test('visitor product views and checkout interactions update their respective counters', async () => {
   for (const [kind, field] of [['view', 'views'], ['click', 'clicks']]) {
     const db = scriptedDatabase(...visible(), { table: 'rpc:bump_offering', data: null });
@@ -58,6 +66,19 @@ test('public profile visits increment views while owner visits do not', async ()
   const ownDb = scriptedDatabase({ table: 'users', data: [{ id: 'owner' }] });
   await tracker.createTracker({ db: ownDb, sessionUser: async () => ({ id: 'owner' }) })({ kind: 'profile', slug: 'owner' }, meta);
   assert.equal(ownDb.calls.length, 1);
+});
+
+test('public custom tags preserve profile and offering tracking with computed privacy', async () => {
+  const account = { id: 'owner', tags: ['custom-mentor'], profile_private: false };
+  const db = scriptedDatabase({ table: 'users', data: [account] }, { table: 'rpc:bump_profile_view', data: null });
+  await tracker.createTracker({ db, sessionUser: async () => null })({ kind: 'profile', slug: 'owner' }, meta);
+  assert.match(step(db.calls[0], 'select')[0], /profile_private/);
+  assert.equal(db.calls.at(-1).table, 'rpc:bump_profile_view');
+  const responses = visible().map(row => row.table === 'profiles' ? { ...row, data: [{ id: 1, users: account }] } : row);
+  const offeringDb = scriptedDatabase(...responses, { table: 'rpc:bump_offering', data: null });
+  await tracker.createTracker({ db: offeringDb, sessionUser: async () => null })({ kind: 'view', id: 1 }, meta);
+  assert.match(step(offeringDb.calls.find(call => call.table === 'profiles'), 'select')[0], /profile_private/);
+  assert.equal(offeringDb.calls.at(-1).table, 'rpc:bump_offering');
 });
 
 test('rating endpoint errors are retryable and do not report success', async t => {

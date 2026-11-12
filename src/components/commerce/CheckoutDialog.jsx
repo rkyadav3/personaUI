@@ -83,9 +83,11 @@ export default function CheckoutDialog({ item, slug, owner, preview, onClose }) 
     } catch (e) { failed(e); }
   }
   async function pay(purchase) {
+    if (!alive.current) return;
     setPhase('loading');
     try {
       const Razorpay = await loadRazorpay();
+      if (!alive.current) return;
       let settled = false;
       const checkout = new Razorpay({
         key: purchase.razorpay.keyId, order_id: purchase.razorpay.orderId, amount: purchase.amount, currency: purchase.currency,

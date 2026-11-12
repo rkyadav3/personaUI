@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { CATEGORIES, INTENTS, OFFERING_FIELDS, PRICING } from '../../../shared/profileSchema.js';
 import { api } from '../../lib/api.js';
@@ -67,6 +69,7 @@ function Card({ c, contributions, reload }) {
       <div className="head">
         <h3>{c.category}{c.subtype ? `: ${c.subtype}` : ''}</h3>
         <div className="row">
+          {!form && <button type="button" className="btn primary" onClick={() => setForm('new')}>Add offering</button>}
           <label className="toggle"><input type="checkbox" checked={c.enabled} onChange={e => save({ enabled: e.target.checked })} /> Offering this</label>
           <label className="toggle"><input type="checkbox" checked={c.visible} onChange={e => save({ visible: e.target.checked })} /> Show on profile</label>
           <button className="btn" onClick={() => setEdit(!edit)}>{edit ? 'Close' : 'Edit'}</button>
@@ -93,14 +96,16 @@ function Card({ c, contributions, reload }) {
           </div>
         </div>
       ))}
-      {form ? <OfferingForm contribution={c} contributions={contributions} offering={form === 'new' ? null : form} onDone={changed => { setForm(null); if (changed) reload(); }} />
-        : <button className="btn" style={{ marginTop: 10 }} onClick={() => setForm('new')}>Add offering</button>}
+      {form ? <OfferingForm key={form === 'new' ? 'new' : form.id} contribution={c} contributions={contributions} offering={form === 'new' ? null : form} onDone={changed => { setForm(null); if (changed) reload(); }} />
+        : null}
     </section>
   );
 }
 
 export default function Contributions({ items, reload }) {
-  const [open, setOpen] = useState(false), [f, setF] = useState({ category: CATEGORIES[0], subtype: '', description: '', intent: 'unspecified' }), [err, setErr] = useState('');
+  const [params] = useSearchParams();
+  const [open, setOpen] = useState(params.get('action') === 'add'), [f, setF] = useState({ category: CATEGORIES[0], subtype: '', description: '', intent: 'unspecified' }), [err, setErr] = useState('');
+  useEffect(() => { if (params.get('action') === 'add') setOpen(true); }, [params]);
   async function add(e) {
     e.preventDefault(); setErr('');
     try { await api('contributions.save', f); setOpen(false); setF({ ...f, subtype: '', description: '' }); reload(); } catch (ex) { setErr(ex.message.includes('duplicate') ? 'You already have that category.' : ex.message); }
@@ -108,7 +113,7 @@ export default function Contributions({ items, reload }) {
   return (
     <>
       {!items.length && <p className="muted">No contribution categories yet. Add one to start listing offerings.</p>}
-      {items.map(c => <Card key={`${c.id}-${c.updated || ''}`} c={c} contributions={items} reload={reload} />)}
+      
       {open ? (
         <form className="card" onSubmit={add}>
           <h3>Add a category</h3>
@@ -122,6 +127,7 @@ export default function Contributions({ items, reload }) {
           <div className="row"><button className="btn primary">Add</button><button type="button" className="btn" onClick={() => setOpen(false)}>Cancel</button></div>
         </form>
       ) : <button className="btn" onClick={() => setOpen(true)}>Add category</button>}
+      {items.map(c => <Card key={`${c.id}-${c.updated || ''}`} c={c} contributions={items} reload={reload} />)}
     </>
   );
 }

@@ -12,7 +12,7 @@ export function LookControls({ page, setPage, imageUrl }) {
     <section className="card"><h3>Portfolio appearance</h3>
       <Field label="Background style"><select value={page.theme.bg} onChange={event => setIn('theme', { bg: event.target.value })}>{Object.entries(BG_MODES).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></Field>
       {page.theme.bg === 'color' && <Field label="Background colour"><input type="color" value={page.theme.bgColor} onChange={event => setIn('theme', { bgColor: event.target.value })} /></Field>}
-      {page.theme.bg === 'image' && <><Range label="Fade background towards white" min={0} max={95} value={page.theme.wash} unit="%" onChange={value => setIn('theme', { wash: value })} />{!imageUrl && <p className="hint">Add a background image in <Link to="/admin/portfolio?tab=persona">Persona settings</Link>.</p>}</>}
+      {page.theme.bg === 'image' && <><Range label="Fade background towards white" min={0} max={95} value={page.theme.wash} unit="%" onChange={value => setIn('theme', { wash: value })} />{!imageUrl && <p className="hint">Add a background image under Chat in this editor.</p>}</>}
       <Field label="Font"><select value={page.theme.font} onChange={event => setIn('theme', { font: event.target.value })}>{Object.entries(FONTS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field>
       <Range label="Corner roundness" min={6} max={44} value={page.theme.radius} unit="px" onChange={value => setIn('theme', { radius: value })} />
       <Range label="Page width" min={1000} max={1700} step={20} value={page.theme.maxWidth} unit="px" onChange={value => setIn('theme', { maxWidth: value })} />
@@ -35,7 +35,7 @@ export function StoreControls({ page, setPage }) {
       <Text label="Shop title" value={page.storeTitle} max={40} onChange={value => setPage({ storeTitle: value })} />
       <Text label="Shop subtitle" value={page.storeSubtitle} max={140} onChange={value => setPage({ storeSubtitle: value })} />
       <Text label="Currency for existing prices without one" value={page.currency} max={6} onChange={value => setPage({ currency: value })} />
-      <p className="hint">Visible free and paid products appear on Home and Store. Manage prices and access links under <Link to="/admin/profile?tab=contrib">Offerings &amp; categories</Link> or <Link to="/admin/portfolio?tab=products">Store products</Link>. Buyer records are under <Link to="/admin/purchases">Activity &amp; Orders</Link>.</p>
+      <p className="hint">Visible free and paid products appear on Home and Store. Manage prices and access links under <Link to="/admin/profile?tab=contrib">Offerings &amp; categories</Link> or <Link to="/admin/settings?tab=products">Store products</Link>. Buyer records are under <Link to="/admin/purchases">Activity &amp; Orders</Link>.</p>
       <div className="portfolio-checks">{Object.entries(SECTION_LABELS).map(([key, label]) => <label className="toggle" key={key}><input type="checkbox" checked={page.sections[key]} onChange={event => setIn('sections', { [key]: event.target.checked })} /> Show {label === 'Store' ? 'Shop' : label}</label>)}</div>
     </section>
     <section className="card"><h3>Offering categories</h3><p className="hint">Visible categories appear in the shop. You can also show them as questions in the Chat sidebar.</p>
@@ -72,7 +72,7 @@ export function PersonaControls({ page, bg, setPage, setBg, imageUrl, onChooseBa
       <label className="toggle"><input type="checkbox" checked={page.ball.show && bg.ball} onChange={event => { setIn('ball', { show: event.target.checked }); setBg({ ball: event.target.checked }); }} /> Show glowing sphere in Chat</label>
       {page.ball.show && bg.ball && <><Range label="Sphere size" min={140} max={320} value={page.ball.size} unit="px" onChange={value => setIn('ball', { size: value })} /><Range label="Sphere glow intensity" min={20} max={100} value={bg.ballOpacity} unit="%" onChange={value => setBg({ ballOpacity: value })} /></>}
     </section>
-    <section className="card"><h3>Background image</h3><p className="hint">Use this image on your portfolio by choosing My background image in Look &amp; Store.</p>
+    <section className="card"><h3>Background image</h3><p className="hint">Use this image across your public pages by choosing My background image under Appearance.</p>
       <Field label="Upload background image"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => onChooseBackground(event.target.files[0])} /></Field>
       {imageUrl && <><img className="portfolio-bg-thumbnail" src={imageUrl} alt="Current background" /><button type="button" className="btn small" onClick={onRemoveBackground}>Remove background image</button></>}
       {[['zoom', 'Background zoom', 1, 3, 0.05, '×'], ['x', 'Focus left to right', 0, 100, 1, '%'], ['y', 'Focus top to bottom', 0, 100, 1, '%'], ['blur', 'Background blur', 0, 24, 1, 'px'], ['brightness', 'Brightness', 30, 140, 1, '%'], ['dim', 'Dark overlay', 0, 85, 1, '%']].map(([key, label, min, max, step, unit]) => <Range key={key} label={label} min={min} max={max} step={step} unit={unit} value={bg[key]} onChange={value => setBg({ [key]: value })} />)}

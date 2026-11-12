@@ -7,6 +7,7 @@ import * as commerceDefault from './commerce.js';
 import { paged } from './supabase.js';
 import { HttpError } from './http.js';
 import { STUDIO_ENTITIES } from '../shared/studioAssistant.js';
+import { createActivityService } from './adminActivity.js';
 
 const lazy = path => new Proxy({}, { get: (_, key) => async (...args) => (await import(path))[key](...args) });
 const fields = (row, keys) => Object.fromEntries(keys.split(' ').filter(key => Object.hasOwn(row || {}, key)).map(key => [key, row[key]]));
@@ -17,6 +18,7 @@ const dependencies = { files: ['folders', 'topics'], folders: ['files'], topics:
 export function createStudioOperations({ store = storeDefault, profile = profileDefault, site = siteDefault, engage = engageDefault, events = eventsDefault, commerce = commerceDefault, invites = lazy('./invites.js'), indexer = lazy('./indexer.js'), rows = paged } = {}) {
   const table = (db, name, columns) => rows(db, name, columns, query => query.order('id'));
   const readers = {
+    analytics: ctx => createActivityService().report(ctx),
     settings: ({ db }) => site.getSettings(db),
     profile: async ({ db }) => (await table(db, 'profiles', 'id,name,purpose,education,contact,experience,designation,expertise,visibility,status')).map(row => fields(row, 'id name purpose education contact experience designation expertise visibility status'))[0] || null,
     files: async ({ db }) => (await table(db, 'files', 'id,name,text_content,folder_id,topic_id,status,mime,size')).map(row => ({ ...fields(row, 'id name status mime size'), text: row.text_content || '', folderId: row.folder_id ?? null, topicId: row.topic_id ?? null })),
@@ -41,7 +43,7 @@ export function createStudioOperations({ store = storeDefault, profile = profile
     payments: async ({ db }) => fields(await commerce.paymentSettings(db), 'mode enabled configured webhookConfigured encryptionReady testMode'),
     knowledge: ({ db }) => store.counts(db),
     users: async () => (await invites.listUsersDetailed()).map(row => ({ ...fields(row, 'id name email slug isLocked isAdmin'), createdAt: row.created_at, lockedUntil: row.locked_until, profileStatus: row.profile_status, designation: row.designation })),
-    invites: async () => (await invites.listInvites()).map(row => ({ ...fields(row, 'id code label uses revoked'), maxUses: row.max_uses, expiresAt: row.expires_at, createdAt: row.created_at })),
+    invites: async ({ user }) => (await invites.listInviteHistory(user)).codes.map(row => ({ ...fields(row, 'id code label uses revoked'), maxUses: row.max_uses, expiresAt: row.expires_at, createdAt: row.created_at })),
   };
   const op = (entity, run) => ({ entity, run });
   const operations = {
@@ -80,7 +82,7 @@ export function createStudioOperations({ store = storeDefault, profile = profile
     'users.setLock': op('users', (ctx, a) => invites.setUserLock(a.id, a.locked, ctx.user.id)),
     'users.delete': op('users', (ctx, a) => invites.deleteUser(a.id, ctx.user.id)),
     'invites.create': op('invites', async (ctx, a) => ({ code: await invites.createInvite(ctx.user.id, a) })),
-    'invites.revoke': op('invites', (ctx, a) => invites.revokeInvite(a.id)),
+    'invites.revoke': op('invites', (ctx, a) => invites.revokeInvite(a.id, ctx.user)),
   };
   return {
     async read(ctx, entities) {
@@ -88,7 +90,7 @@ export function createStudioOperations({ store = storeDefault, profile = profile
       const roots = new Set();
       for (const entity of entities) {
         if (!Object.hasOwn(STUDIO_ENTITIES, entity)) throw new HttpError(400, 'Unknown admin area.');
-        if (STUDIO_ENTITIES[entity].admin && !ctx.user.isAdmin) throw new HttpError(403, 'Super Admin permission is required.');
+        if (STUDIO_ENTITIES[entity].admin && !ctx.user.isSuperAdmin) throw new HttpError(403, 'Super Admin permission is required.');
         roots.add(STUDIO_ENTITIES[entity].root);
         (dependencies[entity] || []).forEach(root => roots.add(root));
       }
@@ -98,7 +100,7 @@ export function createStudioOperations({ store = storeDefault, profile = profile
       identity(ctx);
       const operation = Object.hasOwn(operations, step?.op) ? operations[step.op] : null;
       if (!operation || operation.entity !== step.entity) throw new HttpError(400, 'Unsupported admin command operation or area.');
-      if (STUDIO_ENTITIES[operation.entity].admin && !ctx.user.isAdmin) throw new HttpError(403, 'Super Admin permission is required.');
+      if (STUDIO_ENTITIES[operation.entity].admin && !ctx.user.isSuperAdmin) throw new HttpError(403, 'Super Admin permission is required.');
       return operation.run(ctx, step.args);
     },
   };

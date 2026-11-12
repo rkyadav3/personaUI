@@ -56,7 +56,7 @@ test('admin has five primary groups and a separate visible Logout action', () =>
   const html = render(StudioSidebar, { user: { name: 'Owner', isAdmin: false }, onLogout() {}, logoutError: 'Please retry logout' }, '/admin');
   const nav = html.match(/<div class="studio-primary-nav">([\s\S]*?)<\/div>/)[1];
   assert.equal([...nav.matchAll(/<a\b/g)].length, 5);
-  for (const label of ['Overview &amp; Dashboard &amp; Profile', 'Activity &amp; Orders', 'Offerings', 'Data Pipelines', 'Settings']) assert.ok(nav.includes(label), label);
+  for (const label of ['Overview', 'Activity &amp; Orders', 'Offerings', 'Data Pipelines', 'Settings']) assert.ok(nav.includes(label), label);
   assert.doesNotMatch(nav, /Logout/);
   assert.match(html, /studio-logout[\s\S]*Logout[\s\S]*role="alert"[\s\S]*Please retry logout/);
 });
@@ -72,19 +72,19 @@ test('every secondary admin link selects its own group and privileged tabs stay 
   const { AdminSectionTabs } = require('../src/components/AdminNavigation.jsx');
   const regular = render(AdminSectionTabs, { user: { isAdmin: false } }, '/admin/profile?tab=visibility');
   assert.doesNotMatch(regular, /superadmin/);
-  const admin = render(AdminSectionTabs, { user: { isAdmin: true } }, '/admin/superadmin?tab=invites');
+  const admin = render(AdminSectionTabs, { user: { isAdmin: true, isSuperAdmin: true } }, '/superadmin/invites');
   assert.match(admin, /Invite links/);
 });
 
-test('dashboard shows real workspace counts and order and Q&A destinations', () => {
+test('legacy dashboard links show Overview with workspace counts and activity destinations', () => {
   const { OverviewContent } = require('../src/pages/Overview.jsx');
   const html = render(OverviewContent, { user: { name: 'Owner' }, data: { counts: { files: 12, posts: 3, topics: 2, embedded: 9, chunks: 10 }, recent: [] } }, '/admin?tab=dashboard');
-  assert.match(html, /<h1>Dashboard<\/h1>/);
+  assert.match(html, /What would you like to do/);
   assert.match(html, /<strong>12<\/strong>/);
-  assert.match(html, /1 chunk is waiting to sync/);
+  assert.match(html, /1 knowledge chunks are waiting to sync/);
   assert.match(html, /href="\/admin\/purchases"/);
   assert.match(html, /href="\/admin\/questions"/);
-  assert.doesNotMatch(html, /What would you like to do/);
+  assert.doesNotMatch(html, /<h1>Dashboard<\/h1>/);
 });
 
 test('activity records survive normalization and discard unsafe links and incomplete testimonials', async () => {

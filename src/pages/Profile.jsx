@@ -1,9 +1,8 @@
-import AdminTabs from '../components/AdminTabs.jsx';
 import { useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useSearchParams } from 'react-router-dom';
 import { VISIBILITY_DEFAULTS } from '../../shared/profileSchema.js';
 import { api } from '../lib/api.js';
-import { useAdminTab } from '../lib/adminTabs.js';
+import { LegacyPortfolioRedirect } from './LegacyRedirects.jsx';
 import { QUESTIONS, emptyDraft, mergeDraft, missing } from '../lib/draft.js';
 import { Loading, Notice, Pill } from '../components/Ui.jsx';
 import DraftEditor from '../components/profile/DraftEditor.jsx';
@@ -135,21 +134,24 @@ const toDraft = p => ({ profile: { name: p.name, education: p.education || [], c
 
 export function ProfileManager({ data, reload }) {
   const { profile: p, contributions } = data;
-  const [tab, setTab] = useAdminTab({ values: ['profile', 'visibility', 'contrib'], defaultValue: 'profile' });
-  const [draft, setDraft] = useState(toDraft(p)), [vis, setVis] = useState(p.visibility), [msg, setMsg] = useState(null);
+  const [params] = useSearchParams();
+  const tab = params.get('tab') === 'contrib' ? 'contrib' : 'profile';
+  const [draft, setDraft] = useState(toDraft(p)), [msg, setMsg] = useState(null);
   const [slug, setSlug] = useState(null);
-  useEffect(() => { setDraft(toDraft(p)); setVis(p.visibility); }, [p.updated_at, p.status]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setDraft(toDraft(p)); }, [p.updated_at, p.status]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { api('auth.me').then(r => setSlug(r.user?.slug)); }, []);
   const flash = (kind, t) => { setMsg({ kind, t }); setTimeout(() => setMsg(null), 3500); };
   const guard = fn => async () => { try { await fn(); } catch (e) { flash('error', e.message); } };
+
+  if (params.get('tab') === 'visibility') return <LegacyPortfolioRedirect tab="privacy" />;
 
   return (
     <>
       <div className="head" style={{ marginBottom: 8 }}>
         <div>
-          <h1>{tab === 'contrib' ? 'Offerings & categories' : tab === 'visibility' ? 'Privacy & visibility' : 'Profile'}</h1>
+          <h1>{tab === 'contrib' ? 'Offerings & categories' : 'Profile'}</h1>
           <p className="muted" style={{ margin: 0 }}>
-            Manage your personal identity, bio, public visibility controls, and paid/free contributions.
+            {tab === 'contrib' ? 'Manage the categories and offerings published in your Store.' : 'Manage your personal identity, bio and background. Public page design and privacy are managed in Settings.'}
           </p>
         </div>
         <div className="row">
@@ -182,13 +184,6 @@ export function ProfileManager({ data, reload }) {
         </div>
       </div>
 
-      {/* Unified Tab Navigation */}
-      <AdminTabs label="Profile sections" value={tab} onChange={setTab} items={[
-        { id: 'profile', label: 'Bio & background', icon: 'users' },
-        { id: 'visibility', label: 'Privacy & visibility', icon: 'shield' },
-        { id: 'contrib', label: 'Offerings & categories', icon: 'box', count: contributions?.length || 0 },
-      ]} />
-
       <Notice kind={msg?.kind}>{msg?.t}</Notice>
 
       {tab === 'profile' && (
@@ -207,29 +202,6 @@ export function ProfileManager({ data, reload }) {
             </button>
           </div>
         </>
-      )}
-
-      {tab === 'visibility' && (
-        <section className="card">
-          <h3>Public Persona Visibility</h3>
-          <p className="muted" style={{ marginBottom: 14 }}>
-            Choose which sections are visible to people visiting your profile and chatting with your Persona.
-            Unchecked contact fields remain strictly private.
-          </p>
-          <VisibilityEditor value={vis} onChange={setVis} />
-          <div style={{ marginTop: 18 }}>
-            <button
-              className="btn primary"
-              onClick={guard(async () => {
-                await api('profile.visibility', { visibility: vis });
-                reload();
-                flash('success', 'Visibility preferences saved.');
-              })}
-            >
-              Save Visibility
-            </button>
-          </div>
-        </section>
       )}
 
       {tab === 'contrib' && (

@@ -1,3 +1,4 @@
+import { isSuperAdminEmail } from './auth.js';
 // AI-powered registration: free text -> structured draft (never saved or published until the user confirms).
 import { CATEGORIES, INTENTS, OFFERING_FIELDS, PRICING, VISIBILITY_DEFAULTS } from '../shared/profileSchema.js';
 import { generateJSON } from './gemini.js';
@@ -7,6 +8,7 @@ import { normalizeBg } from '../shared/siteSettings.js';
 import { previewEngage, publicEngage } from './engage.js';
 import { publicUrl } from './site.js';
 import { raw, run } from './supabase.js';
+import { canViewProfile } from '../shared/governance.js';
 
 const MAX_TEXT = 6000, MAX_PER_HOUR = 12;
 const str = (v, n = 300) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
@@ -317,21 +319,21 @@ function decorate(pub, slug, site, engage = { updates: [], schedule: [] }) {
   };
 }
 
-export async function publicProfile(slug) {
+export async function publicProfile(slug, viewer = null, db = raw()) {
   slug = String(slug || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return null;
-  const db = raw();
-  const [u] = await run(db.from('users').select('id').eq('slug', slug).limit(1));
-  if (!u) return null;
+  const [u] = await run(db.from('users').select('id,email,tags,profile_private,locked_until').eq('slug', slug).limit(1));
+  if (isSuperAdminEmail(u?.email) || !canViewProfile(u, viewer)) return null;
   const [p] = await run(db.from('profiles').select('*').eq('owner_id', u.id).eq('status', 'published').limit(1));
   if (!p) return null;
-  const [cs, os, site, engage] = await Promise.all([
+  const [cs, os, site, engage, tagDefinitions] = await Promise.all([
     run(db.from('contributions').select('*').eq('owner_id', u.id).order('id')),
     run(db.from('offerings').select('*').eq('owner_id', u.id).order('id')),
     run(db.from('site_settings').select('*').eq('owner_id', u.id).limit(1)).catch(() => []),
-    publicEngage(u.id),
+    publicEngage(u.id, db),
+    u.tags?.some(tag => tag.startsWith('custom-')) ? run(db.from('profile_tags').select('key,label,visibility').in('key', u.tags)) : [],
   ]);
-  return decorate(buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) }))), slug, site[0], engage);
+  return { ...decorate(buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) }))), slug, site[0], engage), tags: u.tags || [], tagDefinitions };
 }
 
 /** Same data as publicProfile, for the owner's live preview in the editor (works while the profile is still a draft). */
@@ -344,12 +346,12 @@ export async function previewProfile(db, slug) {
 
 /** Legacy offers API: the person's name, whether a public profile exists, and every
  *  offering they have published. Built from buildPublic, so hidden, disabled or inactive things never appear here either. */
-export async function publicOffers(slug) {
+export async function publicOffers(slug, viewer = null) {
   slug = String(slug || process.env.DEFAULT_SLUG || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return null;
   const db = raw();
-  const [u] = await run(db.from('users').select('id,slug').eq('slug', slug).limit(1));
-  if (!u) return null;
+  const [u] = await run(db.from('users').select('id,email,slug,tags,profile_private,locked_until').eq('slug', slug).limit(1));
+  if (isSuperAdminEmail(u?.email) || !canViewProfile(u, viewer)) return null;
   const [p] = await run(db.from('profiles').select('*').eq('owner_id', u.id).eq('status', 'published').limit(1));
   if (!p) return { handle: u.slug, name: null, hasProfile: false, contact: null, offers: [] };
   const [cs, os] = await Promise.all([run(db.from('contributions').select('*').eq('owner_id', u.id).order('id')), run(db.from('offerings').select('*').eq('owner_id', u.id).order('id'))]);

@@ -4,7 +4,7 @@ export const initialStudioState = userId => ({ userId, input: '', messages: [], 
 const browserTimeZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } };
 const turnMessages = turn => [
   { id: `${turn.id}:q`, role: 'user', text: turn.question, createdAt: turn.createdAt },
-  { id: `${turn.id}:a`, role: 'assistant', text: turn.answer, createdAt: turn.createdAt },
+  { id: `${turn.id}:a`, role: 'assistant', text: turn.answer, createdAt: turn.createdAt, ...(turn.insights ? { insights: turn.insights } : {}) },
 ];
 const mergeMessages = (older, newer) => {
   const seen = new Set(newer.map(message => message.id));
@@ -95,7 +95,7 @@ export function createStudioSession({ userId, call, publish, onApplied, storage,
         if (!live(version)) return;
         const messages = value.turn
           ? [...state.messages.filter(item => item.id !== messageId), ...turnMessages(value.turn)]
-          : [...state.messages.map(item => item.id === messageId ? { ...item, unsaved: !!value.historyWarning } : item), { id: `${messageId}:a`, role: 'assistant', text: value.answer || 'Review the proposed changes below.' }];
+          : [...state.messages.map(item => item.id === messageId ? { ...item, unsaved: !!value.historyWarning } : item), { id: `${messageId}:a`, role: 'assistant', text: value.answer || 'Review the proposed changes below.', ...(value.insights ? { insights: value.insights } : {}) }];
         update({ messages, ...(value.historyWarning ? { historyError: value.historyWarning } : {}) }); review(value.review || null);
       } catch (failure) { if (live(version)) update({ error: failure.message || 'The command could not be planned. Try again.', input: message }); }
       finally { if (live(version)) update({ busy: '' }); }

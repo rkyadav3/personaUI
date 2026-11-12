@@ -12,7 +12,10 @@ import Shop from '../commerce/Shop.jsx';
 import Chat from './Chat.jsx';
 import BackgroundLayer from '../BackgroundLayer.jsx';
 import LiquidGlass, { GlassProvider } from '../LiquidGlass.jsx';
+import AccountMenu from '../AccountMenu.jsx';
+import { tagLabel } from '../../../shared/governance.js';
 import '../../styles/portfolio.css';
+import '../../styles/governance.css';
 
 const luminance = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
 const paras = s => String(s || '').split(/\n{2,}/).map(x => x.trim()).filter(Boolean);
@@ -93,7 +96,6 @@ function Hero({ m, ctx }) {
           <div className="pf-right">
             {m.domains.length > 0 && <ul className="pf-domains">{m.domains.map((d, i) => <li key={i}><Icon n={d.icon} size={16} />{d.label}</li>)}</ul>}
             <div className="pf-cta">
-              <A className="pf-btn dark" href={m.cta.url}>{m.cta.label} <Icon n="arrow" size={16} /></A>
               {m.intro.video ? <A className="pf-btn" href={m.intro.url}><Icon n="play" size={16} />{m.intro.label}</A> : <GoTo className="pf-btn" to="chat" ctx={ctx}><Icon n="chat" size={16} />{m.intro.label}</GoTo>}
             </div>
           </div>
@@ -438,13 +440,13 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
           <GoTo to="chat" ctx={ctx} className="pf-brand">{m.brand}</GoTo>
           <nav className="pf-nav" aria-label="Pages">{m.pages.map(p => <GoTo key={p.key} to={p.key} ctx={ctx} className={p.key === current ? 'on' : ''} aria-current={p.key === current ? 'page' : undefined}>{p.label}</GoTo>)}</nav>
           <div className="pf-head-act">
-            {user && !preview && <Link className="pf-round" to="/admin" aria-label="Dashboard" title="Dashboard"><Icon n="briefcase" size={16} /></Link>}
-            <A className="pf-btn dark sm" href={m.navCta.url}>{m.navCta.label} <Icon n="arrow" size={14} /></A>
+            {!preview && <AccountMenu user={user} />}
           </div>
         </div>
       </header>
 
       <main>
+        {!!data.tags?.length && <div className="pf-wrap"><div className="governance-tags" aria-label="Profile tags">{data.tags.map(tag => <span key={tag} className={`governance-tag ${tag}`}>{tagLabel(tag, data.tagDefinitions)}</span>)}</div></div>}
         {current === 'home' ? (
           <>
             <Hero m={m} ctx={ctx} />
