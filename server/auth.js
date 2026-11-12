@@ -9,7 +9,6 @@ import { raw, run } from './supabase.js';
 
 const COOKIE = 'persona_session', MAX_AGE = 60 * 60 * 24 * 7;
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const MAX_FAILS = 5, LOCK_MIN = 10;
 const DUMMY = bcrypt.hashSync('dummy-password', 12);   // equalises timing for unknown emails
 
 const secretKey = () => {
@@ -101,29 +100,25 @@ export async function register({ name, email, password = '', confirm, invite }) 
   return { user: publicUser(row) };
 }
 
-export async function login({ email, password = '' }) {
+const lockedLogin = timestamp => {
+  const mins = Math.floor((parse(timestamp) - now()) / 60000) + 1;
+  return { error: mins > 60 * 24 ? 'This account has been suspended by a Super Admin. Please contact support.' : `Too many attempts. Try again in ${Math.max(1, mins)} minutes.` };
+};
+
+export async function login({ email, password = '' }, db = raw()) {
   email = (email || '').trim().toLowerCase();
-  const db = raw();
   const [u] = await run(db.from('users').select('*').eq('email', email));
   if (!u) { bcrypt.compareSync(password.slice(0, 72), DUMMY); return { error: 'Wrong email or password.' }; }
   const locked = parse(u.locked_until);
-  if (locked && locked > now()) {
-    const mins = Math.floor((locked - now()) / 60000) + 1;
-    if (mins > 60 * 24) {
-      return { error: 'This account has been suspended by a Super Admin. Please contact support.' };
-    }
-    return { error: `Too many attempts. Try again in ${mins} minutes.` };
-  }
-  if (!bcrypt.compareSync(password.slice(0, 72), u.password_hash)) {
-    const fails = (u.failed_attempts || 0) + 1;
-    const upd = fails >= MAX_FAILS
-      ? { failed_attempts: 0, locked_until: new Date(Date.now() + LOCK_MIN * 60000).toISOString() }
-      : { failed_attempts: fails };
-    await run(db.from('users').update(upd).eq('id', u.id));
-    return { error: 'Wrong email or password.' };
-  }
-  await run(db.from('users').update({ failed_attempts: 0, locked_until: null }).eq('id', u.id));
-  return { user: publicUser(u) };
+  if (locked && locked > now()) return lockedLogin(u.locked_until);
+  const { data, error } = await db.rpc('finalize_login', {
+    p_user: u.id, p_email: email, p_password_hash: u.password_hash,
+    p_matched: bcrypt.compareSync(password.slice(0, 72), u.password_hash),
+  });
+  if (error || !data) return { error: 'Sign-in could not be completed. Check the security-hardening database setup and try again.' };
+  if (data.status === 'locked') return lockedLogin(data.locked_until);
+  if (data.status !== 'authenticated' || !data.user?.id) return { error: 'Wrong email or password.' };
+  return { user: publicUser(data.user) };
 }
 
 // ---- session cookie ----

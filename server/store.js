@@ -10,6 +10,20 @@ const batches = (items, n = 100) => Array.from({ length: Math.ceil(items.length 
 const mimeOf = name => ({ '.pdf': 'application/pdf', '.md': 'text/markdown', '.txt': 'text/plain', '.csv': 'text/csv', '.json': 'application/json',
   '.html': 'text/html', '.htm': 'text/html', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }[extOf(name)] || 'application/octet-stream');
 
+function ownedStoragePath(db, path) {
+  // Storage clients normalize URLs. Only a generated object name may follow the
+  // exact tenant prefix; encoded segments, query strings and separators are invalid.
+  const filename = typeof path === 'string' && path.startsWith(`${db.uid}/`) ? path.slice(db.uid.length + 1) : '';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\.[a-z0-9]+)?$/i.test(filename)) throw new Error('Bad storage path.');
+  return path;
+}
+function newStoragePath(db, name) {
+  if (typeof name !== 'string' || !name.trim()) throw new Error('Enter a file name.');
+  const extension = extOf(name);
+  if (extension && !/^\.[a-z0-9]+$/i.test(extension)) throw new Error('Use a file extension containing only letters and numbers.');
+  return ownedStoragePath(db, `${db.uid}/${randomUUID()}${extension}`);
+}
+
 // ---------------- folders ----------------
 export const allFolders = db => paged(db, 'folders', '*');
 export const children = (db, parentId) => {
@@ -31,13 +45,14 @@ export async function ensurePath(db, parentId, parts) {
   return cur;
 }
 
-export async function deleteFolder(db, id) {
+export async function deleteFolder(db, id, storageOverride) {
   const fs = await allFolders(db);
   const ids = [id];
   let frontier = [id];
   while (frontier.length) { frontier = fs.filter(f => frontier.includes(f.parent_id)).map(f => f.id); ids.push(...frontier); }
   const files = await paged(db, 'files', 'id,storage_path', q => q.in('folder_id', ids));
-  for (const b of batches(files.map(f => f.storage_path))) await raw().storage.from(BUCKET).remove(b);
+  const paths = files.map(f => ownedStoragePath(db, f.storage_path));
+  for (const b of batches(paths)) await (storageOverride || raw().storage.from(BUCKET)).remove(b);
   for (const b of batches(files.map(f => `file:${f.id}`))) await run(db.from('chunks').delete().in('source_key', b));
   await run(db.from('folders').delete().eq('id', id));   // cascades to subfolders and file rows
 }
@@ -57,10 +72,12 @@ export function searchFiles(db, text) {
 export const getFile = (db, id) => first(db.from('files').select('*').eq('id', id));
 
 /** Step 1 of an upload: hand the browser signed URLs so big files go straight to Supabase Storage. */
-export async function signUploads(db, names) {
-  return Promise.all(names.map(async name => {
-    const path = `${db.uid}/${randomUUID()}${extOf(name)}`;
-    const { data, error } = await raw().storage.from(BUCKET).createSignedUploadUrl(path);
+export async function signUploads(db, names, storageOverride) {
+  if (!Array.isArray(names)) throw new Error('Enter a list of file names.');
+  const paths = names.map(name => newStoragePath(db, name));
+  return Promise.all(names.map(async (name, index) => {
+    const path = paths[index];
+    const { data, error } = await (storageOverride || raw().storage.from(BUCKET)).createSignedUploadUrl(path);
     if (error) throw new Error(error.message);
     return { path, token: data.token, name };
   }));
@@ -68,10 +85,7 @@ export async function signUploads(db, names) {
 
 /** Step 2: the file is in storage; extract its text and create the row. */
 export async function registerFile(db, { path, name, folderId, folderParts = [], topicId, status = 'published', size }, storageOverride) {
-  // Accept only the single generated object name issued by signUploads. Storage URLs
-  // normalize traversal segments, so checking the owner prefix alone is insufficient.
-  const filename = typeof path === 'string' && path.startsWith(`${db.uid}/`) ? path.slice(db.uid.length + 1) : '';
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\.[a-z0-9]+)?$/i.test(filename)) throw new Error('Bad storage path.');
+  ownedStoragePath(db, path);
   const dl = await (storageOverride || raw().storage.from(BUCKET)).download(path);
   if (dl.error) throw new Error(`Upload not found: ${dl.error.message}`);
   const buf = Buffer.from(await dl.data.arrayBuffer());
@@ -83,24 +97,25 @@ export async function registerFile(db, { path, name, folderId, folderParts = [],
 }
 
 /** "Create a new text file": content comes from the editor, so it is written to storage here. */
-export async function createTextFile(db, { name, folderId, topicId, body = '', status }) {
-  const path = `${db.uid}/${randomUUID()}${extOf(name)}`;
+export async function createTextFile(db, { name, folderId, topicId, body = '', status }, storageOverride) {
+  const path = newStoragePath(db, name);
   const data = Buffer.from(body, 'utf-8');
-  const up = await raw().storage.from(BUCKET).upload(path, data, { contentType: mimeOf(name), upsert: true });
+  const up = await (storageOverride || raw().storage.from(BUCKET)).upload(path, data, { contentType: mimeOf(name), upsert: true });
   if (up.error) throw new Error(up.error.message);
   const [row] = await run(db.from('files').insert({ folder_id: folderId ?? null, topic_id: topicId ?? null, name, storage_path: path,
     mime: mimeOf(name), size: data.length, text_content: body, status }).select());
   return row;
 }
 
-export async function saveFile(db, id, { name, topicId, status, text, folderId }) {
+export async function saveFile(db, id, { name, topicId, status, text, folderId }, storageOverride) {
   const f = await getFile(db, id);
   if (!f) throw new Error('File not found.');
   const patch = { name: (name || '').trim() || f.name, topic_id: topicId ?? null, status, updated_at: nowIso() };
   if (folderId !== undefined) patch.folder_id = folderId ?? null;
   if (text != null && isText(patch.name)) {
+    ownedStoragePath(db, f.storage_path);
     const data = Buffer.from(text, 'utf-8');
-    const up = await raw().storage.from(BUCKET).upload(f.storage_path, data, { contentType: f.mime || 'text/plain', upsert: true });
+    const up = await (storageOverride || raw().storage.from(BUCKET)).upload(f.storage_path, data, { contentType: f.mime || 'text/plain', upsert: true });
     if (up.error) throw new Error(up.error.message);
     Object.assign(patch, { text_content: text, size: data.length });
   }
@@ -109,17 +124,18 @@ export async function saveFile(db, id, { name, topicId, status, text, folderId }
 
 export const moveFile = (db, id, folderId) => run(db.from('files').update({ folder_id: folderId ?? null }).eq('id', id));
 
-export async function deleteFile(db, id) {
+export async function deleteFile(db, id, storageOverride) {
   const f = await getFile(db, id);
-  if (f) await raw().storage.from(BUCKET).remove([f.storage_path]);
+  if (f) await (storageOverride || raw().storage.from(BUCKET)).remove([ownedStoragePath(db, f.storage_path)]);
   await run(db.from('chunks').delete().eq('source_key', `file:${id}`));
   await run(db.from('files').delete().eq('id', id));
 }
 
-export async function signedUrl(db, id, seconds = 3600) {
+export async function signedUrl(db, id, seconds = 3600, storageOverride) {
   const f = await getFile(db, id);
   if (!f) throw new Error('File not found.');
-  const { data, error } = await raw().storage.from(BUCKET).createSignedUrl(f.storage_path, seconds);
+  const path = ownedStoragePath(db, f.storage_path);
+  const { data, error } = await (storageOverride || raw().storage.from(BUCKET)).createSignedUrl(path, seconds);
   if (error) throw new Error(error.message);
   return data.signedUrl;
 }

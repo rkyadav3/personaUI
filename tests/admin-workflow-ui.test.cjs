@@ -15,10 +15,10 @@ test('legacy and detail links select the category and the correct secondary page
   for (const [path, search, group, page] of [
     ['/admin/portfolio', '?tab=projects', 'settings', 'editor'],
     ['/admin/profile', '?tab=contrib', 'offerings', 'categories'],
-    ['/admin/writing/18', '', 'pipelines', 'articles'],
-    ['/admin/writing', '?tab=templates', 'pipelines', 'templates'],
-    ['/admin/templates', '', 'pipelines', 'templates'],
-    ['/admin/topics/7', '', 'pipelines', 'topics'],
+    ['/admin/writing/18', '', 'pipelines', 'content'],
+    ['/admin/writing', '?tab=templates', 'pipelines', 'content'],
+    ['/admin/templates', '', 'pipelines', 'content'],
+    ['/admin/topics/7', '', 'pipelines', 'content'],
     ['/admin/add', '', 'pipelines', 'files'],
     ['/admin/knowledge', '', 'pipelines', 'knowledge'],
     ['/admin/questions', '', 'activity', 'questions'],
@@ -27,11 +27,11 @@ test('legacy and detail links select the category and the correct secondary page
   assert.equal(adminLocation('/admin/writing-other'), null);
 });
 
-test('data pipelines shares one navigation with articles, templates and research topics', () => {
+test('content and knowledge exposes one Content destination instead of separate writing pages', () => {
   const { AdminSectionTabs } = require('../src/components/AdminNavigation.jsx');
   const html = render(AdminSectionTabs, { user: { isAdmin: false } }, '/admin/topics/7');
-  for (const text of ['Articles', 'Templates', 'Research topics', 'Data Pipelines pages']) assert.ok(html.includes(text), text);
-  assert.match(html, /<a(?=[^>]*href="\/admin\/topics")(?=[^>]*aria-current="page")[^>]*>/);
+  for (const text of ['Content', 'Files &amp; notes', 'AI knowledge', 'Content &amp; knowledge pages']) assert.ok(html.includes(text), text);
+  assert.match(html, /<a(?=[^>]*href="\/admin\/writing\?tab=posts")(?=[^>]*aria-current="page")[^>]*>/);
   assert.doesNotMatch(html, /superadmin/);
 });
 

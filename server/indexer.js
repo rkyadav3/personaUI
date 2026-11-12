@@ -1,5 +1,5 @@
 // Keeps the knowledge index (chunks + vectors) in step with your content. Drafts are never indexed.
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { chunk, htmlToText } from './chunker.js';
 import { env } from './config.js';
 import { embed, docText, model } from './embed.js';
@@ -13,10 +13,18 @@ const hash = (name, text) => createHash('sha1').update([name, text, CHUNK_VERSIO
 
 export const deleteSource = (db, key) => run(db.from('chunks').delete().eq('source_key', key));
 
-async function insertChunks(db, kind, sid, name, text) {
-  const key = `${kind}:${sid}`, h = hash(name, text);
-  const rows = chunk(text).map((c, i) => ({ source_key: key, source_type: kind, source_id: sid, source_name: name, source_hash: h, ord: i, heading: c.heading, content: c.text }));
+function completeSource(rows, expectedHash, expectedCount) {
+  return rows.length === expectedCount && new Set(rows.map(row => row.ord)).size === expectedCount &&
+    rows.every(row => row.source_hash === expectedHash && Number.isInteger(row.ord) && row.ord >= 0 && row.ord < expectedCount);
+}
+
+async function insertChunks(db, kind, sid, name, text, parts = chunk(text)) {
+  const key = `${kind}:${sid}`, h = hash(name, text), building = `!building:${randomUUID()}`;
+  const rows = parts.map((c, i) => ({ source_key: key, source_type: kind, source_id: sid, source_name: name, source_hash: building, ord: i, heading: c.heading, content: c.text }));
   for (let i = 0; i < rows.length; i += 100) await run(db.from('chunks').insert(rows.slice(i, i + 100)));
+  // A failed batch or killed serverless invocation leaves an incomplete marker.
+  // Publish only this build's rows; never certify another concurrent build.
+  if (rows.length) await run(db.from('chunks').update({ source_hash: h }).eq('source_key', key).eq('source_hash', building));
   return rows.length;
 }
 
@@ -32,10 +40,11 @@ export async function indexSource(db, kind, sid) {
     if (r) src = [r.title, htmlToText(r.html), r.status];
   }
   if (!src || src[2] !== 'published' || !src[1].trim()) { await deleteSource(db, key); return 0; }
-  const [cur] = await run(db.from('chunks').select('source_hash').eq('source_key', key).limit(1));
-  if (cur && cur.source_hash === hash(src[0], src[1])) return 0;
+  const parts = chunk(src[1]);
+  const current = await paged(db, 'chunks', 'source_hash,ord', query => query.eq('source_key', key));
+  if (completeSource(current, hash(src[0], src[1]), parts.length)) return 0;
   await deleteSource(db, key);
-  return insertChunks(db, kind, sid, src[0], src[1]);
+  return insertChunks(db, kind, sid, src[0], src[1], parts);
 }
 
 export async function pendingCount(db) {
@@ -80,12 +89,18 @@ export async function syncSources(db) {
     const t = htmlToText(p.html);
     if (t.trim()) wanted.set(`post:${p.id}`, ['post', p.id, p.title, t]);
   }
-  const have = Object.fromEntries((await run(db.rpc('chunk_sources'))).map(r => [r.source_key, r.source_hash]));
-  const stale = Object.keys(have).filter(k => !wanted.has(k) || hash(wanted.get(k)[2], wanted.get(k)[3]) !== have[k]);
+  const have = new Map();
+  for (const row of await paged(db, 'chunks', 'source_key,source_hash,ord')) {
+    if (!have.has(row.source_key)) have.set(row.source_key, []);
+    have.get(row.source_key).push(row);
+  }
+  const builds = new Map([...wanted].map(([key, [kind, sid, name, text]]) => [key, { kind, sid, name, text, parts: chunk(text), expectedHash: hash(name, text) }]));
+  const matches = key => { const build = builds.get(key); return !!build && completeSource(have.get(key) || [], build.expectedHash, build.parts.length); };
+  const stale = [...have.keys()].filter(key => !matches(key));
   for (const k of stale) await deleteSource(db, k);
   let added = 0;
-  for (const [k, [kind, sid, name, text]] of wanted)
-    if (have[k] !== hash(name, text)) { await insertChunks(db, kind, sid, name, text); added++; }
+  for (const [key, build] of builds)
+    if (!matches(key)) { await insertChunks(db, build.kind, build.sid, build.name, build.text, build.parts); added++; }
   return { removed: stale.length, added };
 }
 

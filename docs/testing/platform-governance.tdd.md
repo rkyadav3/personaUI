@@ -4,7 +4,7 @@ Journeys were derived from the customer's request: separate owner dashboard, cus
 
 ## Test evidence
 
-The initial `node --test tests/platform-governance.test.js tests/platform-governance-ui.test.cjs` run executed 10 tests with 0 passing and 10 failing. Failures reproduced shared admin/owner roles, publicly visible Private profiles, missing tags, restricted invites, missing suggestions and repeated contact buttons. Subsequent owner-only feature checks reproduced the owner submission form, personal Studio controls, legacy public owner profiles, missing financial UI and unapplied homepage settings. A final public-interaction lookup test reproduced legacy owner visibility and passed after the repository lookup was corrected. The complete suite now passes **413 tests, 0 failures, 0 skipped**, including the admin-experience additions and review regressions.
+The initial `node --test tests/platform-governance.test.js tests/platform-governance-ui.test.cjs` run executed 10 tests with 0 passing and 10 failing. Failures reproduced shared admin/owner roles, publicly visible Private profiles, missing tags, restricted invites, missing suggestions and repeated contact buttons. Subsequent owner-only feature checks reproduced the owner submission form, personal Studio controls, legacy public owner profiles, missing financial UI and unapplied homepage settings. A final public-interaction lookup test reproduced legacy owner visibility and passed after the repository lookup was corrected. The complete suite now passes **427 tests, 0 failures, 0 skipped**, including the admin-experience additions and review regressions.
 
 | Guarantee | Evidence |
 | --- | --- |
@@ -20,7 +20,9 @@ The initial `node --test tests/platform-governance.test.js tests/platform-govern
 | Checkout support is owner-only, validates the admin and writes through that admin’s tenant | `tests/platform-owner.test.js` |
 | Main-site settings normalize text/colors/toggles and render on the public directory | `tests/platform-owner.test.js`, `tests/platform-governance-ui.test.cjs` |
 
-Full verification command: `node --test tests/*.test.js tests/*.test.cjs`. Result: 413 pass, 0 fail.
+Full verification command: `node --test tests/*.test.js tests/*.test.cjs`. Latest result: 427 pass, 0 fail, 0 skipped.
+
+Additional review regressions cover complete storage-path validation, interrupted/legacy index recovery, current-account atomic login finalization and unified Content/Community navigation. `tests/browser/content-navigation.check.cjs` checks topic creation and refreshed article choices, Community destination content and mobile overflow using the actual App and local fixtures. Its execution was blocked by automatic approval review (`content-blocked`); no rendered pass is claimed.
 
 Build command: `node node_modules/vite/bin/vite.js build`. Result: successful production build. The host's `npm` launcher is missing its configured npm-cli.js; the repository's installed Vite executable was run directly.
 
@@ -50,7 +52,7 @@ The admin-experience browser run passed unsaved headline/section changes inside 
 
 The fixture replaces network services; it does not modify live accounts. `supabase/platform-governance.sql` was reviewed but not applied to a live database. Its row lock, registration insert, redemption trigger and use increment are designed to execute in one PostgreSQL transaction. Live migration application and concurrent PostgreSQL execution remain deployment checks.
 
-`supabase/admin-experience.sql` and `supabase/knowledge-visibility.sql` also remain unapplied. See `docs/platform-governance.md` for order, owner provisioning and activity definitions, and `docs/code-review-2026-11-12.md` for the independent full-code Standards/Spec review and four open pre-existing findings.
+`supabase/admin-experience.sql`, `supabase/knowledge-visibility.sql` and `supabase/security-hardening.sql` also remain unapplied. Apply security-hardening before deploying the new login server; missing RPC setup fails closed. Offline login contract/SQL structure checks do not establish live database concurrency behavior. See `docs/platform-governance.md` for order, owner provisioning and activity definitions, and `docs/code-review-2026-11-12.md` for the independent full-code Standards/Spec review and one remaining assistant concurrency finding.
 
 Source review traced Private access through directory, profile, legacy site, chat, enquiry, checkout, events and engagement paths. It also verified tenant-scoped admin content and server-side role checks. Existing test fixtures were updated for published-chat checks and the current Settings/navigation routes.
 

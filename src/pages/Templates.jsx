@@ -1,7 +1,7 @@
 import Writing from './Writing.jsx';
 
 /**
- * Templates shares article editing with Writing and navigation with Data Pipelines.
+ * Legacy Templates links open the shared Content workspace.
  * Navigating to /admin/templates opens the Templates tab directly.
  */
 export default function Templates() {

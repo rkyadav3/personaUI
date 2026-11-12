@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -8,6 +8,9 @@ import { useOp, useTopics } from '../lib/hooks.js';
 import { Confirm, Field, Loading, Notice, Pill } from '../components/Ui.jsx';
 import { TopicSelect } from '../components/Selects.jsx';
 import Icon from '../components/portfolio/Icon.jsx';
+import ContentNavigation from '../components/ContentNavigation.jsx';
+import Topics from './Topics.jsx';
+import { CONTENT_TABS } from '../lib/contentNavigation.js';
 
 const TOOLBAR = [
   [{ header: [1, 2, 3, false] }, { font: [] }, { size: ['small', false, 'large', 'huge'] }],
@@ -46,10 +49,16 @@ function TemplateRow({ t, reload }) {
 function ListView({ defaultTab = 'posts' }) {
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const tab = (params.get('tab') || defaultTab) === 'templates' ? 'templates' : 'posts';
+  const requestedTab = params.get('tab') || defaultTab;
+  const tab = CONTENT_TABS.some(item => item.id === requestedTab) ? requestedTab : 'posts';
 
   const { data: posts, reload: reloadPosts, error: postsError } = useOp('posts.list');
-  const { data: topics } = useTopics();
+  const { data: topics, reload: reloadTopics } = useTopics();
+  const previousTab = useRef(tab);
+  useEffect(() => {
+    if (previousTab.current === 'topics' && tab !== 'topics') reloadTopics();
+    previousTab.current = tab;
+  }, [tab, reloadTopics]);
   const { data: tpls, reload: reloadTpls, error: tplsError } = useOp('templates.list');
 
   const [selectedTpl, setSelectedTpl] = useState('');
@@ -96,15 +105,16 @@ function ListView({ defaultTab = 'posts' }) {
     <>
       <div className="head">
         <div>
-          <h1>{tab === 'templates' ? 'Article templates' : 'Articles'}</h1>
+          <h1>Content</h1>
           <p className="muted" style={{ margin: 0 }}>
-            {tab === 'templates' ? 'Create reusable article outlines, then use them to start a draft.' : 'Write and publish material your AI persona can use when answering visitors.'}
+            Templates start your drafts, articles hold your writing, and research topics group related articles and files.
           </p>
         </div>
       </div>
+      <ContentNavigation active={tab} />
 
       {/* UX Guide Banner */}
-      <div className="ux-guide-banner">
+      {tab !== 'topics' && <div className="ux-guide-banner">
         <div className="ux-guide-icon"><Icon n={tab === 'templates' ? 'template' : 'pen'} size={24} /></div>
         <div className="ux-guide-content">
           <h4>{tab === 'templates' ? 'Template → article → publish' : 'Draft → review → publish'}</h4>
@@ -112,9 +122,10 @@ function ListView({ defaultTab = 'posts' }) {
             {tab === 'templates' ? 'Templates are reusable starting points. They become AI knowledge only when an article using them is published and indexed.' : 'Drafts stay private. Published articles are indexed so your persona can reference them in public chat. Check AI knowledge if indexing needs attention.'}
           </p>
         </div>
-      </div>
+      </div>}
 
       <Notice kind="error">{operationError}</Notice>
+      {tab === 'topics' && <Topics embedded />}
 
       {/* TAB 1: POSTS & ARTICLES */}
       {tab === 'posts' && (
@@ -284,6 +295,7 @@ function EditorView({ id }) {
 
   return (
     <>
+      <ContentNavigation active="posts" />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <Link to="/admin/writing" className="btn small">← Back to Articles</Link>
         <span className="muted" style={{ fontSize: '.88rem' }}>Status: <b>{state}</b></span>

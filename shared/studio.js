@@ -1,6 +1,6 @@
 // Overview opens existing studio tools. It does not execute commands or change content.
 export const STUDIO_SHORTCUTS = [
-  { label: 'Create a new template', to: '/admin/templates', icon: 'template' },
+  { label: 'Create a new template', to: '/admin/writing?tab=templates', icon: 'template' },
   { label: 'Write a post', to: '/admin/writing', icon: 'pen' },
   { label: 'Update my persona', to: '/admin/settings?tab=persona', icon: 'spark' },
   { label: 'Organize my files', to: '/admin/files', icon: 'folder' },

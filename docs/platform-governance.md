@@ -4,6 +4,8 @@ Run `supabase/platform-governance.sql` in the Supabase SQL editor after `multite
 
 Then run `supabase/studio-chat.sql` if it is not installed, followed by `supabase/admin-experience.sql` and `supabase/knowledge-visibility.sql`. The first adds registered custom tags, computed profile privacy, activity snapshots and assistant insights. The second checks current source publication during keyword/vector retrieval and removes stale chunks transactionally on unpublish/delete. These migrations have been source-reviewed locally; they have not been applied to a live database.
 
+Run `supabase/security-hardening.sql` after `platform-governance.sql`, `home.sql` and `studio-assistant.sql`, **before deploying the matching server**. It adds service-only atomic login finalization and serializes offering rating aggregation. The new login code fails closed if `finalize_login` is unavailable; apply this migration before deploying or existing users cannot sign in. SQL execution and concurrency have not been verified against a live database.
+
 Set `SUPERADMIN_EMAILS` to the platform owner's login email(s). SuperAdmin and Admin are mutually exclusive: all other registered accounts are profile admins. For existing installations without `SUPERADMIN_EMAILS`, the old `ADMIN_EMAILS` list retains owner access until an explicit owner list is configured. Never put service keys in `VITE_*` variables.
 
 Public registration rejects configured owner email addresses, including the legacy owner fallback. It cannot establish ownership merely by typing a privileged email. Existing owners sign in normally. For first setup, the platform operator must provision the owner in `public.users` through the trusted server/database with a bcrypt password hash (cost 12), a unique slug and the configured owner email. Never store a plaintext password or use a public invitation as owner provisioning. Owner access continues to be derived from the server configuration.
@@ -13,6 +15,8 @@ The SuperAdmin dashboard is `/superadmin`, with Customers, Sales & payments, Inv
 Customers includes **Add new tag** with a name (up to 40 characters) and Public or Private visibility. Registered tags appear in account filters and assignment controls; public badges use the saved label on directory cards and profiles. Any private tag wins over public tags. The database computes `users.profile_private`; public reads fail closed if a custom-tagged account lacks that value. Updating a registry visibility in the database recomputes affected accounts. Built-in definitions and tag keys cannot be altered; there is no tag deletion/editing UI.
 
 Every profile admin can use `/admin/invites` and `/admin/suggestions`, including before completing a profile. Admins see and revoke their own invite links and view their own invited-member log. The SuperAdmin can create invites and sees all links and joins in `/superadmin/invites`. Creating an invite records the authenticated creator, and registration locks the invite, creates the account, consumes one use and logs the invited member in one transaction. Existing joins are backfilled. Identity snapshots and logs survive account deletion; previously deleted accounts cannot be reconstructed by the migration.
+
+Admin Invite links and Suggestions are grouped under **Community**, outside Settings. **Content & knowledge → Content** combines Articles, Templates and Research topics in one workspace with three named tabs. Templates provide reusable article structure, while topics organize related articles and files. Newly created topics are available in article selectors when switching back. Existing article/template/topic URLs remain supported.
 
 Suggestions support Add, Remove and Update. Only admins can submit them. Senders see their own suggestions and the owner's response. The SuperAdmin sees all suggestions, replies and sets New, Reviewed, Planned, Done or Declined; the owner has no submission form and the server rejects owner submissions. No emails or external notifications are sent.
 
@@ -32,4 +36,4 @@ The public header shows Login to visitors and an exit icon with Dashboard and Lo
 
 Public profile, site and directory responses are not cached, so privacy updates apply to subsequent requests. Private knowledge is also checked before any chat retrieval. Existing publicly hosted image URLs remain public storage assets; the tag controls application profile and knowledge access.
 
-See `docs/code-review-2026-11-12.md` for the full-code review, fixes and remaining pre-existing concurrency/indexing findings.
+See `docs/code-review-2026-11-12.md` for the full-code review, fixes and remaining assistant concurrency finding.

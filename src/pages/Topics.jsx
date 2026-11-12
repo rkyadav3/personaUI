@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useOp } from '../lib/hooks.js';
 import { Confirm, Crumbs, Field, Loading, Notice, Pill } from '../components/Ui.jsx';
 import Icon from '../components/portfolio/Icon.jsx';
+import ContentNavigation from '../components/ContentNavigation.jsx';
 
 function Detail({ id }) {
   const nav = useNavigate();
@@ -25,7 +26,7 @@ function Detail({ id }) {
   }, [topic?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!topics) return <Loading error={topicsError} label="Loading topic…" />;
-  if (!topic) return <><p className="muted">That topic no longer exists.</p><Link to="/admin/topics">← All topics</Link></>;
+  if (!topic) return <><p className="muted">That topic no longer exists.</p><Link to="/admin/writing?tab=topics">← All topics</Link></>;
 
   const myFiles = (files || []).filter(f => f.topic_id === id);
   const myPosts = (posts || []).filter(p => p.topic_id === id);
@@ -107,7 +108,7 @@ function Detail({ id }) {
   );
 }
 
-function List() {
+function List({ embedded = false }) {
   const { data: topics, reload, error } = useOp('topics.list');
   const [name, setName] = useState(''), [desc, setDesc] = useState('');
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(null), [search, setSearch] = useState('');
@@ -117,7 +118,7 @@ function List() {
     <>
       <div className="head">
         <div>
-          <h1>Research Topics</h1>
+          {embedded ? <h2>Research topics</h2> : <h1>Research Topics</h1>}
           <p className="muted" style={{ margin: 0 }}>
             Group related files and articles so your source material is easier to find.
           </p>
@@ -227,7 +228,7 @@ function List() {
   );
 }
 
-export default function Topics() {
+export default function Topics({ embedded = false }) {
   const { id } = useParams();
-  return id ? <Detail key={id} id={Number(id)} /> : <List />;
+  return <>{!embedded && <ContentNavigation active="topics" />}{id ? <Detail key={id} id={Number(id)} /> : <List embedded={embedded} />}</>;
 }

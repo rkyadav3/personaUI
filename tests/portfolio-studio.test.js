@@ -76,7 +76,7 @@ test('ordinary page edits preserve background and image settings not sent by the
 test('overview commands open the requested studio tool without performing changes', async () => {
   const { resolveStudioAction, greetingForHour } = await import('../shared/studio.js');
   const cases = [
-    ['Create a new template for a conference talk', '/admin/templates'],
+    ['Create a new template for a conference talk', '/admin/writing?tab=templates'],
     ['Write a post', '/admin/writing'],
     ['Update my persona', '/admin/settings?tab=persona'],
     ['Organize my files', '/admin/files'],

@@ -41,6 +41,8 @@ async function operation(op, args) {
     case 'purchases.list': return { rows: [], summary: {}, total: 0, page: 1, pageSize: 50 };
     case 'payments.settings': return { enabled: false, configured: true, webhookConfigured: true, testMode: true };
     case 'users.list': return { users: [user], codes: [] };
+    case 'invites.list': return { codes: [], redemptions: [] };
+    case 'suggestions.list': return { rows: [] };
     case 'updates.list': return [];
     case 'folders.all': return folders;
     case 'folders.create': { const row = { id: nextId++, name: args.name, parent_id: args.parentId }; folders.push(row); return row; }

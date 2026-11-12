@@ -51,12 +51,12 @@ test('empty sections explain their state and closed enquiries never expose a sub
   assert.doesNotMatch(contact, /<form/);
 });
 
-test('admin has five primary groups and a separate visible Logout action', () => {
+test('admin has clear primary groups including Community and a separate Logout action', () => {
   const { StudioSidebar } = require('../src/components/Layout.jsx');
   const html = render(StudioSidebar, { user: { name: 'Owner', isAdmin: false }, onLogout() {}, logoutError: 'Please retry logout' }, '/admin');
   const nav = html.match(/<div class="studio-primary-nav">([\s\S]*?)<\/div>/)[1];
-  assert.equal([...nav.matchAll(/<a\b/g)].length, 5);
-  for (const label of ['Overview', 'Activity &amp; Orders', 'Offerings', 'Data Pipelines', 'Settings']) assert.ok(nav.includes(label), label);
+  assert.equal([...nav.matchAll(/<a\b/g)].length, 6);
+  for (const label of ['Overview', 'Activity &amp; Orders', 'Offerings', 'Content &amp; knowledge', 'Community', 'Settings']) assert.ok(nav.includes(label), label);
   assert.doesNotMatch(nav, /Logout/);
   assert.match(html, /studio-logout[\s\S]*Logout[\s\S]*role="alert"[\s\S]*Please retry logout/);
 });
