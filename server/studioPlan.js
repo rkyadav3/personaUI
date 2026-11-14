@@ -9,17 +9,20 @@ import { ENQUIRY_STATUS, ENQUIRY_TYPES } from '../shared/enquiryTypes.js';
 import { isText } from './extract.js';
 import { normalizeDraft, normalizeVisibility } from './profile.js';
 import { HttpError } from './http.js';
+import { customizationReferences } from '../shared/customizationReferences.js';
+import { CUSTOMIZATION_DEFAULTS, customizationProblem, normalizeCustomization, applyStylePreset } from '../shared/customization.js';
 
 const fail = message => { throw new HttpError(400, message); };
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
 const copy = value => structuredClone(value);
 const owns = (value, key) => Object.hasOwn(value || {}, key);
 const trim = (value, max = 2000) => typeof value === 'string' ? value.trim().slice(0, max) : '';
-const ARRAYS = { projects: 24, products: 24, experience: 20, talks: 24, awards: 3, domains: 8, socials: 7, stats: 4 };
-const SINGLE = new Set(['profile', 'portfolio', 'look', 'persona', 'portrait', 'background', 'payments', 'knowledge']);
+const ARRAYS = { projects: 24, products: 24, experience: 20, talks: 24, awards: 3, recognition: 24, certificates: 24, testimonials: 24, domains: 8, socials: 7, stats: 4 };
+const STABLE_ARRAYS = new Set(['products', 'awards', 'recognition']);
+const SINGLE = new Set(['profile', 'portfolio', 'look', 'persona', 'portrait', 'background', 'customization', 'payments', 'knowledge']);
 const referenceFields = new Set(['parentId', 'folderId', 'topicId', 'contributionId', 'templateId']);
-const bools = new Set(['featured', 'enabled', 'active', 'visible', 'pinned', 'fulfilled', 'locked', 'revoked', 'removeImage', 'show', 'on', 'mic', 'sources', 'parallax', 'requirePhone', 'showAttendees', 'required']);
-const numbers = new Set(['amount', 'price', 'zoom', 'x', 'y', 'blur', 'brightness', 'dim', 'ballOpacity', 'size', 'radius', 'maxWidth', 'wash', 'refraction', 'tint', 'dispersion', 'rim', 'shadow', 'maxUses', 'days', 'total_years']);
+const bools = new Set(['cart', 'featured', 'enabled', 'active', 'visible', 'pinned', 'fulfilled', 'locked', 'revoked', 'removeImage', 'show', 'on', 'mic', 'sources', 'parallax', 'requirePhone', 'showAttendees', 'required']);
+const numbers = new Set(['storeLimit', 'amount', 'price', 'zoom', 'x', 'y', 'blur', 'brightness', 'dim', 'ballOpacity', 'size', 'radius', 'maxWidth', 'wash', 'refraction', 'tint', 'dispersion', 'rim', 'shadow', 'maxUses', 'days', 'total_years']);
 const nested = {
   theme: 'bg bgColor font radius maxWidth wash', glass: 'on refraction blur tint dispersion rim shadow', sections: 'store expertise education experience',
   chat: 'mic sources', layout: 'sidebar photo', ball: 'show size', availability: 'show text', cta: 'label url', intro: 'label url', navCta: 'label url',
@@ -40,6 +43,7 @@ function safeTree(value, depth = 0) {
 }
 
 function validateValues(name, values) {
+  if (name === 'customization') { const problem = customizationProblem(values); if (problem) fail(problem); return; }
   const objects = new Set(['theme', 'glass', 'sections', 'placement', 'chat', 'layout', 'availability', 'cta', 'intro', 'navCta', 'rsvp', 'enquiry', 'visibility', 'contact', 'details', 'navLabels']);
   if (name === 'persona') objects.add('ball');
   if (name === 'portfolio') objects.add('about');
@@ -99,6 +103,7 @@ function validateValues(name, values) {
     for (const key of keys) if (owns(values[parent], key) && typeof values[parent][key] !== 'string') fail(`${parent}.${key} must be text.`);
   }
   if (name === 'updates') { choices(values.kind, Object.keys(UPDATE_KINDS), 'update kind'); choices(values.status, ['draft', 'published'], 'publication status'); }
+  if (name === 'recognition') choices(values.kind, ['recognition', 'award'], 'recognition type');
   if (name === 'contributions') choices(values.intent, INTENTS, 'offering intent');
   choices(values.accent, Object.keys(ACCENTS), 'accent');
   choices(values.theme?.bg, Object.keys(BG_MODES), 'background');
@@ -135,9 +140,9 @@ export const studioHtml = text => String(text || '').split(/\r?\n/).map(line => 
 export function studioRecords(state, name) {
   const item = STUDIO_ENTITIES[name];
   if (!item) fail('Unknown assistant area.');
-  if (ARRAYS[name]) return (state.settings?.portfolio?.[name] || []).map((row, index) => ({ ...row, id: name === 'products' ? row.id : `index:${index}` }));
-  if (['portfolio', 'look', 'persona', 'portrait', 'background'].includes(name)) {
-    const settings = state.settings || {}, source = name === 'portfolio' ? settings.portfolio : name === 'background' ? settings.bg : name === 'portrait' ? settings.page?.hero : settings.page;
+  if (ARRAYS[name]) return (state.settings?.portfolio?.[name] || []).map((row, index) => ({ ...row, id: STABLE_ARRAYS.has(name) ? row.id : `index:${index}` }));
+  if (['portfolio', 'look', 'persona', 'portrait', 'background', 'customization'].includes(name)) {
+    const settings = state.settings || {}, source = name === 'customization' ? normalizeCustomization(settings.page?.customization) : name === 'portfolio' ? settings.portfolio : name === 'background' ? settings.bg : name === 'portrait' ? settings.page?.hero : settings.page;
     return [{ ...Object.fromEntries(item.fields.filter(key => owns(source, key)).map(key => [key, source[key]])), id: 'current' }];
   }
   if (SINGLE.has(name)) return state[item.root] ? [{ ...state[item.root], id: name === 'profile' ? state.profile.id : 'current' }] : [];
@@ -153,6 +158,8 @@ export function studioModelContext(state, entities, user) {
     const rows = studioRecords(state, name);
     const referenceRoots = { files: ['folders', 'topics'], folders: ['folders'], posts: ['topics', 'templates'], offerings: ['contributions'], contributions: ['offerings'], responses: ['updates'] };
     const references = Object.fromEntries((referenceRoots[name] || []).map(root => [root, (state[root] || []).slice(0, 80).map(row => fieldsOf(row, ['id', 'name', 'title', 'category', 'subtype', 'eventId']))]));
+    if (name === 'customization') { const choices = customizationReferences(state.settings?.portfolio, state.offerings); references.store = choices.homeFeaturedItems; references.awards = choices.homeAwards; }
+
     return [name, { total: rows.length, references, records: rows.slice(0, 80).map(row => {
       const readFields = {
         files: ['mime', 'size'],
@@ -187,7 +194,7 @@ function price(value, amountKey) {
 function urls(values) {
   for (const [key, value] of Object.entries(values)) {
     if (['url', 'demoUrl', 'repoUrl'].includes(key) && value && !cleanUrl(value)) fail(`Use a valid link for ${key}.`);
-    if (['image', 'deliveryUrl'].includes(key) && value && !cleanImg(value)) fail(`Use an HTTP or HTTPS image/access link for ${key}.`);
+    if (['image', 'imageUrl', 'deliveryUrl'].includes(key) && value && !cleanImg(value)) fail(`Use an HTTP or HTTPS image/access link for ${key}.`);
     if (object(value)) urls(value);
   }
 }
@@ -262,16 +269,24 @@ export function makeStudioPlan(proposal, input, user) {
         if (mode === 'delete') { list.splice(index, 1); arrayTargets[name].splice(index, 1); }
         else {
           const merged = studioMerge(before || (name === 'products' ? { pricing: 'unspecified', currency: 'INR' } : {}), values);
-          if (name === 'products') { merged.id = before?.id || randomUUID(); price(merged, 'amount'); }
+          if (STABLE_ARRAYS.has(name)) merged.id = before?.id || randomUUID();
+          if (name === 'products') price(merged, 'amount');
           if (name === 'projects' && merged.featured) list.forEach(row => { row.featured = false; });
           const normalized = normalizePortfolio({ [name]: [merged] })[name][0];
           if (!normalized) fail(`Give the ${name} item a title or required value.`);
           if (mode === 'create') { list.push(normalized); arrayTargets[name].push(`new:${randomUUID()}`); } else list[index] = normalized;
         }
+      } else if (name === 'customization') {
+        const choices = customizationReferences(settings.portfolio, state.offerings);
+        if (owns(values, 'homeFeaturedItems')) { expected('offerings'); if (values.homeFeaturedItems.some(id => !choices.homeFeaturedItems.some(row => row.id === id))) fail('Choose an existing Store item from your own records.'); }
+        if (owns(values, 'homeAwards') && values.homeAwards.some(id => !choices.homeAwards.some(row => row.id === id))) fail('Choose an existing award from your own records.');
+        let custom = mode === 'delete' ? copy(CUSTOMIZATION_DEFAULTS) : { ...settings.page.customization, ...values };
+        if (owns(values, 'preset')) custom = { ...applyStylePreset(settings.page.customization, values.preset), ...values };
+        settings.page.customization = normalizeCustomization(custom);
       } else if (name === 'portfolio') settings.portfolio = mode === 'delete' ? normalizePortfolio(PORTFOLIO_DEFAULTS) : normalizePortfolio(studioMerge(settings.portfolio, values));
-      else if (name === 'portrait') { if (mode === 'delete') { heroPath = null; settings.heroUrl = null; } else settings.page.hero = { ...settings.page.hero, ...values }; }
+      else if (name === 'portrait') { if (mode === 'delete') { heroPath = null; settings.heroUrl = null; settings.page.hero = { ...settings.page.hero, imageUrl: '' }; } else settings.page.hero = { ...settings.page.hero, ...values }; }
       else if (name === 'background') {
-        if (mode === 'delete' || values.removeImage === true) { path = null; settings.imageUrl = null; }
+        if (mode === 'delete' || values.removeImage === true) { path = null; settings.imageUrl = null; settings.bg.imageUrl = ''; }
         if (mode === 'delete') settings.bg = normalizeBg(); else { const { removeImage, ...patch } = values; settings.bg = normalizeBg({ ...settings.bg, ...patch }); }
       } else {
         const patch = mode === 'delete' ? Object.fromEntries(spec.fields.map(field => [field, PAGE_DEFAULTS[field]])) : values;
@@ -410,7 +425,7 @@ export function makeStudioPlan(proposal, input, user) {
     const before = input.settings, after = state.settings, fields = studioDiff(before, after);
     if (fields.length) {
       changed.unshift({ id: 'settings', title: 'Update Portfolio, Look & Store and Persona', kind: 'update', entity: 'portfolio', href: '/admin/settings', before, after, fields, warning: fields.some(field => field.after === null) ? 'Removed images and deleted items are published when you approve.' : '', affected: [] });
-      steps.unshift({ op: 'page.save', entity: 'portfolio', title: 'Save Portfolio and Persona', href: '/admin/settings', args: { page: after.page, portfolio: after.portfolio, bg: after.bg, ...(heroPath === null ? { heroPath: null } : {}), ...(path === null ? { path: null } : {}) } });
+      steps.unshift({ op: 'page.save', entity: 'portfolio', title: 'Save Portfolio and Persona', href: '/admin/settings', args: { expectedVersion: before.version, page: after.page, portfolio: after.portfolio, bg: after.bg, ...(heroPath === null ? { heroPath: null } : {}), ...(path === null ? { path: null } : {}) } });
     }
   }
   if (steps.some(step => step.entity === 'knowledge') && steps.length > 1) fail('Run knowledge index jobs in their own review.');

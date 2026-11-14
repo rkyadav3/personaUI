@@ -16,7 +16,7 @@ export default function Chat({ m, ctx, data }) {
   const inputRef = useRef(null), controller = useRef(null), recognition = useRef(null), pending = useRef(false), conversationRef = useRef(null), panelRef = useRef(null), dockRef = useRef(null);
   const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
   const name = m.first || m.name || 'this creator';
-  const popularProducts = popularChatProducts(m.products);
+  const popularProducts = page.customization.chatStore ? popularChatProducts(m.products) : [];
   const prompts = page.chips.length ? page.chips : [
     { label: 'About me', prompt: 'Tell me about yourself and your work' },
     ...(m.products.length ? [{ label: 'Explore the shop', prompt: 'What products and services do you offer?' }] : []),
@@ -94,7 +94,7 @@ export default function Chat({ m, ctx, data }) {
   }
 
   return (
-    <section className={`pf-wrap pf-chat-page sidebar-${page.layout.sidebar}`} aria-label={`Chat with ${name}`}>
+    <section className={`pf-wrap pf-chat-page sidebar-${page.layout.sidebar} bubbles-${page.customization.chatBubbleStyle}`} aria-label={`Chat with ${name}`}>
       <div className="pf-chat-main">
         <header className="pf-chat-heading">
           <span className="pf-kicker">Meet my persona</span>
@@ -104,7 +104,7 @@ export default function Chat({ m, ctx, data }) {
         <div className="pf-chat-workspace" ref={panelRef} style={{ '--pf-chat-orb-size': `${page.ball.size}px` }}>
           {page.ball.show && bg.ball && <div className="pf-chat-orb" style={{ opacity: bg.ballOpacity / 100 }} aria-hidden="true"><div className="pf-chat-orb-visual"><PersonaBall width={page.ball.size} height={page.ball.size} mode={busy ? 'thinking' : listening ? 'listening' : 'idle'} /></div></div>}
           <div ref={conversationRef} className={`pf-conversation${messages.length ? ' has-messages' : ''}`} role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions" aria-busy={busy} tabIndex={0}>
-            {!messages.length && <p className="pf-chat-welcome">Start a conversation, or choose a question below.</p>}
+            {!messages.length && <p className="pf-chat-welcome">{page.customization.chatWelcome || 'Start a conversation, or choose a question below.'}</p>}
             {messages.map((message, index) => <article className={`pf-message ${message.role}`} key={index}>
               <span className="pf-message-name">{message.role === 'user' ? 'You' : name}</span>
               <p>{message.text}</p>
@@ -115,7 +115,7 @@ export default function Chat({ m, ctx, data }) {
           <div className="pf-chat-dock" ref={dockRef}>
             {error && <p className="pf-chat-error" role="alert">{error}</p>}
             {listening && <p className="pf-chat-working" role="status">Listening… Speak your question, then stop the microphone to edit it.</p>}
-            <div className="pf-chat-prompts" aria-label="Suggested questions">{prompts.map(prompt => <button key={prompt.label} type="button" disabled={busy} onClick={event => send(event, prompt.prompt)}>{prompt.label}</button>)}</div>
+            {page.customization.chatSuggestions && <div className="pf-chat-prompts" aria-label="Suggested questions">{prompts.map(prompt => <button key={prompt.label} type="button" disabled={busy} onClick={event => send(event, prompt.prompt)}>{prompt.label}</button>)}</div>}
             <form className="pf-chat-composer" onSubmit={send}>
               <label className="studio-sr-only" htmlFor={`chat-message-${ctx.slug}`}>Message to {name}</label>
               <textarea id={`chat-message-${ctx.slug}`} ref={inputRef} aria-label={`Message to ${name}`} aria-describedby={`chat-help-${ctx.slug}`} rows={1} value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (shouldSubmitChat(event)) { event.preventDefault(); send(event); } }} maxLength={500} placeholder={page.placeholder || 'Ask me anything about my work…'} autoComplete="off" disabled={busy} />
@@ -139,7 +139,7 @@ export default function Chat({ m, ctx, data }) {
         </LiquidGlass>
         {popularProducts.length > 0 && <section className="pf-chat-popular" aria-label="Popular products">
           <header><h2>Popular products</h2>{ctx.preview ? <button type="button" onClick={() => ctx.go('store')}>View Store <Icon n="arrow" size={14} /></button> : <Link to={`/p/${ctx.slug}/store`}>View Store <Icon n="arrow" size={14} /></Link>}</header>
-          <Shop items={popularProducts} slug={ctx.slug} owner={m.owner} user={ctx.user} preview={ctx.preview} />
+          <Shop customization={page.customization} items={popularProducts} slug={ctx.slug} owner={m.owner} user={ctx.user} preview={ctx.preview} />
         </section>}
       </aside>
     </section>

@@ -30,7 +30,7 @@ test('account menu shows login for visitors and dashboard and logout for signed-
 test('members get invites and suggestions and only SuperAdmins get platform navigation', () => {
   const { StudioSidebar } = require('../src/components/Layout.jsx');
   const html = render(StudioSidebar, { user: { name: 'Member' } }, '/admin');
-  assert.match(html, /Community/); assert.match(html, /href="\/admin\/invites"/); assert.doesNotMatch(html, /SuperAdmin dashboard/);
+  assert.match(html, />Invite</); assert.match(html, /href="\/admin\/invites"/); assert.doesNotMatch(html, /SuperAdmin dashboard/);
   const owner = render(StudioSidebar, { user: { name: 'Owner', isSuperAdmin: true } }, '/superadmin');
   assert.match(owner, /SuperAdmin dashboard/);
 });

@@ -80,8 +80,8 @@ test('overview commands open the requested studio tool without performing change
     ['Write a post', '/admin/writing'],
     ['Update my persona', '/admin/settings?tab=persona'],
     ['Organize my files', '/admin/files'],
-    ['Edit my shop', '/admin/settings?tab=store'],
-    ['Add a project', '/admin/settings?tab=projects'],
+    ['Edit my shop', '/admin/store'],
+    ['Add a project', '/admin/activity?tab=projects'],
     ['See my purchases', '/admin/purchases'],
   ];
   for (const [query, target] of cases) assert.equal(resolveStudioAction(query)?.to, target, query);

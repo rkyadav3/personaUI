@@ -150,8 +150,8 @@ export function buildHomeFeed({
       ratingAvg,
       ratingCount,
       engagements: mineOffers.reduce((n, o) => n + o.clicks, 0),
-      photo: site?.hero_path ? publicUrl(site.hero_path) : null,
-      photoFocus: page.hero,
+      photo: page.hero.imageUrl || (site?.hero_path ? publicUrl(site.hero_path) : null),
+      photoFocus: { zoom: page.hero.zoom, x: page.hero.x, y: page.hero.y },
       cover: site?.bg_path ? publicUrl(site.bg_path) : null
     });
   }

@@ -20,8 +20,8 @@ async page => {
   const settings = page.getByRole('navigation', { name: 'Settings pages', exact: true });
   check(await settings.getByRole('link', { name: 'Invite links', exact: true }).count() === 0, 'Invites remain in Settings');
   check(await settings.getByRole('link', { name: 'Suggestions', exact: true }).count() === 0, 'Suggestions remain in Settings');
-  await page.getByRole('link', { name: 'Community', exact: true }).click();
-  const community = page.getByRole('navigation', { name: 'Community pages', exact: true });
+  await page.getByRole('link', { name: 'Invite', exact: true }).click();
+  const community = page.getByRole('navigation', { name: 'Invite pages', exact: true });
   await community.getByRole('link', { name: 'Suggestions', exact: true }).waitFor();
   await page.getByRole('heading', { name: 'Invite links', exact: true }).waitFor();
   await page.getByRole('heading', { name: 'Your invite links', exact: true }).waitFor();
@@ -30,7 +30,7 @@ async page => {
   await page.getByRole('heading', { name: 'Platform suggestions', exact: true }).waitFor();
   await page.getByRole('heading', { name: 'Suggest an improvement', exact: true }).waitFor();
   check(await page.getByText(/Fixture does not support/).count() === 0, 'Suggestions destination failed to load');
-  results.push('Invites and Suggestions moved from Settings to Community');
+  results.push('Invites and Suggestions remain outside Settings under Invite');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${base}?route=${encodeURIComponent('/admin/writing?tab=topics')}`);
   await page.getByRole('heading', { name: 'Research topics', exact: true }).waitFor();

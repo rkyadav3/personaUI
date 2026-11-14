@@ -56,7 +56,7 @@ export function RsvpForm({ event, slug, owner, preview, onSaved }) {
   );
 }
 
-export function AttendanceCard({ event, slug, owner, preview, now, past = false }) {
+export function AttendanceCard({ event, slug, owner, preview, now, past = false, showDates = true, showDescriptions = true }) {
   const cfg = normalizeEventForm(event.rsvp);
   const [summary, setSummary] = useState(preview ? { going: 0, notGoing: 0, goingNames: [], notGoingNames: [], accepting: cfg.enabled && !past } : null);
   const [error, setError] = useState(''), [open, setOpen] = useState(false), [saved, setSaved] = useState('');
@@ -72,7 +72,7 @@ export function AttendanceCard({ event, slug, owner, preview, now, past = false 
   }, [url, preview]);
   const accepting = !past && cfg.enabled && summary?.accepting !== false;
   return (
-    <EventRow x={event} now={now} past={past}>
+    <EventRow showDates={showDates} showDescriptions={showDescriptions} x={event} now={now} past={past}>
       <div className="persona-attendance">
         {summary ? <>
           <div className="persona-attendance-counts"><span><b>{summary.going}</b>Going</span><span><b>{summary.notGoing}</b>Not going</span></div>
@@ -92,9 +92,9 @@ export function AttendanceCard({ event, slug, owner, preview, now, past = false 
   );
 }
 
-export default function Events({ events, slug, owner, preview = false }) {
+export default function Events({ events, slug, owner, preview = false, showDates = true, showDescriptions = true }) {
   const now = Date.now(), { upcoming, past } = splitSchedule(events, now);
-  const card = event => <AttendanceCard key={event.id} event={event} slug={slug} owner={owner} preview={preview} now={now} past={past.includes(event)} />;
+  const card = event => <AttendanceCard showDates={showDates} showDescriptions={showDescriptions} key={event.id} event={event} slug={slug} owner={owner} preview={preview} now={now} past={past.includes(event)} />;
   if (!events.length) return null;
   return (
     <div className="persona-events">

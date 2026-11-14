@@ -8,11 +8,12 @@ import { normalizePortfolio } from '../shared/portfolio.js';
 import { env } from './config.js';
 import { raw, run } from './supabase.js';
 import { canViewProfile } from '../shared/governance.js';
+import { HttpError } from './http.js';
 
 const EXT = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' };
 export const publicUrl = path => `${process.env.SUPABASE_URL}/storage/v1/object/public/${BG_BUCKET}/${path}`;
 const row = async db => (await run(db.from('site_settings').select('*').limit(1)))[0] || null;
-const view = r => ({ imageUrl: r?.bg_path ? publicUrl(r.bg_path) : null, bg: normalizeBg(r?.bg), heroUrl: r?.hero_path ? publicUrl(r.hero_path) : null, page: normalizePage(r?.page), portfolio: normalizePortfolio(r?.portfolio) });
+const view = r => ({ version: r?.updated_at || null, uploadedImageUrl: r?.bg_path ? publicUrl(r.bg_path) : null, uploadedHeroUrl: r?.hero_path ? publicUrl(r.hero_path) : null, imageUrl: normalizeBg(r?.bg).imageUrl || (r?.bg_path ? publicUrl(r.bg_path) : null), bg: normalizeBg(r?.bg), heroUrl: normalizePage(r?.page).hero.imageUrl || (r?.hero_path ? publicUrl(r.hero_path) : null), page: normalizePage(r?.page), portfolio: normalizePortfolio(r?.portfolio) });
 
 export async function getSettings(db) { return view(await row(db)); }
 
@@ -32,8 +33,14 @@ export function saveSettings(db, { bg, path }, storageOverride) {
 }
 
 /** Save the look of the public profile page (/p/<slug>), and optionally switch its hero photo (the old file is deleted). */
-export async function savePage(db, { page, portfolio, heroPath, bg, path }, storageOverride) {
+export async function savePage(db, { page, portfolio, portfolioPatch, heroPath, bg, path, expectedVersion }, storageOverride) {
   const cur = await row(db);
+  const conflict = () => { throw new HttpError(409, 'Your settings changed in another editor or assistant review. Reload the latest settings and review your changes again.'); };
+  if (expectedVersion !== undefined && expectedVersion !== (cur?.updated_at || null)) conflict();
+  if (portfolioPatch !== undefined) {
+    if (!portfolioPatch || typeof portfolioPatch !== 'object' || Array.isArray(portfolioPatch) || Object.keys(portfolioPatch).some(key => !Object.hasOwn(normalizePortfolio(), key))) throw new HttpError(400, 'Unknown portfolio field.');
+    portfolio = { ...cur?.portfolio, ...portfolioPatch };
+  }
   const patch = { updated_at: new Date().toISOString() };
   if (bg !== undefined) patch.bg = normalizeBg(bg);
   const uploads = [['hero_path', heroPath], ['bg_path', path]];
@@ -46,10 +53,16 @@ export async function savePage(db, { page, portfolio, heroPath, bg, path }, stor
   if (portfolio !== undefined) {
     patch.portfolio = normalizePortfolio(portfolio);
     const ids = new Set();
+    const remapped = new Map();
     patch.portfolio.products = patch.portfolio.products.map(product => {
       const id = product.id.startsWith('legacy-') || ids.has(product.id) ? randomUUID() : product.id;
+      if (id !== product.id && !remapped.has(product.id)) remapped.set(product.id, id);
       ids.add(id); return { ...product, id };
     });
+    if (remapped.size) {
+      patch.page = patch.page || normalizePage(cur?.page);
+      patch.page.customization.homeFeaturedItems = patch.page.customization.homeFeaturedItems.map(ref => { const [kind, id] = ref.split(':'); return kind === 'product' && remapped.has(id) ? `product:${remapped.get(id)}` : ref; });
+    }
   }
   for (const [column, imagePath] of uploads) {
     if (imagePath === undefined) continue;
@@ -61,7 +74,10 @@ export async function savePage(db, { page, portfolio, heroPath, bg, path }, stor
     patch[column] = imagePath;
   }
   try {
-    if (cur) await run(db.from('site_settings').update(patch).eq('id', cur.id)); else await run(db.from('site_settings').insert(patch));
+    if (cur?.updated_at) {
+      const written = await run(db.from('site_settings').update(patch).eq('id', cur.id).eq('updated_at', cur.updated_at).select('id'));
+      if (!written?.length) conflict();
+    } else if (cur) await run(db.from('site_settings').update(patch).eq('id', cur.id)); else await run(db.from('site_settings').insert(patch));
   } catch (e) {
     if (/hero_path|\bpage\b|portfolio/i.test(e.message)) throw new Error('The database is missing the new columns. Run supabase/page.sql and supabase/portfolio.sql in the Supabase SQL editor, then try again.');
     throw e;

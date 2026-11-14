@@ -23,6 +23,7 @@ export function createCommerceRepository(database = raw) {
       const [profile] = await query(db().from('profiles').select('visibility').eq('owner_id', owner).eq('status', 'published').limit(1));
       if (!profile) return null;
       const [site] = await query(db().from('site_settings').select('page,portfolio').eq('owner_id', owner).limit(1));
+      if (!normalizePage(site?.page).cart) return null;
       if (ref.kind === 'product') {
         const product = normalizePortfolio(site?.portfolio).products.find(p => p.id === ref.id);
         return product ? { kind: 'product', ...product } : null;

@@ -16,7 +16,11 @@ Customers includes **Add new tag** with a name (up to 40 characters) and Public 
 
 Every profile admin can use `/admin/invites` and `/admin/suggestions`, including before completing a profile. Admins see and revoke their own invite links and view their own invited-member log. The SuperAdmin can create invites and sees all links and joins in `/superadmin/invites`. Creating an invite records the authenticated creator, and registration locks the invite, creates the account, consumes one use and logs the invited member in one transaction. Existing joins are backfilled. Identity snapshots and logs survive account deletion; previously deleted accounts cannot be reconstructed by the migration.
 
-Admin Invite links and Suggestions are grouped under **Community**, outside Settings. **Content & knowledge → Content** combines Articles, Templates and Research topics in one workspace with three named tabs. Templates provide reusable article structure, while topics organize related articles and files. Newly created topics are available in article selectors when switching back. Existing article/template/topic URLs remain supported.
+Admin Invite links and Suggestions are grouped under **Invite**, outside Settings. **Content & knowledge → Content** combines Articles, Templates and Research topics in one workspace with three named tabs. Templates provide reusable article structure, while topics organize related articles and files. Newly created topics are available in article selectors when switching back. Existing article/template/topic URLs remain supported.
+
+**Settings → Support** opens `/admin/support`, including before profile setup. Admins create requests about accounts, payments, technical issues or other help, see only their own requests and reply in a saved conversation. The SuperAdmin's `/superadmin/support` inbox lists all customer requests and supports replies plus Open, In progress and Resolved statuses. Status-only changes are recorded in the conversation. An admin reply to a resolved request reopens it. Replies and status updates are committed together under a ticket lock; sender identity and owner access come from the signed-in server account. Failed refreshes preserve loaded threads and unsent drafts. Request records and author snapshots survive account deletion. No external email or notification delivery is included.
+
+Apply `supabase/platform-support.sql` after `registration.sql` before using Support. It creates private ticket/message tables and the service-only reply transaction. The migration has been source-reviewed but has not been applied or executed against a live database. See [Support verification](testing/platform-support.md) for tests and browser-check limits.
 
 Suggestions support Add, Remove and Update. Only admins can submit them. Senders see their own suggestions and the owner's response. The SuperAdmin sees all suggestions, replies and sets New, Reviewed, Planned, Done or Declined; the owner has no submission form and the server rejects owner submissions. No emails or external notifications are sent.
 
@@ -37,3 +41,8 @@ The public header shows Login to visitors and an exit icon with Dashboard and Lo
 Public profile, site and directory responses are not cached, so privacy updates apply to subsequent requests. Private knowledge is also checked before any chat retrieval. Existing publicly hosted image URLs remain public storage assets; the tag controls application profile and knowledge access.
 
 See `docs/code-review-2026-11-12.md` for the full-code review, fixes and remaining assistant concurrency finding.
+
+
+## Canonical content editors and assistant customization
+
+Admin navigation is Overview, Store, Activity, Content & knowledge, Inbox, Invite and Settings. Store owns products and offering categories; Activity owns public records and events; Inbox owns orders, enquiries and visitor conversations. Settings retains the profile, presentation editor, privacy, payments and Support. Appearance editing uses desktop/mobile live preview, Undo and contextual customization controls; record creation links return to canonical editors and retain session drafts. Every supported presentation control is registered for assistant review and approval. See `docs/testing/customization.md` for validation, save conflicts, image handling and deployment notes.

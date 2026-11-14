@@ -18,10 +18,12 @@ const PublicProfile = lazy(() => import('./pages/PublicProfile.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
 const Invites = lazy(() => import('./pages/Invites.jsx'));
 const Suggestions = lazy(() => import('./pages/Suggestions.jsx'));
+const Support = lazy(() => import('./pages/Support.jsx'));
 const PlatformPayments = lazy(() => import('./pages/PlatformPayments.jsx'));
 const MainSiteSettings = lazy(() => import('./pages/MainSiteSettings.jsx'));
 const Register = lazy(() => import('./pages/Register.jsx'));
-const Updates = lazy(() => import('./pages/Updates.jsx'));
+const ContentManager = lazy(() => import('./pages/ContentManager.jsx'));
+const LegacyContentRedirect = lazy(() => import('./pages/LegacyContentRedirect.jsx'));
 const Enquiries = lazy(() => import('./pages/Enquiries.jsx'));
 const Purchases = lazy(() => import('./pages/Purchases.jsx'));
 const Questions = lazy(() => import('./pages/Questions.jsx'));
@@ -58,12 +60,16 @@ export default function App() {
         <Route path="superadmin" element={<LegacySuperAdmin />} />
         <Route path="page" element={<LegacyLookRedirect />} />
         <Route path="portfolio" element={<LegacyPortfolioRedirect />} />
-        <Route path="updates" element={<Updates />} />
+        <Route path="store" element={<ContentManager store />} />
+        <Route path="activity" element={<ContentManager />} />
+        <Route path="updates" element={<LegacyContentRedirect />} />
         <Route path="enquiries" element={<Enquiries />} />
         <Route path="questions" element={<Questions />} />
         <Route path="purchases" element={<Purchases />} />
         <Route path="invites" element={<Invites />} />
         <Route path="suggestions" element={<Suggestions />} />
+        <Route path="support" element={<Support />} />
+        <Route path="support/:id" element={<Support />} />
         <Route path="users" element={<Navigate to="/superadmin/customers" replace />} />
       </Route>
       <Route path="/superadmin" element={<Layout superadmin />}>
@@ -71,6 +77,8 @@ export default function App() {
         <Route path="customers" element={<SuperAdmin />} />
         <Route path="invites" element={<Invites />} />
         <Route path="suggestions" element={<Suggestions />} />
+        <Route path="support" element={<Support />} />
+        <Route path="support/:id" element={<Support />} />
         <Route path="sales" element={<PlatformPayments />} />
         <Route path="settings" element={<MainSiteSettings />} />
       </Route>

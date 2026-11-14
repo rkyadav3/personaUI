@@ -21,8 +21,9 @@ import { createSuggestionService, needSuperAdmin } from '../server/governance.js
 import { createTagService } from '../server/tags.js';
 import { createActivityService } from '../server/adminActivity.js';
 import { createPlatformService } from '../server/platform.js';
+import { createSupportService } from '../server/platformSupport.js';
 
-export function createPlatformOperations({ invitesService = invites, suggestionsService = createSuggestionService(), platformService = createPlatformService(), tagsService = createTagService() } = {}) {
+export function createPlatformOperations({ invitesService = invites, suggestionsService = createSuggestionService(), platformService = createPlatformService(), tagsService = createTagService(), supportService = createSupportService() } = {}) {
   return {
     'invites.list': ({ user }) => invitesService.listInviteHistory(user),
     'invites.create': async ({ user }, args) => ({ code: await invitesService.createInvite(user.id, args) }),
@@ -35,6 +36,10 @@ export function createPlatformOperations({ invitesService = invites, suggestions
     'suggestions.list': async ({ user }) => ({ rows: await suggestionsService.list(user) }),
     'suggestions.create': ({ user }, args) => suggestionsService.create(user, args),
     'suggestions.update': ({ user }, args) => suggestionsService.update(user, args),
+    'support.list': async ({ user }) => ({ rows: await supportService.list(user) }),
+    'support.create': ({ user }, args) => supportService.create(user, args),
+    'support.get': ({ user }, args) => supportService.get(user, args),
+    'support.reply': ({ user }, args) => supportService.reply(user, args),
     'platform.tags.list': async () => ({ tags: await tagsService.list() }),
     'platform.tags.create': async ({ user }, args) => ({ tag: await tagsService.create(user, args) }),
     'platform.sales': ({ user }) => platformService.sales(user),
@@ -181,7 +186,7 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
       const user = await sessionUser(req);
       if (!user) throw new HttpError(401, 'Not signed in.');
-      const platformOp = /^(users\.|invites\.|suggestions\.|platform\.)/.test(op);
+      const platformOp = /^(users\.|invites\.|suggestions\.|support\.|platform\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
       return res.status(200).json(await fn({ db: platformOp ? null : tenantScope(user.id), user }, args));
     } catch (e) {

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import { ACCENTS, FONT_STACK, normalizePage } from '../../../shared/pageSettings.js';
+import { customizePageStyle } from '../../../shared/customization.js';
+import { activityDisplayModel } from '../../lib/customizationDisplay.js';
 import { splitSchedule } from '../../../shared/engage.js';
 import { ACTIVITY_SECTIONS, PUBLIC_PAGE_ALIASES, SOCIAL_KINDS } from '../../../shared/portfolio.js';
 import { resolveSite } from '../../lib/portfolioModel.js';
@@ -15,6 +17,7 @@ import LiquidGlass, { GlassProvider } from '../LiquidGlass.jsx';
 import AccountMenu from '../AccountMenu.jsx';
 import { tagLabel } from '../../../shared/governance.js';
 import '../../styles/portfolio.css';
+import '../../styles/customization.css';
 import '../../styles/governance.css';
 
 const luminance = h => { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
@@ -59,7 +62,7 @@ function SectionHead({ kicker, title, action }) {
 function Hero({ m, ctx }) {
   const hasLeft = m.bio || m.availability || m.socials.length;
   return (
-    <section className="pf-hero">
+    <section className={`pf-hero hero-${ctx.c.heroLayout} align-${ctx.c.heroAlign}`}>
       <div className="pf-glow" aria-hidden="true" />
       <div className="pf-wrap">
         {m.awards.length > 0 && (
@@ -144,7 +147,7 @@ function MiniProject({ x, ctx }) {
 }
 
 function ProjectsHome({ m, ctx }) {
-  const rest = m.others.slice(0, 3);
+  const rest = m.others.slice(0, Math.max(0, ctx.c.homeLimit - 1));
   return (
     <section className="pf-wrap pf-sec" id="work">
       <SectionHead kicker={m.projectsKicker} title={m.projectsTitle}
@@ -162,7 +165,7 @@ function ProductsHome({ m, ctx }) {
     <section className="pf-wrap pf-sec" id="products">
       <SectionHead kicker={m.productsKicker} title={m.productsTitle} action={<GoTo to="products" ctx={ctx} className="pf-more">Explore All <Icon n="arrow" size={14} /></GoTo>} />
       {m.productsSubtitle && <p className="pf-shop-subtitle">{m.productsSubtitle}</p>}
-      <Shop items={m.products} slug={ctx.slug} owner={m.owner} user={ctx.user} preview={ctx.preview} />
+      <Shop customization={ctx.c} limit={ctx.page.storeLimit} items={m.homeProducts} slug={ctx.slug} owner={m.owner} user={ctx.user} preview={ctx.preview} />
     </section>
   );
 }
@@ -170,14 +173,14 @@ function ProductsHome({ m, ctx }) {
 // ------------------------------------------------------------------ updates & schedule
 /** Home page block: the next few schedule items and the latest updates. Leaves out whichever list is empty. */
 function WhatsNew({ m, ctx }) {
-  const now = Date.now(), next = splitSchedule(m.schedule, now).upcoming.slice(0, 3), latest = m.updates.slice(0, 3);
+  const now = Date.now(), next = splitSchedule(m.schedule, now).upcoming.slice(0, ctx.c.homeLimit), latest = m.updates.slice(0, ctx.c.homeLimit);
   if (!next.length && !latest.length) return null;
   return (
     <section className="pf-wrap pf-sec" id="updates">
       <SectionHead kicker="Stay in the loop" title="What’s new" action={<GoTo to="updates" ctx={ctx} className="pf-more">All updates <Icon n="arrow" size={14} /></GoTo>} />
       <div className="pf-upd-grid">
-        {latest.length > 0 && <div><h3 className="pf-h3">Latest updates</h3><div className="pf-stack">{latest.map(u => <UpdateCard key={u.id} u={u} now={now} />)}</div></div>}
-        {next.length > 0 && <div><h3 className="pf-h3">Coming up</h3><div className="pf-stack">{next.map(x => <EventRow key={x.id} x={x} now={now} />)}</div></div>}
+        {latest.length > 0 && <div><h3 className="pf-h3">Latest updates</h3><div className="pf-stack">{latest.map(u => <UpdateCard showDates={ctx.c.activityDates} showDescriptions={ctx.c.activityDescriptions} key={u.id} u={u} now={now} />)}</div></div>}
+        {next.length > 0 && <div><h3 className="pf-h3">Coming up</h3><div className="pf-stack">{next.map(x => <EventRow showDates={ctx.c.activityDates} showDescriptions={ctx.c.activityDescriptions} key={x.id} x={x} now={now} />)}</div></div>}
       </div>
     </section>
   );
@@ -187,7 +190,7 @@ function EventsHome({ m, ctx }) {
   if (!m.events.length) return null;
   return <section className="pf-wrap pf-sec" id="events">
     <SectionHead kicker="Join the community" title="Events" />
-    <Events events={m.events} slug={ctx.slug} owner={m.owner} preview={ctx.preview} />
+    <Events events={m.events.slice(0, ctx.c.homeLimit)} slug={ctx.slug} owner={m.owner} preview={ctx.preview} />
   </section>;
 }
 
@@ -228,7 +231,7 @@ function ProductsPage({ m, ctx }) {
     <>
       <PageTop kicker={m.productsKicker} title={m.productsTitle}>{m.productsSubtitle && <p className="pf-lead">{m.productsSubtitle}</p>}</PageTop>
       {!m.products.length && <p className="pf-wrap pf-muted">No offerings are available right now. Check back soon.</p>}
-      <section className="pf-wrap pf-sec tight"><Shop items={m.products} slug={ctx.slug} owner={m.owner} user={ctx.user} preview={ctx.preview} /></section>
+      <section className="pf-wrap pf-sec tight"><Shop customization={ctx.c} limit={ctx.page.storeLimit} items={m.products} slug={ctx.slug} owner={m.owner} user={ctx.user} preview={ctx.preview} /></section>
     </>
   );
 }
@@ -283,14 +286,14 @@ function UpdatesPage({ m, ctx, embedded = false }) {
   return (
     <>
       {!embedded && <PageTop kicker="Stay in the loop" title={m.updatesTitle} />}
-      {m.events.length > 0 && <section className="pf-wrap pf-sec tight"><h3 className="pf-h3">Events</h3><Events events={m.events} slug={ctx.slug} owner={m.owner} preview={ctx.preview} /></section>}
+      {m.events.length > 0 && <section className="pf-wrap pf-sec tight"><h3 className="pf-h3">Events</h3><Events showDates={ctx.c.activityDates} showDescriptions={ctx.c.activityDescriptions} events={m.events} slug={ctx.slug} owner={m.owner} preview={ctx.preview} /></section>}
       <section className="pf-wrap pf-sec tight pf-upd-grid">
-        {m.updates.length > 0 && <div><h3 className="pf-h3">Latest updates</h3><div className="pf-stack">{m.updates.map(u => <UpdateCard key={u.id} u={u} now={now} />)}</div></div>}
+        {m.updates.length > 0 && <div><h3 className="pf-h3">Latest updates</h3><div className="pf-stack">{m.updates.map(u => <UpdateCard showDates={ctx.c.activityDates} showDescriptions={ctx.c.activityDescriptions} key={u.id} u={u} now={now} />)}</div></div>}
         {m.schedule.length > 0 && (
           <div>
             <h3 className="pf-h3">Schedule</h3>
-            {upcoming.length > 0 ? <div className="pf-stack">{upcoming.map(x => <EventRow key={x.id} x={x} now={now} />)}</div> : <p className="pf-muted">Nothing is scheduled right now. Check back soon.</p>}
-            {past.length > 0 && <details className="pf-past"><summary>Past events ({past.length})</summary><div className="pf-stack">{past.map(x => <EventRow key={x.id} x={x} now={now} past />)}</div></details>}
+            {upcoming.length > 0 ? <div className="pf-stack">{upcoming.map(x => <EventRow showDates={ctx.c.activityDates} showDescriptions={ctx.c.activityDescriptions} key={x.id} x={x} now={now} />)}</div> : <p className="pf-muted">Nothing is scheduled right now. Check back soon.</p>}
+            {past.length > 0 && <details className="pf-past"><summary>Past events ({past.length})</summary><div className="pf-stack">{past.map(x => <EventRow showDates={ctx.c.activityDates} showDescriptions={ctx.c.activityDescriptions} key={x.id} x={x} now={now} past />)}</div></details>}
           </div>
         )}
       </section>
@@ -311,10 +314,14 @@ function ActivityRecords({ items, section }) {
 function ActivityPage({ m, ctx, initialSection }) {
   const { search } = useLocation();
   const requested = new URLSearchParams(search).get('section');
-  const [previewSection, setPreviewSection] = useState(initialSection || 'projects');
+  const [previewSection, setPreviewSection] = useState(initialSection || ctx.c.activityDefault);
+  const [count, setCount] = useState(ctx.c.activityLimit);
   const navRef = useRef(null);
-  useEffect(() => { setPreviewSection(initialSection || 'projects'); }, [initialSection]);
-  const section = Object.hasOwn(ACTIVITY_SECTIONS, ctx.preview ? previewSection : requested) ? (ctx.preview ? previewSection : requested) : 'projects';
+  useEffect(() => { setPreviewSection(initialSection || ctx.c.activityDefault); }, [initialSection, ctx.c.activityDefault]);
+  const candidate = ctx.preview ? previewSection : requested;
+  const section = ctx.c.activitySections.includes(candidate) ? candidate : ctx.c.activityDefault;
+  useEffect(() => { setCount(ctx.c.activityLimit); }, [section, ctx.c.activityLimit]);
+  const shown = activityDisplayModel(m, ctx.c, count);
   useEffect(() => {
     const nav = navRef.current, active = nav?.querySelector('[aria-current="page"]');
     if (!active || nav.scrollWidth <= nav.clientWidth) return;
@@ -326,11 +333,13 @@ function ActivityPage({ m, ctx, initialSection }) {
   const Body = { projects: WorkPage, events: UpdatesPage, talks: TalksPage, experience: ExperiencePage }[section];
   return <>
     <PageTop kicker="Work, milestones & community" title="Activity"><p className="pf-lead">Explore projects, events, talks and the milestones along the way.</p></PageTop>
-    <nav ref={navRef} className="pf-wrap pf-activity-nav" aria-label="Activity sections">{Object.entries(ACTIVITY_SECTIONS).map(([key, label]) => ctx.preview
+    <nav ref={navRef} className="pf-wrap pf-activity-nav" aria-label="Activity sections">{Object.entries(ACTIVITY_SECTIONS).filter(([key]) => ctx.c.activitySections.includes(key)).map(([key, label]) => ctx.preview
       ? <button key={key} type="button" className={section === key ? 'on' : ''} aria-current={section === key ? 'page' : undefined} onClick={() => setPreviewSection(key)}>{label}</button>
       : <Link key={key} to={`/p/${ctx.slug}/activity?section=${key}`} className={section === key ? 'on' : ''} aria-current={section === key ? 'page' : undefined}>{label}</Link>)}</nav>
+    {ctx.preview && <Link className="pf-wrap pf-preview-edit" to={`/admin/activity?tab=${section}&return=${encodeURIComponent('/admin/settings?tab=projects')}`}>Edit {ACTIVITY_SECTIONS[section]}</Link>}
     <div className="pf-wrap pf-activity-heading"><h2>{ACTIVITY_SECTIONS[section]}</h2><span>{items.length} {items.length === 1 ? 'item' : 'items'}</span></div>
-    {items.length ? Body ? <Body m={m} ctx={ctx} embedded /> : <ActivityRecords items={items} section={section} /> : <div className="pf-wrap pf-activity-empty"><Icon n="layers" size={28} /><p>No {ACTIVITY_SECTIONS[section].toLowerCase()} have been published yet.</p></div>}
+    {items.length ? Body ? <Body m={shown} ctx={ctx} embedded /> : <ActivityRecords items={{ recognition: shown.recognition, awards: shown.activityAwards, certificates: shown.certificates, testimonials: shown.testimonials }[section]} section={section} /> : <div className="pf-wrap pf-activity-empty"><Icon n="layers" size={28} /><p>No {ACTIVITY_SECTIONS[section].toLowerCase()} have been published yet.</p></div>}
+    {items.length > count && <div className="pf-wrap"><button type="button" className="pf-btn" onClick={() => setCount(value => value + ctx.c.activityLimit)}>Show more activity</button></div>}
   </>;
 }
 
@@ -340,7 +349,7 @@ function ContactPage({ m, ctx }) {
     <>
       <PageTop kicker="Get in touch" title={m.contactTitle}>{m.enquiry.intro && <p className="pf-lead">{m.enquiry.intro}</p>}</PageTop>
       <section className="pf-wrap pf-sec tight pf-contact-grid">
-        {m.enquiry.enabled ? <EnquiryForm slug={ctx.slug} cfg={m.enquiry} offers={m.offerOptions} owner={m.owner} preview={ctx.preview} /> : <p className="pf-muted">Enquiries are currently closed. You can use the contact details here or visit <GoTo to="chat" ctx={ctx}>Chat</GoTo>.</p>}
+        {m.enquiry.enabled ? <EnquiryForm customization={ctx.c} slug={ctx.slug} cfg={m.enquiry} offers={m.offerOptions} owner={m.owner} preview={ctx.preview} /> : <p className="pf-muted">Enquiries are currently closed. You can use the contact details here or visit <GoTo to="chat" ctx={ctx}>Chat</GoTo>.</p>}
         {(c || m.socials.length > 0) && (
           <LiquidGlass as="aside" className="pf-card pf-side">
             <h3 className="pf-h3">Prefer to reach out directly?</h3>
@@ -408,7 +417,9 @@ function ProjectModal({ x, onClose }) {
 export default function PortfolioSite({ data, slug, sub, user, preview = false, heroOverride, activitySection }) {
   const location = useLocation();
   const m = useMemo(() => resolveSite(data, slug, heroOverride), [data, slug, heroOverride]);
-  const page = useMemo(() => normalizePage(data.page), [data.page]);
+  const basePage = useMemo(() => normalizePage(data.page), [data.page]);
+  const [systemDark, setSystemDark] = useState(false);
+  useEffect(() => { const media = window.matchMedia?.('(prefers-color-scheme: dark)'); if (!media) return; const change = () => setSystemDark(media.matches); change(); media.addEventListener('change', change); return () => media.removeEventListener('change', change); }, []);
   const [pv, setPv] = useState(null), [openProj, setOpenProj] = useState(null);
   useEffect(() => { if (preview) setPv(null); }, [sub, preview, activitySection]);
   const want = preview ? (pv || sub || 'home') : (sub || 'chat');
@@ -425,16 +436,17 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
     return <Navigate to={`${path}${params.size ? `?${params}` : ''}${location.hash}`} replace />;
   }
 
+  const page = customizePageStyle(basePage, current), c = page.customization;
   const T = page.theme, accent = page.accentHex ? [page.accentHex, `color-mix(in srgb, ${page.accentHex} 55%, #ffffff)`] : (ACCENTS[page.accent] || ACCENTS.violet);
-  const dark = T.bg === 'color' && luminance(T.bgColor) < 0.45;
-  const ctx = { slug, user, pages: m.pages, preview, live: !preview, email: data.contact?.email || '', enquiry: m.enquiry.enabled, go: setPv, open: setOpenProj };
+  const dark = page.scheme === 'dark' || page.scheme === 'auto' && systemDark || T.bg === 'color' && luminance(T.bgColor) < 0.45;
+  const ctx = { slug, user, pages: m.pages, preview, live: !preview, c, page, email: data.contact?.email || '', enquiry: m.enquiry.enabled, go: setPv, open: setOpenProj };
   const Body = { store: ProductsPage, contact: ContactPage }[current];
 
   return (
     <GlassProvider value={{ ...page.glass, dark, radius: T.radius }}>
-    <div className={`pf pf-bg-${T.bg}${dark ? ' pf-dark' : ''}${preview ? ' is-preview' : ''}${page.glass.on ? '' : ' pf-plain-panels'}`}
-      style={{ '--a1': accent[0], '--a2': accent[1], '--r': `${T.radius}px`, '--maxw': `${T.maxWidth}px`, '--pf-blur': `${page.glass.on ? page.glass.blur : 0}px`, '--pf-shadow': page.glass.on ? page.glass.shadow / 100 : 0, '--pf-tint': page.glass.on ? (0.18 + page.glass.tint / 100 * 0.62) : 1, fontFamily: FONT_STACK[T.font], background: T.bg === 'color' ? T.bgColor : undefined }}>
-      {T.bg === 'image' && data.bgImage && <div className="pf-backdrop" aria-hidden="true"><BackgroundLayer imageUrl={data.bgImage} bg={preview ? { ...data.bg, parallax: false } : data.bg} /><div className="pf-background-wash" style={{ opacity: T.wash / 100 }} /></div>}
+    <div className={`pf pf-bg-${T.bg}${dark ? ' pf-dark' : ''}${preview ? ' is-preview' : ''}${page.glass.on ? '' : ' pf-plain-panels'} spacing-${c.spacing} buttons-${c.buttonStyle} nav-${c.navStyle} footer-${c.footerLayout} photo-${c.photoShape} activity-${c.activityLayout}`}
+      style={{ '--a1': accent[0], '--a2': accent[1], '--r': `${T.radius}px`, '--maxw': `${T.maxWidth}px`, '--pf-blur': `${page.glass.on ? page.glass.blur : 0}px`, '--pf-shadow': page.glass.on ? page.glass.shadow / 100 : 0, '--pf-tint': page.glass.on ? (0.18 + page.glass.tint / 100 * 0.62) : 1, '--pf-text-scale': c.textScale / 100, '--serif': FONT_STACK[T.font], fontFamily: FONT_STACK[T.font], background: T.bg === 'color' ? T.bgColor : dark ? '#15171d' : undefined }}>
+      {T.bg === 'image' && (data.bg?.imageUrl || data.bgImage) && <div className="pf-backdrop" aria-hidden="true"><BackgroundLayer imageUrl={data.bg?.imageUrl || data.bgImage} bg={preview ? { ...data.bg, parallax: false } : data.bg} /><div className="pf-background-wash" style={{ opacity: T.wash / 100 }} /></div>}
       <header className="pf-head">
         <div className="pf-wrap pf-head-in">
           <GoTo to="chat" ctx={ctx} className="pf-brand">{m.brand}</GoTo>
@@ -447,16 +459,12 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
 
       <main>
         {!!data.tags?.length && <div className="pf-wrap"><div className="governance-tags" aria-label="Profile tags">{data.tags.map(tag => <span key={tag} className={`governance-tag ${tag}`}>{tagLabel(tag, data.tagDefinitions)}</span>)}</div></div>}
-        {current === 'home' ? (
-          <>
-            <Hero m={m} ctx={ctx} />
-            <WhatsNew m={m} ctx={ctx} />
-            <EventsHome m={m} ctx={ctx} />
-            {m.featured && <ProjectsHome m={m} ctx={ctx} />}
-            {m.products.length > 0 && <ProductsHome m={m} ctx={ctx} />}
-            {!!(m.aboutBody || m.skills.length) && <AboutPage m={m} embedded />}
-          </>
-        ) : current === 'chat' ? <Chat key={slug} m={m} ctx={ctx} data={data} /> : current === 'activity' ? <ActivityPage m={m} ctx={ctx} initialSection={alias?.section || activitySection} /> : <Body m={m} ctx={ctx} />}
+        {preview && <div className="pf-wrap pf-preview-edit"><Link to={`${current === 'store' ? '/admin/store' : current === 'activity' ? '/admin/activity' : '/admin/settings?tab=' + (current === 'chat' ? 'persona' : current === 'contact' ? 'contact' : 'hero')}${current === 'store' || current === 'activity' ? '?return=' + encodeURIComponent('/admin/settings?tab='+ (current === 'store' ? 'store' : 'projects')) : ''}`}>Edit {current === 'store' || current === 'activity' ? 'content' : 'page settings'}</Link></div>}
+        {current === 'home' ? <>{c.homeOrder.filter(key => !c.homeHidden.includes(key)).map(key => {
+          const blocks = { intro: <Hero m={m} ctx={ctx} />, updates: <WhatsNew m={m} ctx={ctx} />, events: <EventsHome m={m} ctx={ctx} />, projects: m.featured && <ProjectsHome m={m} ctx={ctx} />, store: m.homeProducts.length > 0 && <ProductsHome m={m} ctx={ctx} />, about: !!(m.aboutBody || m.skills.length) && <AboutPage m={m} embedded /> };
+          return <div key={key}>{blocks[key]}</div>;
+        })}</> : current === 'chat' ? <Chat key={slug} m={m} ctx={ctx} data={{...data, page}} /> : current === 'activity' ? <ActivityPage m={m} ctx={ctx} initialSection={alias?.section || activitySection} /> : <Body m={m} ctx={ctx} />}
+
       </main>
 
       <footer className="pf-foot">

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PAGE_DEFAULTS, normalizePage } from '../../shared/pageSettings.js';
 import { ICON_NAMES, PAGE_LABELS, PORTFOLIO_DEFAULTS, PUBLIC_NAV_PAGES, PRODUCT_STATUS, SOCIAL_KINDS, normalizePortfolio } from '../../shared/portfolio.js';
@@ -14,56 +14,13 @@ import { CHECKOUT_CURRENCIES } from '../../shared/commerce.js';
 import { LookControls, PersonaControls, StoreControls } from '../components/portfolio/PortfolioControls.jsx';
 import { EDITOR_AREAS as AREAS, EDITOR_TABS as AREA_TABS, EDITOR_PREVIEW as TAB_PAGE } from '../lib/publicPageSettings.js';
 import '../styles/portfolioEditor.css';
-
-const W = 1320;   // the page is drawn at this width and scaled down into the preview column
-
-function ScaledPreview({ children }) {
-  const box = useRef(null), inner = useRef(null), [k, setK] = useState(0.5), [h, setH] = useState(600);
-  useLayoutEffect(() => {
-    const fit = () => { if (box.current) setK(Math.min(1, box.current.clientWidth / W)); if (inner.current) setH(inner.current.scrollHeight); };
-    fit(); const ro = new ResizeObserver(fit); ro.observe(box.current); ro.observe(inner.current); return () => ro.disconnect();
-  }, []);
-  return (
-    <div ref={box} className="pp-prev-box" style={{ height: h * k }}>
-      <div ref={inner} style={{ width: W, transform: `scale(${k})`, transformOrigin: 'top left' }}>{children}</div>
-    </div>
-  );
-}
-
-/** One labelled text input or textarea. */
-const Txt = ({ label, value, onChange, max, ph, rows, hint }) => (
-  <Field label={label}>
-    {rows
-      ? <textarea rows={rows} value={value || ''} maxLength={max} placeholder={ph} onChange={e => onChange(e.target.value)} />
-      : <input value={value || ''} maxLength={max} placeholder={ph} onChange={e => onChange(e.target.value)} />}
-    {hint && <span className="hint">{hint}</span>}
-  </Field>
-);
-
-/** A list of cards the owner can add to, remove from and re-order. `children(item, patch)` draws the fields of one card. */
-function Repeater({ items, onChange, blank, max, noun, title, children }) {
-  const patch = (i, p) => onChange(items.map((x, j) => (j === i ? { ...x, ...p } : x)));
-  const move = (i, d) => { const a = [...items], j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; onChange(a); };
-  return (
-    <>
-      {items.map((it, i) => (
-        <div className="card inner" key={i}>
-          <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-            <b>{title ? title(it, i) : `${noun} ${i + 1}`}</b>
-            <span className="row">
-              <button type="button" className="btn small" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up">↑</button>
-              <button type="button" className="btn small" disabled={i === items.length - 1} onClick={() => move(i, 1)} aria-label="Move down">↓</button>
-              <button type="button" className="btn small danger" onClick={() => onChange(items.filter((_, j) => j !== i))}>Remove</button>
-            </span>
-          </div>
-          {children(it, p => patch(i, p), i)}
-        </div>
-      ))}
-      <button type="button" className="btn" disabled={items.length >= max} onClick={() => onChange([...items, { ...blank }])}>+ Add {noun.toLowerCase()}</button>
-      {items.length >= max && <span className="hint"> Maximum {max}.</span>}
-    </>
-  );
-}
+import '../styles/customization.css';
+import CustomizationControls from '../components/portfolio/CustomizationControls.jsx';
+import { customizationReferences } from '../../shared/customizationReferences.js';
+import { customizationProblem } from '../../shared/customization.js';
+import ScaledPreview from '../components/portfolio/ScaledPreview.jsx';
+import { clearEditorDraft, readEditorDraft, saveEditorDraft, rebaseEditorDraft, editorDraftChanged } from '../lib/editorDrafts.js';
+import { Txt, Repeater } from '../components/portfolio/EditorFields.jsx';
 
 function Tabs({ items, active, onChange, prefix, label, controls = 'portfolio-area-panel' }) {
   const entries = Object.entries(items);
@@ -88,29 +45,47 @@ export function PortfolioPreviewState({ error, missing, onRetry }) {
 
 export default function PortfolioEditor() {
   const { user } = useAuth();
+  const draftKey = `${user.id}:appearance`, draftSnapshot = useRef(null), urls = useRef(new Set());
   const [params, setParams] = useSearchParams();
-  const tab = Object.hasOwn(TAB_PAGE, params.get('tab')) ? params.get('tab') : 'hero';
+  const requestedTab = Object.hasOwn(TAB_PAGE, params.get('tab')) ? params.get('tab') : 'hero';
+  const tab = ['talks', 'recognition', 'certificates', 'testimonials', 'experience'].includes(requestedTab) ? 'projects' : requestedTab === 'products' ? 'store' : requestedTab;
   const area = Object.keys(AREA_TABS).find(key => Object.hasOwn(AREA_TABS[key], tab));
   const setTab = value => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next, { replace: true }); };
   const [saved, setSaved] = useState(null), [page, setPage] = useState(PAGE_DEFAULTS), [pf, setPf] = useState(PORTFOLIO_DEFAULTS), [data, setData] = useState(undefined);
-  const [previewError, setPreviewError] = useState('');
+  const [previewError, setPreviewError] = useState(''), [mobile, setMobile] = useState(false), [historyCount, setHistoryCount] = useState(0);
+  const history = useRef([]), previous = useRef(null), skipHistory = useRef(false);
   const [bg, setBg] = useState(normalizeBg()), [pendingBg, setPendingBg] = useState(null), [removedBg, setRemovedBg] = useState(false);
   const [pending, setPending] = useState(null), [removed, setRemoved] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState(null);
+  useEffect(() => {
+    const next = { page, pf, bg, pending, pendingBg, removed, removedBg };
+    if (saved && previous.current && !skipHistory.current && JSON.stringify(next) !== JSON.stringify(previous.current)) { history.current = [...history.current.slice(-49), previous.current]; setHistoryCount(history.current.length); }
+    skipHistory.current = false; previous.current = next;
+  }, [page, pf, bg, pending, pendingBg, removed, removedBg, saved]);
+
 
   useEffect(() => {
     let active = true;
-    api('site.get').then(s => { if (active) { setSaved(s); setPage(s.page); setPf(s.portfolio); setBg(s.bg); } }, e => { if (active) setMsg({ kind: 'error', t: e.message }); });
+    api('site.get').then(s => { if (active) {
+      const cached = readEditorDraft(draftKey), draft = cached ? rebaseEditorDraft(cached, s) : null;
+      skipHistory.current = true; setSaved(draft?.saved || s); setPage(draft?.page || normalizePage(s.page)); setPf(draft?.pf || normalizePortfolio(s.portfolio)); setBg(draft?.bg || s.bg);
+      if (draft) { setPending(draft.pending); setPendingBg(draft.pendingBg); setRemoved(draft.removed); setRemovedBg(draft.removedBg); for (const image of [draft.pending, draft.pendingBg]) if (image?.url) urls.current.add(image.url); setMsg({ kind: draft.conflicts.length ? 'error' : 'info', t: draft.conflicts.length ? 'The same fields changed elsewhere. Your draft is retained; reload saved settings to resolve the conflict.' : 'Your unsaved page draft was restored.' }); }
+    } }, e => { if (active) setMsg({ kind: 'error', t: e.message }); });
     api('page.preview').then(value => { if (active) setData(value); }, error => { if (active) setPreviewError(error.message); });
     return () => { active = false; };
   }, []);
-  useEffect(() => () => { if (pending) URL.revokeObjectURL(pending.url); }, [pending]);
-  useEffect(() => () => { if (pendingBg) URL.revokeObjectURL(pendingBg.url); }, [pendingBg]);
+  draftSnapshot.current = saved ? { saved, page, pf, bg, pending, pendingBg, removed, removedBg } : null;
+  useEffect(() => {
+    const unload = event => { if (editorDraftChanged(draftSnapshot.current)) { event.preventDefault(); event.returnValue = ''; } };
+    window.addEventListener('beforeunload', unload);
+    return () => { window.removeEventListener('beforeunload', unload); const draft = draftSnapshot.current; if (editorDraftChanged(draft)) saveEditorDraft(draftKey, draft); else clearEditorDraft(draftKey); const retained = new Set([draft?.pending?.url, draft?.pendingBg?.url].filter(Boolean)); for (const url of urls.current) if (!retained.has(url)) URL.revokeObjectURL(url); };
+  }, [draftKey]);
+
 
   if (!saved) return <Loading error={msg?.t} label="Loading page editor…" />;
   if (data === null) return <PortfolioPreviewState missing />;
 
-  const hero = removed ? null : pending?.url || saved.heroUrl;
-  const background = removedBg ? null : pendingBg?.url || saved.imageUrl;
+  const hero = removed ? null : pending?.url || page.hero.imageUrl || (Object.hasOwn(saved, 'uploadedHeroUrl') ? saved.uploadedHeroUrl : saved.heroUrl);
+  const background = removedBg ? null : pendingBg?.url || bg.imageUrl || (Object.hasOwn(saved, 'uploadedImageUrl') ? saved.uploadedImageUrl : saved.imageUrl);
   const normPf = normalizePortfolio(pf), normPage = normalizePage(page);
   const dirty = !!pending || removed || !!pendingBg || removedBg || JSON.stringify(normalizeBg(bg)) !== JSON.stringify(saved.bg) || JSON.stringify(normPf) !== JSON.stringify(saved.portfolio) || JSON.stringify(normPage) !== JSON.stringify(saved.page);
   const set = patch => setPf(p => ({ ...p, ...patch }));
@@ -126,18 +101,22 @@ export default function PortfolioEditor() {
 
   async function choose(file) {
     if (!file) return;
-    try { const p = await prepareImage(file); setPending({ ...p, url: URL.createObjectURL(p.blob) }); setRemoved(false); setPg({ hero: { zoom: 1, x: 50, y: 25 } }); setMsg(null); }
+    setBusy(true);
+    try { const p = await prepareImage(file); const url = URL.createObjectURL(p.blob); urls.current.add(url); setPending({ ...p, url }); setRemoved(false); setPg({ hero: { zoom: 1, x: 50, y: 25, imageUrl: '' } }); setMsg(null); }
     catch (e) { setMsg({ kind: 'error', t: e.message }); }
+    finally { setBusy(false); }
   }
   async function save() {
+    const problem = customizationProblem(page.customization);
+    if (problem) { setMsg({ kind: 'error', t: problem }); return; }
     setBusy(true); setMsg(null);
     try {
       let heroPath;
       if (pending) { const s = await api('site.sign', { type: pending.type }); await uploadToSigned(s.path, s.token, pending.blob, BG_BUCKET); heroPath = s.path; } else if (removed) heroPath = null;
       let path;
       if (pendingBg) { const s = await api('site.sign', { type: pendingBg.type }); await uploadToSigned(s.path, s.token, pendingBg.blob, BG_BUCKET); path = s.path; } else if (removedBg) path = null;
-      const r = await api('page.save', { page, portfolio: pf, heroPath, bg, path });
-      setSaved(r); setPage(r.page); setPf(r.portfolio); setBg(r.bg); setPending(null); setRemoved(false); setPendingBg(null); setRemovedBg(false);
+      const r = await api('page.save', { page, portfolioPatch: Object.fromEntries(Object.entries(pf).filter(([key]) => !['projects', 'products', 'experience', 'talks', 'awards', 'recognition', 'certificates', 'testimonials'].includes(key))), expectedVersion: saved.version, heroPath, bg, path });
+      clearEditorDraft(draftKey); history.current = []; setHistoryCount(0); skipHistory.current = true; setSaved(r); setPage(r.page); setPf(r.portfolio); setBg(r.bg); setPending(null); setRemoved(false); setPendingBg(null); setRemovedBg(false);
       setMsg({ kind: r.warning ? 'info' : 'success', t: r.warning || 'Saved. Your portfolio, shop and persona settings are published together (visitors may need up to 30 seconds to see them).' });
     } catch (e) { setMsg({ kind: 'error', t: e.message }); }
     setBusy(false);
@@ -145,8 +124,10 @@ export default function PortfolioEditor() {
 
   async function chooseBackground(file) {
     if (!file) return;
-    try { const picture = await prepareImage(file); setPendingBg({ ...picture, url: URL.createObjectURL(picture.blob) }); setRemovedBg(false); setBg(b => ({ ...b, x: 50, y: 50, zoom: 1 })); setPg({ theme: { ...page.theme, bg: 'image' } }); setMsg(null); }
+    setBusy(true);
+    try { const picture = await prepareImage(file); const url = URL.createObjectURL(picture.blob); urls.current.add(url); setPendingBg({ ...picture, url }); setRemovedBg(false); setBg(b => ({ ...b, imageUrl: '', x: 50, y: 50, zoom: 1 })); setPg({ theme: { ...page.theme, bg: 'image' } }); setMsg(null); }
     catch (e) { setMsg({ kind: 'error', t: e.message }); }
+    finally { setBusy(false); }
   }
 
   const preview = data && { ...data, page: normPage, portfolio: normPf, bgImage: background, bg: normalizeBg(bg) };
@@ -154,22 +135,25 @@ export default function PortfolioEditor() {
   return (
     <div className="portfolio-editor">
       <div className="head" style={{ marginBottom: 8 }}>
-        <div><h1>Public page editor</h1><p className="muted" style={{ margin: 0 }}>All your public pages in one place. Choose a page below, edit its content and preview your changes before saving.</p></div>
+        <div><h1>Public page editor</h1><p className="muted" style={{ margin: 0 }}>Customize layout, style and featured content. Manage records in Store and Activity. Preview changes before publishing.</p></div>
         <div className="row">
+          <button type="button" className="btn" disabled={busy || !historyCount} onClick={() => { const last = history.current.pop(); if (!last) return; skipHistory.current = true; setPage(last.page); setPf(last.pf); setBg(last.bg); setPending(last.pending); setPendingBg(last.pendingBg); setRemoved(last.removed); setRemovedBg(last.removedBg); setHistoryCount(history.current.length); }}>Undo</button>
+          {dirty && <span className="hint" role="status">Unsaved changes</span>}
           {user.slug && <a className="btn" href={`/p/${user.slug}`} target="_blank" rel="noreferrer">View live ↗</a>}
           <button className="btn primary" disabled={!dirty || busy} onClick={save}>{busy ? 'Saving…' : dirty ? 'Save changes' : 'Saved'}</button>
         </div>
       </div>
       <Notice kind={msg?.kind}>{msg?.t}</Notice>
+      {msg?.kind === 'error' && <button type="button" className="btn" disabled={busy} onClick={async () => { setBusy(true); try { const next = await api('site.get'); history.current = []; setHistoryCount(0); skipHistory.current = true; setSaved(next); setPage(next.page); setPf(next.portfolio); setBg(next.bg); setPending(null); setPendingBg(null); setRemoved(false); setRemovedBg(false); setMsg({ kind: 'info', t: 'Latest saved settings loaded. The local draft was discarded.' }); } catch (error) { setMsg({ kind: 'error', t: error.message }); } finally { setBusy(false); } }}>Reload saved settings and discard draft</button>}
       <div className="portfolio-areas"><Tabs items={AREAS} active={area} prefix="portfolio-area" label="Portfolio settings" onChange={key => setTab(Object.keys(AREA_TABS[key])[0])} /></div>
       <div className="pp-editor">
-        <div className="pp-form" id="portfolio-area-panel" role="tabpanel" aria-labelledby={`portfolio-area-${area}`}>
+        <fieldset disabled={busy} className="pp-form editor-fieldset" id="portfolio-area-panel" role="tabpanel" aria-labelledby={`portfolio-area-${area}`}>
           {Object.keys(AREA_TABS[area]).length > 1 && <Tabs items={AREA_TABS[area]} active={tab} prefix="portfolio-content" controls="portfolio-content-panel" label={`${AREAS[area]} settings`} onChange={setTab} />}
-          {area === 'activity' && <p className="hint">Publish events and updates in <Link to="/admin/updates">Events &amp; updates</Link>. All these sections appear under Activity on your public page.</p>}
+          {area === 'activity' && <p className="hint">Publish events and updates in <Link to="/admin/activity?tab=events">Events &amp; updates</Link>. All these sections appear under Activity on your public page.</p>}
           <div className="pp-content" id="portfolio-content-panel" role={Object.keys(AREA_TABS[area]).length > 1 ? 'tabpanel' : undefined} aria-labelledby={Object.keys(AREA_TABS[area]).length > 1 ? `portfolio-content-${tab}` : undefined}>
           {tab === 'look' && <LookControls page={normPage} setPage={setPg} imageUrl={background} />}
-          {tab === 'store' && <StoreControls page={{ ...normPage, storeTitle: normPf.productsTitle || normPage.storeTitle }} setPage={setPg} />}
-          {tab === 'persona' && <PersonaControls page={page} bg={bg} setPage={setPg} setBg={patch => setBg(b => ({ ...b, ...patch }))} imageUrl={background} onChooseBackground={chooseBackground} onRemoveBackground={() => { setPendingBg(null); setRemovedBg(true); }} />}
+          {tab === 'store' && <><StoreControls page={{ ...normPage, storeTitle: normPf.productsTitle || normPage.storeTitle }} setPage={setPg} /><section className="card"><Txt label="Store small heading" value={pf.productsKicker} max={40} onChange={value => set({ productsKicker: value })} /><p className="hint"><Link to="/admin/store?return=%2Fadmin%2Fsettings%3Ftab%3Dstore">Manage Store items</Link></p></section></>}
+          {tab === 'persona' && <PersonaControls page={page} bg={bg} setPage={setPg} setBg={patch => { if (Object.hasOwn(patch, 'imageUrl')) { setPendingBg(null); setRemovedBg(false); } setBg(b => ({ ...b, ...patch })); }} imageUrl={background} onChooseBackground={chooseBackground} onRemoveBackground={() => { setPendingBg(null); setRemovedBg(true); setBg(value => ({ ...value, imageUrl: '' })); }} />}
           {tab === 'contact' && <section className="card"><h3>Contact page</h3>
             <label className="toggle"><input type="checkbox" checked={pf.enquiry.enabled} onChange={e => setIn('enquiry', { enabled: e.target.checked })} />Accept visitor enquiries</label>
             <Txt label="Page heading" value={pf.enquiry.title} max={60} onChange={v => setIn('enquiry', { title: v })} />
@@ -179,10 +163,12 @@ export default function PortfolioEditor() {
             {Object.entries(ENQUIRY_TYPES).map(([key, label]) => <label className="toggle" key={key}><input type="checkbox" checked={pf.enquiry.types.includes(key)} onChange={e => setIn('enquiry', { types: e.target.checked ? [...pf.enquiry.types, key] : pf.enquiry.types.filter(type => type !== key) })} />{label}</label>)}
           </section>}
 
+          <CustomizationControls area={area} value={page.customization} onChange={customization => setPg({ customization })} references={customizationReferences(pf, (data?.contributions || []).flatMap(group => group.offerings || []))} />
           {tab === 'hero' && <>
             <section className="card"><h3>Photo</h3>
-              <p className="hint">Your photo fills the circle. Use zoom and position to adjust the crop. Without a photo, your initials are shown.</p>
-              <div className="row"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => choose(e.target.files[0])} />{hero && <button className="btn" onClick={() => { setPending(null); setRemoved(true); }}>Remove photo</button>}</div>
+              <p className="hint">Choose your portrait shape below. Your photo fills the frame. Use zoom and position to adjust the crop. Without a photo, your initials are shown.</p>
+              <div className="row"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => choose(e.target.files[0])} />{hero && <button className="btn" onClick={() => { setPending(null); setRemoved(true); setPg({ hero: { ...page.hero, imageUrl: '' } }); }}>Remove photo</button>}</div>
+              <Txt label="Portrait image link" value={page.hero.imageUrl} ph="https://…" hint="Paste a public image URL, or choose a file above." onChange={imageUrl => { setPending(null); setRemoved(false); setPg({ hero: { ...page.hero, imageUrl } }); }} />
               {hero && <>
                 {['zoom:1:3:0.05:Zoom', 'x:0:100:1:Left to right', 'y:0:100:1:Top to bottom'].map(d => { const [k, lo, hi, st, label] = d.split(':'); return <Field key={k} label={`${label} (${page.hero[k]})`}><input type="range" min={lo} max={hi} step={st} value={page.hero[k]} onChange={e => setPg({ hero: { ...page.hero, [k]: Number(e.target.value) } })} /></Field>; })}
                 <Field label="Photo colour"><select value={pf.photoStyle} onChange={e => set({ photoStyle: e.target.value })}><option value="bw">Black &amp; white</option><option value="color">Original colours</option></select></Field></>}
@@ -200,11 +186,7 @@ export default function PortfolioEditor() {
               <p className="hint">Visitors can reach you through the Contact page in your navigation.</p>
               <div className="cols c2"><Txt label="Second button" value={pf.intro.label} max={24} ph="Watch Introduction" onChange={v => setIn('intro', { label: v })} /><Txt label="…opens (video link)" value={pf.intro.url} ph="empty = “Chat with my AI”" onChange={v => setIn('intro', { url: v })} /></div>
             </section>
-            <section className="card"><h3>Awards &amp; recognition (up to 3)</h3>
-              <Repeater items={pf.awards} onChange={awards => set({ awards })} blank={{ title: '', sub: '' }} max={3} noun="Award" title={a => a.title || a.sub || 'New award'}>
-                {(a, p) => <div className="cols c2"><Txt label="Small line" value={a.title} max={50} ph="IIT Project Expo 3.0" onChange={v => p({ title: v })} /><Txt label="Main line" value={a.sub} max={60} ph="3rd Prize — VisionSwitch" onChange={v => p({ sub: v })} /></div>}
-              </Repeater>
-            </section>
+            <p className="hint">Choose highlighted awards below. <Link to="/admin/activity?tab=awards&return=%2Fadmin%2Fsettings%3Ftab%3Dhero">Manage awards in Activity</Link>.</p>
             <section className="card"><h3>What I do (list right of your photo)</h3>
               <p className="hint">Empty = your expertise from Profile &amp; Offerings.</p>
               <Repeater items={pf.domains} onChange={domains => set({ domains })} blank={{ label: '', icon: '' }} max={8} noun="Item" title={d => d.label || 'New item'}>
@@ -230,99 +212,7 @@ export default function PortfolioEditor() {
             </section>
           )}
 
-          {tab === 'projects' && <>
-            <section className="card"><h3>Projects section</h3>
-              <p className="hint">Appears on your home page and as the Work page once you add a project with a title.</p>
-              <div className="cols c2"><Txt label="Small heading" value={pf.projectsKicker} max={30} ph="Featured work" onChange={v => set({ projectsKicker: v })} /><Txt label="Heading" value={pf.projectsTitle} max={40} ph="Selected Projects" onChange={v => set({ projectsTitle: v })} /></div>
-            </section>
-            <section className="card"><h3>Projects</h3>
-              <Repeater items={pf.projects} onChange={projects => set({ projects })} blank={{ title: '' }} max={24} noun="Project" title={x => x.title || 'New project'}>
-                {(x, p) => <>
-                  <Txt label="Title" value={x.title} max={80} ph="VisionSwitch" onChange={v => p({ title: v })} />
-                  <div className="cols c2"><Txt label="Category tag" value={x.tag} max={40} ph="IoT + Computer Vision" onChange={v => p({ tag: v })} /><Txt label="Year" value={x.year} max={10} ph="2025" onChange={v => p({ year: v })} /></div>
-                  <Txt label="One-line summary" value={x.summary} max={240} rows={2} onChange={v => p({ summary: v })} />
-                  <Txt label="Full description (opens in a pop-up; blank line = new paragraph)" value={x.description} max={1600} rows={4} onChange={v => p({ description: v })} />
-                  <Txt label="Picture link (https://…)" value={x.image} ph="https://…/screenshot.png" onChange={v => p({ image: v })} />
-                  <Txt label="Technologies (comma separated)" value={x.tech} max={160} ph="React, Arduino, OpenCV" onChange={v => p({ tech: v })} />
-                  <div className="cols c2"><Txt label="Award line" value={x.award} max={60} ph="3rd Prize — PROJECT EXPO 3.0" onChange={v => p({ award: v })} /><Txt label="Award detail" value={x.awardSub} max={60} ph="Manipal University Jaipur" onChange={v => p({ awardSub: v })} /></div>
-                  <div className="cols c2"><Txt label="Main link" value={x.demoUrl} ph="https://…" onChange={v => p({ demoUrl: v })} /><Txt label="Main button text" value={x.demoLabel} max={24} ph="View Project" onChange={v => p({ demoLabel: v })} /></div>
-                  <div className="cols c2"><Txt label="Code link" value={x.repoUrl} ph="https://github.com/…" onChange={v => p({ repoUrl: v })} /><Txt label="Code button text" value={x.repoLabel} max={24} ph="Github" onChange={v => p({ repoLabel: v })} /></div>
-                  <label className="toggle"><input type="checkbox" checked={!!x.featured} onChange={e => set({ projects: pf.projects.map(y => (y === x ? { ...y, featured: e.target.checked } : { ...y, featured: e.target.checked ? false : y.featured })) })} /> Feature this one big on the home page</label>
-                </>}
-              </Repeater>
-            </section>
-          </>}
-
-          {tab === 'products' && <>
-            <section className="card"><h3>Products section</h3>
-              <p className="hint">Every visible product and offering appears in the shop on your profile home page. Manage buyers and payment setup in <Link to="/admin/purchases">Purchases</Link>.</p>
-              <div className="cols c2"><Txt label="Small heading" value={pf.productsKicker} max={40} ph="Free & paid offerings" onChange={v => set({ productsKicker: v })} /><Txt label="Heading" value={pf.productsTitle} max={40} ph="Shop" onChange={v => set({ productsTitle: v })} /></div>
-            </section>
-            <section className="card"><h3>Products &amp; initiatives</h3>
-              <Repeater items={pf.products} onChange={products => set({ products })} blank={{ id: '', title: '', pricing: 'free', amount: 0, currency: 'INR', deliveryUrl: '' }} max={24} noun="Product" title={x => x.title || 'New product'}>
-                {(x, p) => <>
-                  <Txt label="Name" value={x.title} max={80} ph="Attendance System" onChange={v => p({ title: v })} />
-                  <Txt label="Description" value={x.summary} max={240} rows={2} ph="RFID + Face Recognition + IoT Integration" onChange={v => p({ summary: v })} />
-                  <div className="cols c2"><Field label="Status"><select value={x.status || ''} onChange={e => p({ status: e.target.value })}>{PRODUCT_STATUS.map(s => <option key={s} value={s}>{s || 'None'}</option>)}</select></Field>
-                    <Field label="Icon"><select value={x.icon || ''} onChange={e => p({ icon: e.target.value })}><option value="">Automatic</option>{ICON_NAMES.map(n => <option key={n} value={n}>{n}</option>)}</select></Field></div>
-                  <Field label="Free or paid"><select value={x.pricing || 'unspecified'} onChange={e => p({ pricing: e.target.value, price: '' })}><option value="free">Free</option><option value="paid">Paid</option><option value="unspecified">Information only</option></select></Field>
-                  {x.pricing === 'paid' && <div className="cols c2"><Field label="Price"><input type="number" min={0.01} max={9999999.99} step="0.01" value={x.amount ?? ''} onChange={e => p({ amount: e.target.value, price: '' })} /></Field>
-                    <Field label="Currency"><select value={x.currency || 'INR'} onChange={e => p({ currency: e.target.value })}>{CHECKOUT_CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></Field></div>}
-                  {['free', 'paid'].includes(x.pricing) && <Txt label="Access / download link after checkout" value={x.deliveryUrl} max={600} ph="https://…" hint="Released to the buyer after a free claim or verified payment. Add a link to enable checkout." onChange={v => p({ deliveryUrl: v })} />}
-                  <Txt label="Picture link" value={x.image} ph="https://…" onChange={v => p({ image: v })} />
-                  <div className="cols c2"><Txt label="Public details link" value={x.url} ph="https://…" onChange={v => p({ url: v })} /><Txt label="Details button text" value={x.linkLabel} max={24} ph="More details" onChange={v => p({ linkLabel: v })} /></div>
-                </>}
-              </Repeater>
-            </section>
-          </>}
-
-          {tab === 'experience' && (
-            <section className="card"><h3>Experience timeline</h3>
-              <p className="hint">Empty = the employers from Profile &amp; Offerings. Education always comes from there.</p>
-              <Repeater items={pf.experience} onChange={experience => set({ experience })} blank={{ role: '', company: '' }} max={20} noun="Role" title={e => [e.role, e.company].filter(Boolean).join(' · ') || 'New role'}>
-                {(e, p) => <>
-                  <div className="cols c2"><Txt label="Role" value={e.role} max={80} ph="Founder" onChange={v => p({ role: v })} /><Txt label="Company" value={e.company} max={80} ph="Equilx Corporation" onChange={v => p({ company: v })} /></div>
-                  <Txt label="Period" value={e.period} max={40} ph="2023 – Present" onChange={v => p({ period: v })} />
-                  <Txt label="What you did" value={e.summary} max={500} rows={3} onChange={v => p({ summary: v })} />
-                </>}
-              </Repeater>
-            </section>
-          )}
-
-          {tab === 'talks' && (
-            <section className="card"><h3>Talks, podcasts &amp; interviews</h3>
-              <p className="hint">Your “Talk Shows” offerings also appear here, under Activity → Talks.</p>
-              <Repeater items={pf.talks} onChange={talks => set({ talks })} blank={{ title: '' }} max={24} noun="Talk" title={t => t.title || 'New talk'}>
-                {(t, p) => <>
-                  <Txt label="Title" value={t.title} max={100} onChange={v => p({ title: v })} />
-                  <div className="cols c2"><Txt label="Event or show" value={t.event} max={100} onChange={v => p({ event: v })} /><Txt label="Date" value={t.date} max={30} ph="March 2025" onChange={v => p({ date: v })} /></div>
-                  <Txt label="Short note" value={t.summary} max={300} rows={2} onChange={v => p({ summary: v })} />
-                  <Txt label="Link (video / article)" value={t.url} ph="https://…" onChange={v => p({ url: v })} />
-                </>}
-              </Repeater>
-            </section>
-          )}
-
-          {['recognition', 'certificates'].includes(tab) && <section className="card"><h3>{tab === 'recognition' ? 'Recognition & awards' : 'Certificates'}</h3>
-            <p className="hint">These entries are published on your Activity page. Awards highlighted on Home also appear under Activity → Awards.</p>
-            <Repeater items={pf[tab]} onChange={items => set({ [tab]: items })} blank={{ title: '', ...(tab === 'recognition' ? { kind: 'recognition' } : {}) }} max={24} noun={tab === 'recognition' ? 'Recognition' : 'Certificate'} title={item => item.title || 'New entry'}>
-              {(item, patch) => <>
-                {tab === 'recognition' && <Field label="Type"><select value={item.kind} onChange={e => patch({ kind: e.target.value })}><option value="recognition">Recognition</option><option value="award">Award</option></select></Field>}
-                <Txt label="Title" value={item.title} max={100} onChange={v => patch({ title: v })} />
-                <div className="cols c2"><Txt label="Issued by" value={item.issuer} max={100} onChange={v => patch({ issuer: v })} /><Txt label="Date" value={item.date} max={30} onChange={v => patch({ date: v })} /></div>
-                <Txt label="Description" value={item.summary} max={500} rows={3} onChange={v => patch({ summary: v })} />
-                <Txt label={tab === 'certificates' ? 'Certificate link' : 'Source link'} value={item.url} ph="https://…" onChange={v => patch({ url: v })} />
-              </>}
-            </Repeater>
-          </section>}
-
-          {tab === 'testimonials' && <section className="card"><h3>Testimonials</h3>
-            <p className="hint">Publish testimonials you have permission to share under Activity → Testimonials.</p>
-            <Repeater items={pf.testimonials} onChange={testimonials => set({ testimonials })} blank={{ author: '', quote: '' }} max={24} noun="Testimonial" title={item => item.author || 'New testimonial'}>
-              {(item, patch) => <><Txt label="Name" value={item.author} max={100} onChange={v => patch({ author: v })} /><Txt label="Role or organisation" value={item.role} max={100} onChange={v => patch({ role: v })} /><Txt label="Testimonial" value={item.quote} max={1200} rows={5} onChange={v => patch({ quote: v })} /><Txt label="Source link" value={item.url} ph="https://…" onChange={v => patch({ url: v })} /></>}
-            </Repeater>
-          </section>}
-
+          {['projects', 'talks', 'recognition', 'certificates', 'testimonials', 'experience'].includes(tab) && <section className="card"><h3>Activity presentation</h3><p>Manage records in <Link to={`/admin/activity?tab=${tab}&return=${encodeURIComponent('/admin/settings?tab='+tab)}`}>Activity</Link>. Preview layout and visibility here.</p><Txt label="Projects heading" value={pf.projectsTitle} max={40} onChange={value => set({ projectsTitle: value })} /><Txt label="Projects small heading" value={pf.projectsKicker} max={30} onChange={value => set({ projectsKicker: value })} /></section>}
           {tab === 'about' && (
             <section className="card"><h3>About section on Home</h3>
               <Txt label="Page heading" value={pf.about.title} max={60} ph={`About ${real.name?.split(' ')[0] || 'me'}`} onChange={v => setIn('about', { title: v })} />
@@ -341,10 +231,10 @@ export default function PortfolioEditor() {
             </section>
           </>}
           </div>
-        </div>
+        </fieldset>
 
-        <div className="pp-prev"><div className="pp-prev-label">Live preview · {PAGE_LABELS[TAB_PAGE[tab]]}</div>
-          {preview ? <ScaledPreview><PortfolioSite data={preview} slug={user.slug} sub={TAB_PAGE[tab]} activitySection={['recognition', 'certificates', 'testimonials'].includes(tab) ? tab : undefined} preview heroOverride={hero} /></ScaledPreview> : <PortfolioPreviewState error={previewError} onRetry={retryPreview} />}</div>
+        <div className="pp-prev"><div className="head"><div className="pp-prev-label">Live preview · {PAGE_LABELS[TAB_PAGE[tab]]}</div><div className="row"><button type="button" className="btn small" aria-pressed={!mobile} onClick={() => setMobile(false)}>Desktop</button><button type="button" className="btn small" aria-pressed={mobile} onClick={() => setMobile(true)}>Mobile</button></div></div>
+          {preview ? <ScaledPreview mobile={mobile}><PortfolioSite data={preview} slug={user.slug} sub={TAB_PAGE[tab]} activitySection={['talks', 'recognition', 'certificates', 'testimonials', 'experience'].includes(requestedTab) ? requestedTab : undefined} preview heroOverride={hero} /></ScaledPreview> : <PortfolioPreviewState error={previewError} onRetry={retryPreview} />}</div>
       </div>
     </div>
   );

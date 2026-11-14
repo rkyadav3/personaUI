@@ -1,5 +1,7 @@
 // Per-user background and sphere settings. Shared by the Portfolio editor, public Portfolio and server.
+import { cleanImg } from './portfolio.js';
 export const BG_DEFAULTS = {
+  imageUrl: '',
   x: 50, y: 50,          // focal point, % (what stays centred when the screen shape changes)
   zoom: 1,               // 1 to 3
   blur: 0,               // px, 0 to 24
@@ -17,6 +19,7 @@ const clamp = (v, [lo, hi], fallback) => { const n = v == null || v === '' ? NaN
 export function normalizeBg(input) {
   const s = input && typeof input === 'object' ? input : {};
   const out = { ...BG_DEFAULTS };
+  out.imageUrl = cleanImg(s.imageUrl);
   for (const k of Object.keys(BG_LIMITS)) out[k] = clamp(s[k], BG_LIMITS[k], BG_DEFAULTS[k]);
   out.parallax = typeof s.parallax === 'boolean' ? s.parallax : BG_DEFAULTS.parallax;
   out.ball = typeof s.ball === 'boolean' ? s.ball : BG_DEFAULTS.ball;

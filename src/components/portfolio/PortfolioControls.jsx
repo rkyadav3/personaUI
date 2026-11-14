@@ -34,8 +34,10 @@ export function StoreControls({ page, setPage }) {
     <section className="card"><h3>Shop &amp; visible sections</h3>
       <Text label="Shop title" value={page.storeTitle} max={40} onChange={value => setPage({ storeTitle: value })} />
       <Text label="Shop subtitle" value={page.storeSubtitle} max={140} onChange={value => setPage({ storeSubtitle: value })} />
+      <Range label="Items before Show more" min={2} max={40} value={page.storeLimit} onChange={value => setPage({ storeLimit: value })} />
+      <label className="toggle"><input type="checkbox" checked={page.cart} onChange={event => setPage({ cart: event.target.checked })} />Enable checkout for Store items</label>
       <Text label="Currency for existing prices without one" value={page.currency} max={6} onChange={value => setPage({ currency: value })} />
-      <p className="hint">Visible free and paid products appear on Home and Store. Manage prices and access links under <Link to="/admin/profile?tab=contrib">Offerings &amp; categories</Link> or <Link to="/admin/settings?tab=products">Store products</Link>. Buyer records are under <Link to="/admin/purchases">Activity &amp; Orders</Link>.</p>
+      <p className="hint">Visible free and paid products appear on Home and Store. Manage prices and access links under <Link to="/admin/store?tab=categories">Offerings &amp; categories</Link> or <Link to="/admin/store?tab=products">Store products</Link>. Buyer records are under <Link to="/admin/purchases">Orders</Link>.</p>
       <div className="portfolio-checks">{Object.entries(SECTION_LABELS).map(([key, label]) => <label className="toggle" key={key}><input type="checkbox" checked={page.sections[key]} onChange={event => setIn('sections', { [key]: event.target.checked })} /> Show {label === 'Store' ? 'Shop' : label}</label>)}</div>
     </section>
     <section className="card"><h3>Offering categories</h3><p className="hint">Visible categories appear in the shop. You can also show them as questions in the Chat sidebar.</p>
@@ -74,6 +76,7 @@ export function PersonaControls({ page, bg, setPage, setBg, imageUrl, onChooseBa
     </section>
     <section className="card"><h3>Background image</h3><p className="hint">Use this image across your public pages by choosing My background image under Appearance.</p>
       <Field label="Upload background image"><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => onChooseBackground(event.target.files[0])} /></Field>
+      <Text label="Background image link" value={bg.imageUrl} max={600} onChange={imageUrl => setBg({ imageUrl })} />
       {imageUrl && <><img className="portfolio-bg-thumbnail" src={imageUrl} alt="Current background" /><button type="button" className="btn small" onClick={onRemoveBackground}>Remove background image</button></>}
       {[['zoom', 'Background zoom', 1, 3, 0.05, '×'], ['x', 'Focus left to right', 0, 100, 1, '%'], ['y', 'Focus top to bottom', 0, 100, 1, '%'], ['blur', 'Background blur', 0, 24, 1, 'px'], ['brightness', 'Brightness', 30, 140, 1, '%'], ['dim', 'Dark overlay', 0, 85, 1, '%']].map(([key, label, min, max, step, unit]) => <Range key={key} label={label} min={min} max={max} step={step} unit={unit} value={bg[key]} onChange={value => setBg({ [key]: value })} />)}
       <label className="toggle"><input type="checkbox" checked={bg.parallax} onChange={event => setBg({ parallax: event.target.checked })} /> Subtle background parallax</label>

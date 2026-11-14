@@ -4,11 +4,12 @@ Module._extensions['.jsx'] = (module, file) => module._compile(transformSync(fs.
 Module._extensions['.css'] = () => {};
 const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'), { MemoryRouter } = require('react-router-dom');
 
-test('Settings has no invitations or suggestions and Community retains both destinations', async () => {
+test('Settings has no invitations or suggestions and Invite retains both destinations', async () => {
   const { ADMIN_SECTIONS, adminLocation } = await import('../src/lib/adminNavigation.js');
   const settings = ADMIN_SECTIONS.find(section => section.id === 'settings');
   assert.ok(settings.pages.every(page => !['invites', 'suggestions'].includes(page.id)));
   assert.deepEqual(ADMIN_SECTIONS.find(section => section.id === 'community').pages.map(page => page.id), ['invites', 'suggestions']);
+  assert.equal(ADMIN_SECTIONS.find(section => section.id === 'community').label, 'Invite');
   assert.deepEqual(adminLocation('/admin/invites'), { group: 'community', page: 'invites' });
   assert.deepEqual(adminLocation('/admin/suggestions'), { group: 'community', page: 'suggestions' });
 });

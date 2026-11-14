@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useOutletContext, useSearchParams } from 'react-router-dom';
+import { Navigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { VISIBILITY_DEFAULTS } from '../../shared/profileSchema.js';
 import { api } from '../lib/api.js';
 import { LegacyPortfolioRedirect } from './LegacyRedirects.jsx';
@@ -7,7 +7,6 @@ import { QUESTIONS, emptyDraft, mergeDraft, missing } from '../lib/draft.js';
 import { Loading, Notice, Pill } from '../components/Ui.jsx';
 import DraftEditor from '../components/profile/DraftEditor.jsx';
 import VisibilityEditor from '../components/profile/VisibilityEditor.jsx';
-import Contributions from '../components/profile/Contributions.jsx';
 import Icon from '../components/portfolio/Icon.jsx';
 
 const PLACEHOLDER = 'Tell us about yourself, your education, professional experience, expertise, and what you would like to contribute to our platform.';
@@ -143,6 +142,7 @@ export function ProfileManager({ data, reload }) {
   const flash = (kind, t) => { setMsg({ kind, t }); setTimeout(() => setMsg(null), 3500); };
   const guard = fn => async () => { try { await fn(); } catch (e) { flash('error', e.message); } };
 
+  if (params.get('tab') === 'contrib') return <Navigate to={`/admin/store?tab=categories${params.get('action') === 'add' ? '&action=add' : ''}`} replace />;
   if (params.get('tab') === 'visibility') return <LegacyPortfolioRedirect tab="privacy" />;
 
   return (
@@ -204,20 +204,7 @@ export function ProfileManager({ data, reload }) {
         </>
       )}
 
-      {tab === 'contrib' && (
-        <>
-          <div className="ux-guide-banner">
-            <div className="ux-guide-icon"><Icon n="box" size={24} /></div>
-            <div className="ux-guide-content">
-              <h4>Categories → offerings → public shop</h4>
-              <p>
-                Add a category, then list your offerings inside it. Active offerings appear in your public shop when the profile is published. For checkout, add a price and an access or download link.
-              </p>
-            </div>
-          </div>
-          <Contributions items={contributions} reload={reload} />
-        </>
-      )}
+
     </>
   );
 }

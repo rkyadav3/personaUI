@@ -31,6 +31,7 @@ const clean = (v, n) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().s
 const long = (v, n) => (typeof v === 'string' ? v.replace(/\r/g, '').replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, n) : '');
 const list = (v, n) => (Array.isArray(v) ? v.slice(0, n) : []);
 const pick = (v, allowed, d = '') => (allowed.includes(v) ? v : d);
+const recordId = (value, kind, index) => /^[a-zA-Z0-9_-]{1,80}$/.test(value || '') ? value : `legacy-${kind}-${index}`;
 
 /** Links: http(s), mailto, tel, or a path on this site. A bare "github.com/me" gets https://, a bare email gets mailto:.
  *  Anything else (javascript:, data:, //host …) becomes empty, so nothing dangerous can reach an <a href>. */
@@ -63,7 +64,7 @@ export function normalizePortfolio(input) {
     brand: clean(i.brand, 40), greeting: clean(i.greeting, 30), heroName: clean(i.heroName, 60), titleLine: clean(i.titleLine, 70),
     bio: clean(i.bio, 320), photoStyle: pick(i.photoStyle, ['bw', 'color'], 'bw'),
     availability: { show: i.availability?.show === true, text: clean(i.availability?.text, 60) },
-    awards: list(i.awards, 3).map(a => ({ title: clean(a?.title, 50), sub: clean(a?.sub, 60) })).filter(a => a.title || a.sub),
+    awards: list(i.awards, 3).map((a, index) => ({ id: recordId(a?.id, 'award', index), title: clean(a?.title, 50), sub: clean(a?.sub, 60) })).filter(a => a.title || a.sub),
     socials: list(i.socials, 7).map(s => ({ kind: pick(s?.kind, Object.keys(SOCIAL_KINDS), 'website'), url: cleanUrl(s?.url) })).filter(s => s.url),
     domains: list(i.domains, 8).map(d => ({ label: clean(d?.label, 40), icon: pick(d?.icon, ICON_NAMES) })).filter(d => d.label),
     cta: { label: clean(i.cta?.label, 24), url: cleanUrl(i.cta?.url) },
@@ -86,7 +87,7 @@ export function normalizePortfolio(input) {
     })).filter(p => p.title),
     experience: list(i.experience, 20).map(e => ({ role: clean(e?.role, 80), company: clean(e?.company, 80), period: clean(e?.period, 40), summary: clean(e?.summary, 500) })).filter(e => e.role || e.company),
     talks: list(i.talks, 24).map(t => ({ title: clean(t?.title, 100), event: clean(t?.event, 100), date: clean(t?.date, 30), summary: clean(t?.summary, 300), url: cleanUrl(t?.url) })).filter(t => t.title),
-    recognition: list(i.recognition, 24).map(r => ({ kind: pick(r?.kind, ['recognition', 'award'], 'recognition'), title: clean(r?.title, 100), issuer: clean(r?.issuer, 100), date: clean(r?.date, 30), summary: clean(r?.summary, 500), url: cleanUrl(r?.url) })).filter(r => r.title),
+    recognition: list(i.recognition, 24).map((r, index) => ({ id: recordId(r?.id, 'recognition', index), kind: pick(r?.kind, ['recognition', 'award'], 'recognition'), title: clean(r?.title, 100), issuer: clean(r?.issuer, 100), date: clean(r?.date, 30), summary: clean(r?.summary, 500), url: cleanUrl(r?.url) })).filter(r => r.title),
     certificates: list(i.certificates, 24).map(c => ({ title: clean(c?.title, 100), issuer: clean(c?.issuer, 100), date: clean(c?.date, 30), summary: clean(c?.summary, 500), url: cleanUrl(c?.url) })).filter(c => c.title),
     testimonials: list(i.testimonials, 24).map(t => ({ author: clean(t?.author, 100), role: clean(t?.role, 100), quote: long(t?.quote, 1200), url: cleanUrl(t?.url) })).filter(t => t.author && t.quote),
     about: { title: clean(i.about?.title, 60), body: long(i.about?.body, 3000), skills: clean(i.about?.skills, 400) },

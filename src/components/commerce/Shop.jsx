@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cleanImg, cleanUrl } from '../../../shared/portfolio.js';
 import { minorUnits } from '../../../shared/commerce.js';
 import { useSeen } from '../../lib/useSeen.js';
@@ -6,9 +6,11 @@ import { track } from '../../lib/track.js';
 import Icon from '../portfolio/Icon.jsx';
 import CheckoutDialog from './CheckoutDialog.jsx';
 import OfferingRating from '../home/OfferingRating.jsx';
+import { normalizeCustomization } from '../../../shared/customization.js';
+import { sortDisplayItems } from '../../lib/customizationDisplay.js';
 import '../../styles/profileActions.css';
 
-export function ShopCard({ item, slug, user, preview, onCheckout }) {
+export function ShopCard({ item, slug, user, preview, onCheckout, display = normalizeCustomization() }) {
   const ref = useRef(null), offering = item.kind === 'offering';
   const [badImage, setBadImage] = useState(false);
   useSeen(ref, !preview && offering, () => track({ kind: 'view', id: item.id }));
@@ -20,12 +22,12 @@ export function ShopCard({ item, slug, user, preview, onCheckout }) {
     <article className="persona-shop-card" ref={ref}>
       <div className="persona-shop-cover">
         {image && !badImage ? <img src={image} alt="" loading="lazy" onError={() => setBadImage(true)} /> : <span aria-hidden="true"><Icon n={item.icon || 'spark'} size={30} /></span>}
-        <span className="persona-tag">{item.pricing === 'free' ? 'Free' : item.pricing === 'paid' ? 'Paid' : item.status || 'Offering'}</span>
+        {display.storeBadges && <span className="persona-tag">{item.pricing === 'free' ? 'Free' : item.pricing === 'paid' ? 'Paid' : item.status || 'Offering'}</span>}
       </div>
       <h3>{item.title}</h3>
-      {item.summary && <p>{item.summary}</p>}
+      {display.storeDescriptions && item.summary && <p>{item.summary}</p>}
       <div className="persona-shop-footer">
-        <strong>{item.price}</strong>
+        {display.storePrices && <strong>{item.price}</strong>}
         {item.checkout && <button type="button" className="persona-button primary" disabled={unavailable && !preview} onClick={() => { if (!preview && offering) track({ kind: 'click', id: item.id }); onCheckout(item); }}>{item.pricing === 'free' ? 'Get free' : 'Buy now'}</button>}
       </div>
       {item.ratingCount > 0 && <small className="persona-muted">★ {Number(item.ratingAvg || 0).toFixed(1)} ({item.ratingCount} ratings)</small>}
@@ -36,11 +38,19 @@ export function ShopCard({ item, slug, user, preview, onCheckout }) {
   );
 }
 
-export default function Shop({ items, slug, owner, user, preview = false }) {
+export default function Shop({ items, slug, owner, user, preview = false, customization, limit = 40 }) {
   const [selected, setSelected] = useState(null);
+  const [category, setCategory] = useState('all'), [count, setCount] = useState(limit);
+  useEffect(() => { setCount(limit); }, [limit]);
+  const display = normalizeCustomization(customization);
+  const categories = [...new Set(items.map(item => item.category || (item.kind === 'product' ? 'Products' : 'Offerings')))];
+  const active = display.storeFilters && categories.includes(category) ? category : 'all';
+  const sorted = sortDisplayItems(items.filter(item => active === 'all' || (item.category || (item.kind === 'product' ? 'Products' : 'Offerings')) === active), display.storeSort);
   return (
     <>
-      <div className="persona-shop-grid">{items.map(item => <ShopCard key={`${item.kind}:${item.id}`} item={item} slug={slug} user={user} preview={preview} onCheckout={setSelected} />)}</div>
+      {display.storeFilters && categories.length > 1 && <label className="pf-store-filter">Category<select value={active} onChange={event => { setCategory(event.target.value); setCount(limit); }}><option value="all">All items</option>{categories.map(name => <option key={name}>{name}</option>)}</select></label>}
+      <div className={`persona-shop-grid shop-${display.storeLayout} shop-${display.storeCardSize} image-${display.storeImageRatio}`} style={{ '--store-columns': display.storeColumns }}>{sorted.slice(0, count).map(item => <ShopCard key={`${item.kind}:${item.id}`} item={item} slug={slug} user={user} preview={preview} onCheckout={setSelected} display={display} />)}</div>
+      {sorted.length > count && <button type="button" className="pf-btn" onClick={() => setCount(value => value + limit)}>Show more items</button>}
       {selected && <CheckoutDialog key={`${selected.kind}:${selected.id}`} item={selected} slug={slug} owner={owner} preview={preview} onClose={() => setSelected(null)} />}
     </>
   );

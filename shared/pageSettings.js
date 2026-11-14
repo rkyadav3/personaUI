@@ -1,6 +1,8 @@
 // What the owner can customise on their public page (/p/<slug>). Shared by the editor, the page and the server.
 // Empty text uses the published profile as a fallback on the portfolio and its Chat page.
 import { CATEGORIES } from './profileSchema.js';
+import { CUSTOMIZATION_DEFAULTS, normalizeCustomization } from './customization.js';
+import { cleanImg } from './portfolio.js';
 
 export const ACCENTS = {
   violet: ['#6d4aff', '#a855f7'], blue: ['#2563eb', '#38bdf8'], emerald: ['#059669', '#34d399'],
@@ -14,6 +16,7 @@ export const PLACEMENT_DEFAULTS = {
 export const SECTION_LABELS = { store: 'Store', expertise: 'Expertise', education: 'Education', experience: 'Experience' };
 
 export const PAGE_DEFAULTS = {
+  customization: CUSTOMIZATION_DEFAULTS,
   template: 'portfolio',                          // one public portfolio, including its Chat page
   headline: '', headlineAccent: '', subtitle: '', placeholder: '', tagline: '', about: '',
   chips: [],                                   // [{ label, prompt }], up to 6. Empty = chips made from what you offer.
@@ -22,7 +25,7 @@ export const PAGE_DEFAULTS = {
   accent: 'violet', currency: 'INR', cart: true,
   placement: PLACEMENT_DEFAULTS,
   sections: { store: true, expertise: true, education: true, experience: true },
-  hero: { zoom: 1, x: 50, y: 25 },
+  hero: { zoom: 1, x: 50, y: 25, imageUrl: '' },
   accentHex: '',                                   // '' = use the preset above; '#rrggbb' = your own colour
   theme: { bg: 'orbs', bgColor: '#ffffff', wash: 55, font: 'sans', radius: 28, maxWidth: 1380 },
   glass: { on: true, refraction: 55, blur: 14, tint: 55, dispersion: 25, rim: 70, shadow: 50 },
@@ -50,6 +53,7 @@ export function normalizePage(input) {
     .map(c => ({ label: s(c?.label, 32), prompt: s(c?.prompt, 200) })).filter(c => c.label)
     .map(c => ({ ...c, prompt: c.prompt || c.label }));
   return {
+    customization: normalizeCustomization(i.customization),
     template: 'portfolio',
     headline: s(i.headline, 60), headlineAccent: s(i.headlineAccent, 40), subtitle: s(i.subtitle, 220), placeholder: s(i.placeholder, 120),
     tagline: s(i.tagline, 120), about: s(i.about, 600), chips,
@@ -57,7 +61,7 @@ export function normalizePage(input) {
     openLabel: s(i.openLabel, 24) || d.openLabel, talkLabel: s(i.talkLabel, 24) || d.talkLabel,
     accent: ACCENTS[i.accent] ? i.accent : d.accent, currency: s(i.currency, 6) || d.currency, cart: typeof i.cart === 'boolean' ? i.cart : d.cart,
     placement, sections,
-    hero: { zoom: num(i.hero?.zoom, 1, 3, d.hero.zoom), x: num(i.hero?.x, 0, 100, d.hero.x), y: num(i.hero?.y, 0, 100, d.hero.y) },
+    hero: { zoom: num(i.hero?.zoom, 1, 3, d.hero.zoom), x: num(i.hero?.x, 0, 100, d.hero.x), y: num(i.hero?.y, 0, 100, d.hero.y), imageUrl: cleanImg(i.hero?.imageUrl) },
     accentHex: HEX.test(i.accentHex) ? i.accentHex.toLowerCase() : '',
     theme: {
       bg: BG_MODES[i.theme?.bg] ? i.theme.bg : d.theme.bg, bgColor: HEX.test(i.theme?.bgColor) ? i.theme.bgColor.toLowerCase() : d.theme.bgColor,

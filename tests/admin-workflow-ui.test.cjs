@@ -14,14 +14,14 @@ test('legacy and detail links select the category and the correct secondary page
   const { adminLocation } = await import('../src/lib/adminNavigation.js');
   for (const [path, search, group, page] of [
     ['/admin/portfolio', '?tab=projects', 'settings', 'editor'],
-    ['/admin/profile', '?tab=contrib', 'offerings', 'categories'],
+    ['/admin/profile', '?tab=contrib', 'store', 'catalogue'],
     ['/admin/writing/18', '', 'pipelines', 'content'],
     ['/admin/writing', '?tab=templates', 'pipelines', 'content'],
     ['/admin/templates', '', 'pipelines', 'content'],
     ['/admin/topics/7', '', 'pipelines', 'content'],
     ['/admin/add', '', 'pipelines', 'files'],
     ['/admin/knowledge', '', 'pipelines', 'knowledge'],
-    ['/admin/questions', '', 'activity', 'questions'],
+    ['/admin/questions', '', 'inbox', 'questions'],
     ['/admin/superadmin', '?tab=invites', 'platform', 'invites'],
   ]) assert.deepEqual(adminLocation(path, search), { group, page }, path);
   assert.equal(adminLocation('/admin/writing-other'), null);

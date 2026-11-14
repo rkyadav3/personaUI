@@ -85,7 +85,7 @@ function EventResponses({ event }) {
   </section>;
 }
 
-export default function Updates() {
+export default function Updates({ embedded = false } = {}) {
   const { user } = useAuth();
   const { data, error, reload } = useOp('updates.list');
   const [kind, setKind] = useAdminTab({ values: Object.keys(COPY), defaultValue: 'update', parameter: 'kind' });

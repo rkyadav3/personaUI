@@ -31,6 +31,7 @@ window.fetch = async (url, options) => {
     case 'page.preview': return Response.json({ ...state.profile, page: state.site.page, portfolio: state.site.portfolio, contributions: [] });
     case 'page.save':
       if (args.page) state.site.page = normalizePage(args.page);
+      if (args.portfolioPatch) state.site.portfolio = normalizePortfolio({ ...state.site.portfolio, ...args.portfolioPatch });
       if (args.portfolio) state.site.portfolio = normalizePortfolio(args.portfolio);
       if (args.bg) state.site.bg = normalizeBg(args.bg);
       persist(); return Response.json(state.site);

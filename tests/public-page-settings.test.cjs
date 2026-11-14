@@ -38,8 +38,8 @@ test('public page settings retains every editor area and safely resolves invalid
 
 test('assistant links reach the consolidated editor and the separate offerings manager', async () => {
   const { STUDIO_ENTITIES } = await import('../shared/studioAssistant.js');
-  for (const entity of Object.values(STUDIO_ENTITIES).filter(entity => entity.root === 'settings')) assert.ok(entity.href.startsWith('/admin/settings'), entity.label);
+  for (const entity of Object.values(STUDIO_ENTITIES).filter(entity => entity.root === 'settings' && !['Portfolio projects', 'Free and paid shop products', 'Public experience timeline', 'Portfolio talks and interviews', 'Home award highlights', 'Recognition and awards', 'Certificates', 'Testimonials'].includes(entity.label))) assert.ok(entity.href.startsWith('/admin/settings'), entity.label);
   assert.equal(STUDIO_ENTITIES.payments.href, '/admin/settings?tab=payments');
-  assert.equal(STUDIO_ENTITIES.contributions.href, '/admin/profile?tab=contrib');
-  assert.equal(STUDIO_ENTITIES.offerings.href, '/admin/profile?tab=contrib');
+  assert.equal(STUDIO_ENTITIES.contributions.href, '/admin/store?tab=categories');
+  assert.equal(STUDIO_ENTITIES.offerings.href, '/admin/store?tab=categories');
 });

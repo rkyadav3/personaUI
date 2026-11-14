@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { CONTACT_METHODS, ENQUIRY_TYPES, MEETING_MODES, SCHEDULING_TYPES, TIME_SLOTS } from '../../../shared/enquiryTypes.js';
+import { normalizeCustomization } from '../../../shared/customization.js';
 import { normalizeEnquiry } from '../../../shared/engage.js';
 import Icon from './Icon.jsx';
 
@@ -19,7 +20,9 @@ function Row({ label, hint, error, id, required, children }) {
   );
 }
 
-export default function EnquiryForm({ slug, cfg, offers = [], owner, preview = false }) {
+export default function EnquiryForm({ slug, cfg, offers = [], owner, preview = false, customization }) {
+  const display = normalizeCustomization(customization);
+  const optional = key => display.contactFields.includes(key);
   const q = new URLSearchParams(useLocation().search);
   const types = useMemo(() => (cfg.types?.length ? cfg.types : Object.keys(ENQUIRY_TYPES)), [cfg.types]);
   const fromOffer = preview ? null : offers.find(o => String(o.id) === q.get('offering'));   // "Enquire" on a product card pre-fills this
@@ -33,7 +36,9 @@ export default function EnquiryForm({ slug, cfg, offers = [], owner, preview = f
   async function submit(e) {
     e.preventDefault();
     if (preview || busy) return;
-    const r = normalizeEnquiry(f, { types });
+    const submitted = { ...f, ...Object.fromEntries(['phone', 'organisation', 'location', 'budget'].filter(key => !optional(key)).map(key => [key, ''])) };
+    if (!optional('phone') && /phone|whatsapp/i.test(submitted.prefContact)) submitted.prefContact = '';
+    const r = normalizeEnquiry(submitted, { types });
     if (!r.ok) {
       setErrors(r.errors); setServerErr('');
       const first = Object.keys(r.errors)[0];
@@ -42,7 +47,7 @@ export default function EnquiryForm({ slug, cfg, offers = [], owner, preview = f
     }
     setBusy(true); setErrors({}); setServerErr('');
     try {
-      const res = await fetch('/api/enquiry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, slug }) });
+      const res = await fetch('/api/enquiry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...submitted, slug }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.ok === false) { setServerErr(d.error || 'Could not send your enquiry. Please try again.'); if (d.errors) setErrors(d.errors); }
       else { setDone(true); window.scrollTo?.({ top: 0, behavior: 'smooth' }); }
@@ -70,9 +75,9 @@ export default function EnquiryForm({ slug, cfg, offers = [], owner, preview = f
         <div className="pf-fgrid">
           <Row label="Full name" id="enq-name" required error={errors.name}><input type="text" autoComplete="name" maxLength={100} {...input('name')} /></Row>
           <Row label="Email" id="enq-email" required error={errors.email}><input type="email" autoComplete="email" maxLength={160} {...input('email')} /></Row>
-          <Row label="Phone or WhatsApp" id="enq-phone" error={errors.phone} hint="Optional, with country code"><input type="tel" autoComplete="tel" maxLength={40} {...input('phone')} /></Row>
-          <Row label="Organisation or company" id="enq-organisation" error={errors.organisation}><input type="text" autoComplete="organization" maxLength={120} {...input('organisation')} /></Row>
-          <Row label="City and country" id="enq-location" error={errors.location}><input type="text" maxLength={120} {...input('location')} /></Row>
+          {optional('phone') && <Row label="Phone or WhatsApp" id="enq-phone" error={errors.phone} hint="Optional, with country code"><input type="tel" autoComplete="tel" maxLength={40} {...input('phone')} /></Row>}
+          {optional('organisation') && <Row label="Organisation or company" id="enq-organisation" error={errors.organisation}><input type="text" autoComplete="organization" maxLength={120} {...input('organisation')} /></Row>}
+          {optional('location') && <Row label="City and country" id="enq-location" error={errors.location}><input type="text" maxLength={120} {...input('location')} /></Row>}
         </div>
       </fieldset>
 
@@ -99,7 +104,7 @@ export default function EnquiryForm({ slug, cfg, offers = [], owner, preview = f
             <Row label="Preferred date" id="enq-prefDate" error={errors.prefDate}><input type="date" min={today} {...input('prefDate')} /></Row>
             <Row label="Preferred time" id="enq-prefTime"><select {...input('prefTime')}><option value="">No preference</option>{TIME_SLOTS.map(t => <option key={t}>{t}</option>)}</select></Row>
             <Row label="Meeting mode" id="enq-meetingMode"><select {...input('meetingMode')}><option value="">Not sure yet</option>{MEETING_MODES.map(t => <option key={t}>{t}</option>)}</select></Row>
-            <Row label="Budget or fee range" id="enq-budget" hint="Optional"><input type="text" maxLength={60} placeholder="e.g. ₹5,000 to ₹10,000" {...input('budget')} /></Row>
+            {optional('budget') && <Row label="Budget or fee range" id="enq-budget" hint="Optional"><input type="text" maxLength={60} placeholder="e.g. ₹5,000 to ₹10,000" {...input('budget')} /></Row>}
           </div>
         </fieldset>
       )}
@@ -107,7 +112,7 @@ export default function EnquiryForm({ slug, cfg, offers = [], owner, preview = f
       <fieldset className="pf-fs">
         <legend>How should we reply?</legend>
         <Row label="Preferred way to reach you" id="enq-prefContact" error={errors.prefContact}>
-          <select {...input('prefContact')}><option value="">Email is fine</option>{CONTACT_METHODS.map(t => <option key={t}>{t}</option>)}</select>
+          <select {...input('prefContact')}><option value="">Email is fine</option>{CONTACT_METHODS.filter(t => optional('phone') || !/phone|whatsapp/i.test(t)).map(t => <option key={t}>{t}</option>)}</select>
         </Row>
         <div className="pf-hp" aria-hidden="true"><label>Leave this empty<input type="text" tabIndex={-1} autoComplete="off" value={f.website} onChange={e => set('website', e.target.value)} /></label></div>
         <label className={`pf-check${errors.consent ? ' bad' : ''}`}>
@@ -118,7 +123,7 @@ export default function EnquiryForm({ slug, cfg, offers = [], owner, preview = f
       </fieldset>
 
       {serverErr && <p className="pf-banner" role="alert">{serverErr}</p>}
-      <button className="pf-btn dark" disabled={busy || preview}>{busy ? 'Sending…' : 'Send enquiry'} <Icon n="arrow" size={16} /></button>
+      <button className="pf-btn dark" disabled={busy || preview}>{busy ? 'Sending…' : display.contactButton} <Icon n="arrow" size={16} /></button>
     </form>
   );
 }

@@ -24,7 +24,7 @@ export function StudioSidebar({ user, unread = 0, photo, onLogout, onNavigate, n
   useEffect(() => setBadPhoto(false), [photo]);
   const link = item => {
     const selected = active?.group === item.id;
-    return <Link key={item.id} to={item.to} className={`studio-nav${selected ? ' active' : ''}`} aria-current={selected ? 'page' : undefined} onClick={onNavigate}><Icon n={item.icon} size={19} /><span>{item.label}</span>{item.id === 'activity' && unread > 0 && <span className="studio-badge" aria-label={`${unread} new enquiries`}>{unread}</span>}</Link>;
+    return <Link key={item.id} to={item.to} className={`studio-nav${selected ? ' active' : ''}`} aria-current={selected ? 'page' : undefined} onClick={onNavigate}><Icon n={item.icon} size={19} /><span>{item.label}</span>{item.id === 'inbox' && unread > 0 && <span className="studio-badge" aria-label={`${unread} new enquiries`}>{unread}</span>}</Link>;
   };
   return <aside className="studio-sidebar">
     <div className="studio-brand-row"><Link to={platform ? '/superadmin' : '/admin'} className="studio-brand" onClick={onNavigate}><StudioMark />{platform ? 'Platform' : 'Studio'}</Link><button type="button" className="studio-menu-toggle" aria-label={navOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navOpen} aria-controls="studio-navigation" onClick={onToggleNav}><Icon n="menu" /></button></div>
@@ -71,7 +71,8 @@ function Inner({ superadmin }) {
   if (!superadmin && user.isSuperAdmin) return <Navigate to="/superadmin" replace />;
   if (superadmin && !user.isSuperAdmin) return <Navigate to="/admin" replace />;
   if (!superadmin && needs === null) return <Loading label="Opening your workspace…" />;
-  if (!superadmin && needs && !['/admin/profile', '/admin/superadmin', '/admin/users', '/admin/invites', '/admin/suggestions'].includes(pathname)) return <Navigate to="/admin/profile" replace />;
+  const supportPage = pathname === '/admin/support' || pathname.startsWith('/admin/support/');
+  if (!superadmin && needs && !supportPage && !['/admin/profile', '/admin/superadmin', '/admin/users', '/admin/invites', '/admin/suggestions'].includes(pathname)) return <Navigate to="/admin/profile" replace />;
   const overview = pathname.replace(/\/$/, '') === '/admin';
   return <div className={`studio-shell${navOpen ? ' nav-open' : ''}`}>
     <a className="studio-skip" href="#studio-main">Skip to content</a>

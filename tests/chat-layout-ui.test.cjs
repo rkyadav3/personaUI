@@ -18,14 +18,14 @@ test('opening the public profile root shows Chat and keeps the portfolio Home li
   assert.match(html, /<a(?=[^>]*href="\/p\/ravi")(?=[^>]*aria-current="page")[^>]*>Chat<\/a>/);
   assert.match(html, /href="\/p\/ravi\/home"[^>]*>Home<\/a>/);
   assert.match(html, /href="\/p\/ravi\/home"[^>]*>View portfolio/);
-  assert.doesNotMatch(html, /class="pf-hero"/);
+  assert.doesNotMatch(html, /class="pf-hero[ "]/);
 });
 
 test('the explicit Home page still renders the portfolio and links Chat to the profile root', () => {
   const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
   const html = render(React.createElement(PortfolioSite, { data: { name: 'Ravi', portfolio: { bio: 'My public introduction' } }, slug: 'ravi', sub: 'home' }), '/p/ravi/home');
   assert.match(html, /My public introduction/);
-  assert.match(html, /class="pf-hero"/);
+  assert.match(html, /class="pf-hero[ "]/);
   assert.match(html, /<a(?=[^>]*href="\/p\/ravi\/home")(?=[^>]*aria-current="page")[^>]*>Home<\/a>/);
   assert.match(html, /href="\/p\/ravi"[^>]*>Chat<\/a>/);
   assert.doesNotMatch(html, /aria-label="Message to Ravi"/);
@@ -36,7 +36,7 @@ test('existing explicit Chat links still open Chat and the editor still previews
   const props = { data: { name: 'Ravi' }, slug: 'ravi' };
   assert.match(render(React.createElement(PortfolioSite, { ...props, sub: 'chat' }), '/p/ravi/chat'), /aria-label="Message to Ravi"/);
   const preview = render(React.createElement(PortfolioSite, { ...props, preview: true }));
-  assert.match(preview, /class="pf-hero"/);
+  assert.match(preview, /class="pf-hero[ "]/);
   assert.doesNotMatch(preview, /aria-label="Message to Ravi"/);
 });
 

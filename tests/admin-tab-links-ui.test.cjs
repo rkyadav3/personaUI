@@ -24,10 +24,10 @@ test('offering links select categories and privacy controls have one Settings ed
   const { ProfileManager } = require('../src/pages/Profile.jsx');
   const props = { data: { profile: { name: 'Owner', status: 'published', visibility: { contact: {} } }, contributions: [] }, reload() {} };
   const offerings = render(ProfileManager, props, '/admin/profile?tab=contrib');
-  assert.match(offerings, /Offerings &amp; categories/);
-  assert.match(offerings, /Add category/);
-  assert.doesNotMatch(offerings, /Save Profile Changes/);
-  assert.doesNotMatch(offerings, /Profile sections|Privacy &amp; visibility/);
+  assert.equal(offerings, ''); // Router redirects the retired editor to Store.
+  const source = fs.readFileSync('src/pages/Profile.jsx', 'utf8');
+  assert.match(source, /Navigate to=\{`\/admin\/store\?tab=categories/);
+  assert.doesNotMatch(source, /<Contributions/);
   const { PrivacyPreferences } = require('../src/pages/Settings.jsx');
   const visibility = render(PrivacyPreferences, { value: { contact: {} }, onChange() {}, onSave() {}, busy: false }, '/admin/settings?tab=privacy');
   assert.match(visibility, /Save visibility/);
