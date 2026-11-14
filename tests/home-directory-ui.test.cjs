@@ -31,6 +31,16 @@ test('custom tag labels appear on featured profiles and directory cards', () => 
   assert.equal((html.match(/>Creative Partner</g) || []).length, 2);
 });
 
+test('featured profile settings change its presentation while keeping the real profile link', () => {
+  const { FeaturedProfile, HomeDirectory } = require('../src/pages/Home.jsx');
+  const settings = { featuredBadge: 'Community spotlight', featuredButton: 'Explore this profile', featuredButtonStyle: 'square', featuredPortrait: false, featuredBio: false, featuredRole: false, featuredExpertise: false, featuredReviews: false, featuredViews: false, featuredInteractions: false };
+  const html = render(React.createElement(FeaturedProfile, { member: feed.members[0], settings }));
+  assert.match(html, /Community spotlight/); assert.match(html, /Explore this profile/); assert.match(html, /shape-square/); assert.match(html, /without-portrait/); assert.match(html, /href="\/p\/ravi"/);
+  assert.doesNotMatch(html, /directory-portrait|directory-stat|directory-role|directory-bio|directory-tags/);
+  assert.match(render(React.createElement(HomeDirectory, { feed: { ...feed, settings } })), /Community spotlight/);
+  assert.doesNotMatch(render(React.createElement(FeaturedProfile, { member: feed.members[0], settings: { featuredShowBadge: false, featuredButton: ' ' } })), /directory-feature-badge/);
+});
+
 test('main home renders the reference layout with a featured profile, real metrics and products', () => {
   const { HomeDirectory } = require('../src/pages/Home.jsx');
   const html = render(React.createElement(HomeDirectory, { feed }));

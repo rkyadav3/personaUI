@@ -20,6 +20,7 @@
 /* buttons / pills */
 .pf-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;padding:13px 24px;font-weight:600;font-size:.95rem;text-decoration:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);transition:transform .15s,box-shadow .15s;white-space:nowrap;box-shadow:0 6px 18px -12px rgba(0,0,0,.35)}
 .pf-btn:hover{transform:translateY(-1px)}
+.pf-btn{max-width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;text-align:center}.pf-btn>svg{flex-shrink:0}
 .pf-btn.dark{background:var(--btn-bg);color:var(--btn-fg);border-color:transparent}
 .pf-btn.sm{padding:8px 16px;font-size:.84rem}
 .pf-pill{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 14px;font-size:.8rem;font-weight:600;color:var(--ink2);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -167,9 +168,11 @@
 .pf-date b{font-size:1.5rem;font-weight:600}.pf-date span{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;margin-top:4px;opacity:.85}
 .pf-evt-line{display:flex;align-items:center;gap:6px;color:var(--mut);font-size:.84rem;overflow-wrap:anywhere}.pf-evt-line svg{flex:none}
 .pf-past{margin-top:16px}.pf-past summary{cursor:pointer;font-weight:600;color:var(--ink2)}
-.pf-contact-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start}
-@media (min-width:900px){.pf-contact-grid:has(.pf-side){grid-template-columns:minmax(0,1fr) 320px}.pf-side{position:sticky;top:90px}}
-.pf-form{display:grid;gap:22px;max-width:880px;width:100%;margin:0 auto;padding:clamp(18px,3vw,30px)}.pf-contact-grid .pf-form{margin:0}
+.pf-contact-grid{--contact-width:880px;display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start;justify-items:center}
+.pf-contact-grid.contact-width-comfortable{--contact-width:640px}
+.pf-contact-grid>.pf-side{width:100%;max-width:var(--contact-width);min-width:0;overflow-wrap:anywhere}
+@media (min-width:900px){.pf-contact-grid.contact-sidebar:has(.pf-side){grid-template-columns:minmax(0,1fr) 320px}.contact-sidebar>.pf-side{position:sticky;top:90px}}
+.pf-form{display:grid;gap:22px;max-width:var(--contact-width,880px);width:100%;margin:0 auto;padding:clamp(18px,3vw,30px)}
 .pf-fs{border:0;padding:0;margin:0;display:grid;gap:14px;min-width:0}
 .pf-fs legend{padding:0;margin-bottom:6px;font-family:var(--serif);font-size:1.35rem;font-weight:500}
 .pf-fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:14px}

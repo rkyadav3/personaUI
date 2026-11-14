@@ -24,6 +24,25 @@ test('Contact optional fields can be hidden and the submit label is editable', (
   for (const field of ['phone', 'organisation', 'location', 'budget']) assert.ok(!html.includes(`id="enq-${field}"`), field);
   assert.match(html, /Send request/); for (const field of ['name', 'email', 'subject', 'message', 'consent']) assert.ok(html.includes(`id="enq-${field}"`), field);
 });
+
+test('Contact defaults to a centered form with direct details and supports an optional sidebar', () => {
+  const data = { name: 'Owner', contact: { email: 'owner@example.test' } };
+  const centered = render({ sub: 'contact', data });
+  assert.match(centered, /contact-centered contact-width-wide/); assert.match(centered, /mailto:owner@example.test/); assert.match(centered, /id="enq-message"/);
+  const sidebar = render({ sub: 'contact', data: { ...data, page: { customization: { contactLayout: 'sidebar', contactWidth: 'comfortable' } } } });
+  assert.match(sidebar, /contact-sidebar contact-width-comfortable/);
+  const hidden = render({ sub: 'contact', data: { ...data, page: { customization: { contactDetails: false } } } });
+  assert.doesNotMatch(hidden, /Prefer to reach out directly/); assert.match(hidden, /id="enq-message"/);
+  const closed = render({ sub: 'contact', data: { ...data, portfolio: { enquiry: { enabled: false } }, page: { customization: { contactDetails: false } } } });
+  assert.match(closed, /Enquiries are currently closed/); assert.doesNotMatch(closed, /Use the contact details/);
+});
+
+test('the introduction button can be hidden without losing the Chat navigation', () => {
+  const data = { name: 'Owner', portfolio: { intro: { label: 'Watch my introduction', url: 'https://example.test/video' } } };
+  assert.match(render({ sub: 'home', data }), /Watch my introduction/);
+  const hidden = render({ sub: 'home', data: { ...data, page: { customization: { introButton: false } } } });
+  assert.doesNotMatch(hidden, /Watch my introduction/); assert.match(hidden, /Chat/);
+});
 test('Activity uses configured opening category and displays a real featured project badge', () => {
   const html = render({ sub: 'activity', data: { name: 'Owner', portfolio: { projects: [{ title: 'Regular' }, { title: 'Featured project', featured: true }] }, page: { customization: { activitySections: ['projects'], activityDefault: 'projects', activityLayout: 'timeline' } } } });
   assert.match(html, /activity-timeline/); assert.match(html, /pf-pill sm feat">Featured/); assert.doesNotMatch(html, />Certificates<\/button>/);

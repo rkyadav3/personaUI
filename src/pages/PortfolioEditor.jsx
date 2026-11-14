@@ -190,7 +190,9 @@ function PortfolioEditorContent({ uploading }) {
             </section>
             <section className="card"><h3>Buttons</h3>
               <p className="hint">Visitors can reach you through the Contact page in your navigation.</p>
-              <div className="cols c2"><Txt label="Second button" value={pf.intro.label} max={24} ph="Watch Introduction" onChange={v => setIn('intro', { label: v })} /><Txt label="…opens (video link)" value={pf.intro.url} ph="empty = “Chat with my AI”" onChange={v => setIn('intro', { url: v })} /></div>
+              <Txt label="Introduction button text" value={pf.intro.label} max={24} ph="Chat with my AI" onChange={v => setIn('intro', { label: v })} />
+              <Txt label="Introduction video or file" upload value={pf.intro.url} onChange={v => setIn('intro', { url: v })} />
+              <p className="hint">Leave the file or link empty to open your persona chat. Change the button shape in Site style or its visibility in Home layout &amp; display.</p>
             </section>
             <p className="hint">Choose highlighted awards below. <Link to="/admin/activity?tab=awards&return=%2Fadmin%2Fsettings%3Ftab%3Dhero">Manage awards in Activity</Link>.</p>
             <section className="card"><h3>What I do (list right of your photo)</h3>

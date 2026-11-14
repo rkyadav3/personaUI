@@ -98,9 +98,9 @@ function Hero({ m, ctx }) {
           </div>
           <div className="pf-right">
             {m.domains.length > 0 && <ul className="pf-domains">{m.domains.map((d, i) => <li key={i}><Icon n={d.icon} size={16} />{d.label}</li>)}</ul>}
-            <div className="pf-cta">
+            {ctx.c.introButton && <div className="pf-cta">
               {m.intro.video ? <A className="pf-btn" href={m.intro.url}><Icon n="play" size={16} />{m.intro.label}</A> : <GoTo className="pf-btn" to="chat" ctx={ctx}><Icon n="chat" size={16} />{m.intro.label}</GoTo>}
-            </div>
+            </div>}
           </div>
         </div>
         {m.stats.length > 0 && <div className="pf-stats">{m.stats.map((s, i) => <div className="pf-stat" key={i}><b>{s.value}</b>{s.label && <span>{s.label}</span>}</div>)}</div>}
@@ -345,12 +345,13 @@ function ActivityPage({ m, ctx, initialSection }) {
 
 function ContactPage({ m, ctx }) {
   const c = m.contact;
+  const showDetails = ctx.c.contactDetails && !!(c?.email || c?.phone || c?.location || m.socials.length);
   return (
     <>
       <PageTop kicker="Get in touch" title={m.contactTitle}>{m.enquiry.intro && <p className="pf-lead">{m.enquiry.intro}</p>}</PageTop>
-      <section className="pf-wrap pf-sec tight pf-contact-grid">
-        {m.enquiry.enabled ? <EnquiryForm customization={ctx.c} slug={ctx.slug} cfg={m.enquiry} offers={m.offerOptions} owner={m.owner} preview={ctx.preview} /> : <p className="pf-muted">Enquiries are currently closed. You can use the contact details here or visit <GoTo to="chat" ctx={ctx}>Chat</GoTo>.</p>}
-        {(c || m.socials.length > 0) && (
+      <section className={`pf-wrap pf-sec tight pf-contact-grid contact-${ctx.c.contactLayout} contact-width-${ctx.c.contactWidth}`}>
+        {m.enquiry.enabled ? <EnquiryForm customization={ctx.c} slug={ctx.slug} cfg={m.enquiry} offers={m.offerOptions} owner={m.owner} preview={ctx.preview} /> : <p className="pf-muted">Enquiries are currently closed. {showDetails ? 'Use the contact details below or visit ' : 'Visit '}<GoTo to="chat" ctx={ctx}>Chat</GoTo>.</p>}
+        {showDetails && (
           <LiquidGlass as="aside" className="pf-card pf-side">
             <h3 className="pf-h3">Prefer to reach out directly?</h3>
             <ul className="pf-contact">

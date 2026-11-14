@@ -23,5 +23,7 @@ function Page() {
   return <PortfolioSite data={data} slug="preview" sub={sub} />;
 }
 const params = new URLSearchParams(location.search);
+data.contact = { email: 'owner@example.test', location: 'Bengaluru' };
+data.page = { customization: { contactLayout: params.get('contactLayout') || 'centered', contactWidth: params.get('contactWidth') || 'wide', contactDetails: params.get('contactDetails') !== 'false' } };
 const section = ['projects', 'events', 'talks', 'recognition', 'awards', 'certificates', 'testimonials', 'experience'].includes(params.get('section')) ? params.get('section') : 'projects';
-createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[`/p/preview/activity?section=${section}`]}><Routes><Route path="/p/preview" element={<Page />} /><Route path="/p/preview/:sub" element={<Page />} /></Routes></MemoryRouter>);
+createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[params.get('view') === 'contact' ? '/p/preview/contact' : `/p/preview/activity?section=${section}`]}><Routes><Route path="/p/preview" element={<Page />} /><Route path="/p/preview/:sub" element={<Page />} /></Routes></MemoryRouter>);

@@ -9,6 +9,13 @@ import { publicProfile } from '../server/profile.js';
 import { createPublicRepository } from '../server/publicRepository.js';
 import { createPlatformService, buildSalesReport } from '../server/platform.js';
 import { normalizeHomeSettings, HOME_DEFAULTS } from '../shared/homeSettings.js';
+
+test('featured card settings persist safe text, shapes and visibility with compatible defaults', () => {
+  const settings = normalizeHomeSettings({ featuredBadge: ' Spotlight ', featuredButton: 'x'.repeat(90), featuredButtonStyle: 'square', featuredPortrait: false, featuredViews: false });
+  assert.equal(settings.featuredBadge, 'Spotlight'); assert.equal(settings.featuredButton.length, 40); assert.equal(settings.featuredButtonStyle, 'square'); assert.equal(settings.featuredPortrait, false); assert.equal(settings.featuredViews, false); assert.equal(settings.featuredReviews, true);
+  const invalid = normalizeHomeSettings({ featuredButton: ' ', featuredButtonStyle: 'invalid', featuredPortrait: 'false' });
+  assert.equal(invalid.featuredButton, 'View Profile'); assert.equal(invalid.featuredButtonStyle, 'pill'); assert.equal(invalid.featuredPortrait, true);
+});
 const response = () => ({ setHeader() {}, status(code) { this.code = code; return this; }, json(value) { this.value = value; return this; } });
 
 test('legacy platform owner profiles do not appear publicly or expose their knowledge', async () => {

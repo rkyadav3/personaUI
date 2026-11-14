@@ -15,6 +15,7 @@ export const CUSTOMIZATION_FIELDS = {
   footerLayout: select('Footer layout', ['spread', 'center', 'minimal'], 'spread', 'navigation'),
   heroLayout: select('Introduction layout', ['classic', 'centered', 'reversed'], 'classic', 'home'),
   heroAlign: select('Heading alignment', ['left', 'center'], 'center', 'home'),
+  introButton: toggle('Show introduction button', true, 'home'),
   photoShape: select('Portrait shape', ['circle', 'rounded', 'square'], 'circle', 'home'),
   homeOrder: list('Section order', ['intro', 'updates', 'events', 'projects', 'store', 'about'], ['intro', 'updates', 'events', 'projects', 'store', 'about'], 'home', true),
   homeHidden: list('Hidden sections', ['intro', 'updates', 'events', 'projects', 'store', 'about'], [], 'home'),
@@ -41,6 +42,9 @@ export const CUSTOMIZATION_FIELDS = {
   chatBubbleStyle: select('Message style', ['rounded', 'compact'], 'rounded', 'chat'),
   chatSuggestions: toggle('Show suggested questions', true, 'chat'),
   chatStore: toggle('Show Store items beside Chat', true, 'chat'),
+  contactLayout: select('Contact layout', ['centered', 'sidebar'], 'centered', 'contact'),
+  contactWidth: select('Form width', ['comfortable', 'wide'], 'wide', 'contact'),
+  contactDetails: toggle('Show direct contact details', true, 'contact'),
   contactFields: list('Optional form fields', ['phone', 'organisation', 'location', 'budget'], ['phone', 'organisation', 'location', 'budget'], 'contact'),
   contactButton: text('Submit button text', 'Send enquiry', 'contact', 40),
 };
