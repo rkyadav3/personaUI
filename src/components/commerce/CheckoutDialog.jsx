@@ -158,11 +158,12 @@ export default function CheckoutDialog({ item, slug, owner, preview, onClose }) 
               ))}
               <div className="persona-row">
                 {row?.razorpay ? <button type="button" className="persona-button primary" disabled={working} onClick={() => pay(row)}>Continue payment</button>
-                  : row?.status === 'failed' ? <button type="button" className="persona-button primary" disabled={working} onClick={reset}>Start a new checkout</button>
-                    : <button className="persona-button primary" disabled={working || preview}>{working ? phase === 'verifying' ? 'Verifying payment…' : phase === 'checking' ? 'Checking receipt…' : 'Please wait…' : item.pricing === 'free' ? 'Get free item' : 'Pay with Razorpay'}</button>}
+                  : row?.status === 'failed' ? <button type="button" className="persona-button primary" disabled={working || item.quantity === 0} onClick={reset}>Start a new checkout</button>
+                    : <button className="persona-button primary" disabled={working || preview || item.quantity === 0}>{working ? phase === 'verifying' ? 'Verifying payment…' : phase === 'checking' ? 'Checking receipt…' : 'Please wait…' : item.pricing === 'free' ? 'Get free item' : 'Pay with Razorpay'}</button>}
                 {!preview && <button type="button" className="persona-button" disabled={working} onClick={check}>Check receipt</button>}
               </div>
               {row?.status === 'pending' && !row.razorpay && <p className="persona-muted">Your payment order is being prepared. Check the receipt in a moment.</p>}
+              {item.quantity === 0 && !row?.razorpay && <p className="persona-muted">This item is sold out. You can still check or recover a previous purchase.</p>}
             </form>
           )}
           {!preview && !recoveryOpen && <div className="persona-recovery-entry"><span>Already purchased?</span><a className="persona-button" href={`/p/${slug}/purchases`}>My purchases</a><button type="button" className="persona-button" disabled={working} onClick={openRecovery}>Use an old payment receipt</button></div>}

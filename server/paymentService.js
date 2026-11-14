@@ -84,14 +84,21 @@ export function createPaymentService({ repo, gateway, clock = Date.now, receiptS
       const ref = input?.item;
       if (!['offering', 'product'].includes(ref?.kind) || !/^[a-zA-Z0-9_-]{1,80}$/.test(String(ref?.id || ''))) throw new HttpError(400, 'Choose a valid shop item.');
       const user = await owner(input.slug);
+      const existingView = row => {
+        checkToken(row, input.receiptToken);
+        if (row.item_kind !== ref.kind || row.item_id !== String(ref.id)) throw new HttpError(409, 'Start a new checkout for this item.');
+        return purchaseView(row);
+      };
       const previous = await repo.byRequest(user.id, input.requestId);
-      if (previous) {
-        checkToken(previous, input.receiptToken);
-        if (previous.item_kind !== ref.kind || previous.item_id !== String(ref.id)) throw new HttpError(409, 'Start a new checkout for this item.');
-        return purchaseView(previous);
-      }
+      if (previous) return existingView(previous);
       const item = await repo.item(user.id, ref);
       if (!item || !['free', 'paid'].includes(item.pricing)) throw new HttpError(404, 'This shop item is no longer available.');
+      if (item.quantity === 0) {
+        const concurrent = await repo.byRequest(user.id, input.requestId);
+        if (concurrent) return existingView(concurrent);
+        throw new HttpError(409, 'This item is sold out. Please contact the owner for availability.');
+      }
+      if (item.quantity != null) await repo.inventoryReady();
       const assetId = item.deliveryKind === 'service' ? null : item.assetId;
       const delivery = item.deliveryKind === 'service' ? '' : cleanImg(item.deliveryUrl);
       if (assetId) await repo.asset(user.id, assetId);
@@ -120,17 +127,25 @@ export function createPaymentService({ repo, gateway, clock = Date.now, receiptS
         if (error.code !== '23505') throw error;
         const existing = await repo.byRequest(user.id, input.requestId);
         if (!existing) throw error;
-        checkToken(existing, input.receiptToken);
-        if (existing.item_kind !== ref.kind || existing.item_id !== String(ref.id)) throw new HttpError(409, 'Start a new checkout for this item.');
-        return purchaseView(existing);
+        return existingView(existing);
       }
       if (!amount) return purchaseView(row);
+      const reserved = row.inventory_reserved ?? (item.quantity != null);
+      let order;
       try {
-        const order = await gateway.createOrder(account, { amount, currency: row.currency, receipt: id, notes: { purchase_id: id, owner_id: user.id } });
+        order = await gateway.createOrder(account, { amount, currency: row.currency, receipt: id, notes: { purchase_id: id, owner_id: user.id } });
         if (!/^order_[A-Za-z0-9]+$/.test(order?.id || '') || Number(order.amount) !== amount || order.currency !== row.currency) throw new HttpError(502, 'Razorpay returned an order that does not match this purchase.');
         return purchaseView(await repo.attach(user.id, id, order.id));
       } catch (error) {
-        try { await repo.fail(user.id, id); } catch (markError) { console.error('purchase-state', markError?.code || markError?.name); }
+        if (/^order_[A-Za-z0-9]+$/.test(order?.id || '') && Number(order.amount) === amount && order.currency === row.currency) {
+          // Retry saving the same known order; never create a second gateway order.
+          try { return purchaseView(await repo.attach(user.id, id, order.id)); }
+          catch (attachError) { console.error('purchase-order-attachment', attachError?.code || attachError?.name); }
+        }
+        // A timeout or lost response may still have created a payable gateway order.
+        if (!reserved || !order && error.orderNotCreated === true) {
+          try { await repo.fail(user.id, id); } catch (markError) { console.error('purchase-state', markError?.code || markError?.name); }
+        }
         throw error;
       }
     },

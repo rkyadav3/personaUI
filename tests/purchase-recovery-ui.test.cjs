@@ -8,6 +8,30 @@ Module._extensions['.css'] = () => {};
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 
+test('sold-out Store items block fresh checkout but keep saved receipts accessible', () => {
+  const { ShopCard } = require('../src/components/commerce/Shop.jsx');
+  const item = { kind: 'product', id: 'book', title: 'Book', pricing: 'paid', amount: 10, currency: 'INR', price: '₹10', accessReady: true, quantity: 0, checkout: { kind: 'product', id: 'book' } };
+  const render = () => renderToStaticMarkup(React.createElement(ShopCard, { item, slug: 'quantity-fixture', onCheckout() {} }));
+  const previousStorage = global.localStorage;
+  try {
+    global.localStorage = { getItem: () => null };
+    assert.match(render(), /disabled=""[^>]*>Sold out/);
+    const receipt = { requestId: '223ecb9d-6e31-4e2e-bb6e-5ce70c74e5ef', receiptToken: Buffer.alloc(32, 7).toString('base64url') };
+    global.localStorage = { getItem: () => JSON.stringify(receipt) };
+    const button = render().match(/<button[^>]*>View purchase<\/button>/)?.[0];
+    assert.ok(button);
+    assert.doesNotMatch(button, /disabled/);
+  } finally { global.localStorage = previousStorage; }
+});
+
+test('sold-out checkout retains recovery while disabling creation of a fresh order', () => {
+  const CheckoutDialog = require('../src/components/commerce/CheckoutDialog.jsx').default;
+  const html = renderToStaticMarkup(React.createElement(CheckoutDialog, { slug: 'quantity-fixture', item: { title: 'Book', pricing: 'paid', quantity: 0, checkout: { kind: 'offering', id: '5' } }, onClose() {} }));
+  assert.match(html, /disabled=""[^>]*>Pay with Razorpay/);
+  assert.match(html, /Use an old payment receipt/);
+  assert.match(html, /You can still check or recover a previous purchase/);
+});
+
 test('checkout offers recovery separately from creating another paid order', () => {
   const CheckoutDialog = require('../src/components/commerce/CheckoutDialog.jsx').default;
   const html = renderToStaticMarkup(React.createElement(CheckoutDialog, { slug: 'alice', item: { title: 'Book', pricing: 'paid', checkout: { kind: 'offering', id: '5' } }, onClose() {} }));

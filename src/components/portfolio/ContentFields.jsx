@@ -3,7 +3,7 @@ import { Field } from '../Ui.jsx';
 import { Txt, Repeater } from './EditorFields.jsx';
 import MediaUpload from '../MediaUpload.jsx';
 import { ICON_NAMES, PRODUCT_STATUS, normalizePortfolio } from '../../../shared/portfolio.js';
-import { CHECKOUT_CURRENCIES } from '../../../shared/commerce.js';
+import { CHECKOUT_CURRENCIES, MAX_QUANTITY } from '../../../shared/commerce.js';
 const recordRequirements = { awards: 'Add at least one award line.', experience: 'Add a role or company.', testimonials: 'Add the author name and testimonial.' };
 const validateRecord = collection => record => normalizePortfolio({ [collection]: [record] })[collection].length ? '' : recordRequirements[collection] || 'Add a name or title before adding this entry.';
 export default function ContentFields({ tab, pf, set }) { return <>
@@ -43,6 +43,7 @@ export default function ContentFields({ tab, pf, set }) { return <>
                   <div className="cols c2"><Field label="Status"><select value={x.status || ''} onChange={e => p({ status: e.target.value })}>{PRODUCT_STATUS.map(s => <option key={s} value={s}>{s || 'None'}</option>)}</select></Field>
                     <Field label="Icon"><select value={x.icon || ''} onChange={e => p({ icon: e.target.value })}><option value="">Automatic</option>{ICON_NAMES.map(n => <option key={n} value={n}>{n}</option>)}</select></Field></div>
                   <Field label="Free or paid"><select value={x.pricing || 'unspecified'} onChange={e => p({ pricing: e.target.value, price: '' })}><option value="free">Free</option><option value="paid">Paid</option><option value="unspecified">Information only</option></select></Field>
+                  <Field label="Available quantity (optional)"><input aria-label="Available quantity (optional)" type="number" min={0} max={MAX_QUANTITY} step={1} value={x.quantity ?? ''} placeholder="Unlimited" onChange={e => p({ quantity: e.target.value })} /><span className="hint">Leave blank for unlimited stock or slots. Zero means sold out.</span></Field>
                   {x.pricing === 'paid' && <div className="cols c2"><Field label="Price"><input type="number" min={0.01} max={9999999.99} step="0.01" value={x.amount ?? ''} onChange={e => p({ amount: e.target.value, price: '' })} /></Field>
                     <Field label="Currency"><select value={x.currency || 'INR'} onChange={e => p({ currency: e.target.value })}>{CHECKOUT_CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></Field></div>}
                   {['free', 'paid'].includes(x.pricing) && <MediaUpload purpose="delivery" label="Private delivery file" value={x.assetId} onChange={assetId => p({ assetId, deliveryUrl: '' })} />}

@@ -22,6 +22,7 @@ function fixture(options = {}) {
     sealAccount: (value, owner, id) => JSON.stringify(value),
     purchaseAccount: async row => JSON.parse(row.payment_credentials),
     claim: async () => {},
+    inventoryReady: async () => {},
     byRequest: async (owner, id) => rows.find(r => r.owner_id === owner && r.request_id === id) || null,
     byOrder: async (owner, id) => rows.find(r => r.owner_id === owner && r.razorpay_order_id === id) || null,
     byPayment: async (owner, id) => rows.find(r => r.owner_id === owner && r.razorpay_payment_id === id) || null,
@@ -98,6 +99,50 @@ test('a receipt from another profile or with a wrong token reveals no purchase',
   const { service } = fixture(); await service.create(input);
   await assert.rejects(service.status({ ...input, slug: 'bob' }), /not found|receipt/i);
   await assert.rejects(service.status({ ...input, receiptToken: Buffer.alloc(32, 8).toString('base64url') }), /receipt/i);
+});
+
+test('sold-out items reject new checkout while an existing checkout still recovers', async () => {
+  const soldOut = fixture({ item: { quantity: 0 } });
+  await assert.rejects(soldOut.service.create(input), /sold out/);
+  assert.equal(soldOut.counts().orders, 0);
+  const existing = fixture();
+  const purchase = await existing.service.create(input);
+  existing.repo.item = async () => ({ quantity: 0, pricing: 'paid' });
+  assert.equal((await existing.service.create(input)).id, purchase.id);
+  const lookup = existing.repo.byRequest; let reads = 0;
+  existing.repo.byRequest = async (...args) => ++reads === 1 ? null : lookup(...args);
+  assert.equal((await existing.service.create(input)).id, purchase.id, 'A concurrent retry can recover the receipt for the last unit.');
+});
+
+test('limited stock stays reserved when gateway setup outcome is uncertain', async () => {
+  const uncertain = fixture({ item: { quantity: 1 } });
+  uncertain.gateway.createOrder = async () => { throw new Error('Response lost'); };
+  await assert.rejects(uncertain.service.create(input), /Response lost/);
+  assert.equal(uncertain.rows[0].status, 'pending');
+  const rejected = fixture({ item: { quantity: 1 } });
+  rejected.gateway.createOrder = async () => { throw Object.assign(new Error('Rejected'), { orderNotCreated: true }); };
+  await assert.rejects(rejected.service.create(input), /Rejected/);
+  assert.equal(rejected.rows[0].status, 'failed');
+});
+
+test('gateway uncertainty uses the actual reservation when stock becomes limited during checkout', async () => {
+  const f = fixture();
+  const insert = f.repo.insert;
+  f.repo.insert = record => insert({ ...record, inventory_reserved: true });
+  f.gateway.createOrder = async () => { throw new Error('Response lost'); };
+  await assert.rejects(f.service.create(input), /Response lost/);
+  assert.equal(f.rows[0].status, 'pending');
+});
+
+test('a failed order attachment retries the known order without releasing its unit', async () => {
+  const f = fixture({ item: { quantity: 1 } });
+  const attach = f.repo.attach; let attempts = 0;
+  f.repo.attach = async (...args) => { if (++attempts === 1) throw new Error('Attachment failed'); return attach(...args); };
+  const result = await f.service.create(input);
+  assert.equal(result.razorpay.orderId, 'order_fixture');
+  assert.equal(attempts, 2);
+  assert.equal(f.counts().orders, 1);
+  assert.equal(f.rows[0].status, 'pending');
 });
 
 test('a signed webhook recovers a lost callback and stays idempotent', async () => {

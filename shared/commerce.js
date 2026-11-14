@@ -1,4 +1,10 @@
 export const CHECKOUT_CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AUD', 'CAD', 'SGD', 'AED'];
+export const MAX_QUANTITY = 1000000000;
+export function normalizeQuantity(value) {
+  if (value == null || typeof value === 'string' && !value.trim()) return null;
+  if (!['number', 'string'].includes(typeof value) || typeof value === 'string' && !/^\d+$/.test(value.trim()) || !Number.isSafeInteger(Number(value)) || Number(value) < 0 || Number(value) > MAX_QUANTITY) throw new Error(`Quantity must be a whole number from 0 to ${MAX_QUANTITY}, or blank for unlimited availability.`);
+  return Number(value);
+}
 const text = (v, n) => typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
 export const validRequestId = v => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(v);
 export const validReceiptToken = v => typeof v === 'string' && /^[A-Za-z0-9_-]{43}$/.test(v);

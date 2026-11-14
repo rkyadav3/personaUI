@@ -11,6 +11,7 @@ import { normalizeDraft, normalizeVisibility } from './profile.js';
 import { HttpError } from './http.js';
 import { customizationReferences } from '../shared/customizationReferences.js';
 import { CUSTOMIZATION_DEFAULTS, customizationProblem, normalizeCustomization, applyStylePreset } from '../shared/customization.js';
+import { normalizeQuantity } from '../shared/commerce.js';
 
 const fail = message => { throw new HttpError(400, message); };
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -23,6 +24,7 @@ const SINGLE = new Set(['profile', 'portfolio', 'look', 'persona', 'portrait', '
 const referenceFields = new Set(['parentId', 'folderId', 'topicId', 'contributionId', 'templateId']);
 const bools = new Set(['cart', 'featured', 'enabled', 'active', 'visible', 'pinned', 'fulfilled', 'locked', 'revoked', 'removeImage', 'show', 'on', 'mic', 'sources', 'parallax', 'requirePhone', 'showAttendees', 'required']);
 const numbers = new Set(['storeLimit', 'amount', 'price', 'zoom', 'x', 'y', 'blur', 'brightness', 'dim', 'ballOpacity', 'size', 'radius', 'maxWidth', 'wash', 'refraction', 'tint', 'dispersion', 'rim', 'shadow', 'maxUses', 'days', 'total_years']);
+numbers.add('quantity');
 const nested = {
   theme: 'bg bgColor font radius maxWidth wash', glass: 'on refraction blur tint dispersion rim shadow', sections: 'store expertise education experience',
   chat: 'mic sources', layout: 'sidebar photo', ball: 'show size', availability: 'show text', cta: 'label url', intro: 'label url', navCta: 'label url',
@@ -43,6 +45,7 @@ function safeTree(value, depth = 0) {
 }
 
 function validateValues(name, values) {
+  if (Object.hasOwn(values, 'quantity')) { if (values.quantity !== null && typeof values.quantity !== 'number') fail('Quantity must be a whole number or null for unlimited availability.'); try { normalizeQuantity(values.quantity); } catch (error) { fail(error.message); } }
   if (name === 'customization') { const problem = customizationProblem(values); if (problem) fail(problem); return; }
   const objects = new Set(['theme', 'glass', 'sections', 'placement', 'chat', 'layout', 'availability', 'cta', 'intro', 'navCta', 'rsvp', 'enquiry', 'visibility', 'contact', 'details', 'navLabels']);
   if (name === 'persona') objects.add('ball');
@@ -374,6 +377,7 @@ export function makeStudioPlan(proposal, input, user) {
       const cleanText = (value, max) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
       after.title = cleanText(after.title, 160); after.description = typeof after.description === 'string' ? after.description.replace(/\r\n?/g, '\n').trim().slice(0, 1500) : '';
       requireText(after.title, 'Item title'); price(after, 'price'); delete after.deliveryUrl; after.currency = String(after.currency || 'INR').toUpperCase();
+      after.quantity = normalizeQuantity(after.quantity);
       if (owns(values, 'assetId') && values.assetId) { expected('assets'); reference(state, 'assets', values.assetId); if (state.assets.find(row => row.id === values.assetId)?.purpose !== 'delivery') fail('Choose a private delivery file from this account.'); }
       if (after.deliveryKind && !['file', 'service'].includes(after.deliveryKind)) fail('Choose file or service delivery.');
       if (after.deliveryKind === 'service') after.assetId = '';

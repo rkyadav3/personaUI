@@ -23,6 +23,16 @@ function snapshot() {
 }
 const plan = (actions, state = snapshot()) => makeStudioPlan({ actions }, state, owner);
 
+test('assistant can change stock or slots and clear limits without accepting invalid quantities', () => {
+  for (const quantity of [0, 5, null]) {
+    const result = plan([{ entity: 'offerings', action: 'update', id: 8, values: { quantity } }]);
+    assert.equal(result.steps[0].args.quantity, quantity);
+    const products = plan([{ entity: 'products', action: 'create', values: { title: 'Book', pricing: 'free', quantity } }]);
+    assert.equal(products.steps[0].args.portfolio.products[0].quantity, quantity);
+  }
+  for (const quantity of [-1, 1.5, '5', 1000000001]) assert.throws(() => plan([{ entity: 'offerings', action: 'update', id: 8, values: { quantity } }]), /[Qq]uantity/);
+});
+
 test('assistant title edits retain offering paragraphs and remove obsolete sale links', () => {
   const state = snapshot(); state.offerings[0].description = 'First paragraph.\n\nSecond paragraph.';
   state.offerings[0].details = { buy_link: 'https://old-sale.test' };

@@ -6,6 +6,7 @@ import { checkoutItem } from '../../lib/homeDirectory.js';
 import { track } from '../../lib/track.js';
 import Dialog from '../commerce/Dialog.jsx';
 import OfferingRating from './OfferingRating.jsx';
+import { readReceipt } from '../../lib/publicActions.js';
 
 export function ProductDetails({ product, user, onCheckout, onRated, titleId }) {
   const item = checkoutItem(product), info = cleanUrl(product.link);
@@ -13,7 +14,8 @@ export function ProductDetails({ product, user, onCheckout, onRated, titleId }) 
   const enquire = () => {
     if ((product.kind || 'offering') === 'offering') track({ kind: 'click', id: product.id });
   };
-  let available = !!item.checkout && product.accessReady === true;
+  let available = !!item.checkout && product.accessReady === true && product.quantity !== 0;
+  const hasReceipt = item.checkout && !!readReceipt(product.slug, item.checkout);
   if (available && item.pricing === 'paid') {
     try { minorUnits(item.amount, item.currency); } catch { available = false; }
   }
@@ -23,9 +25,10 @@ export function ProductDetails({ product, user, onCheckout, onRated, titleId }) 
       <h2 id={titleId}>{product.title}</h2>
       {product.description && <p>{product.description}</p>}
       <strong className="directory-detail-price">{item.price || 'Contact for details'}</strong>
+      {product.quantity != null && <p className="directory-muted">{product.quantity === 0 ? 'Sold out' : `${product.quantity} available`}</p>}
       <div className="directory-detail-actions">
-        {available ? (
-          <button type="button" className="directory-buy" onClick={() => onCheckout(item)}>{product.pricing === 'free' ? 'Get free' : 'Buy now'}</button>
+        {available || hasReceipt ? (
+          <button type="button" className="directory-buy" onClick={() => onCheckout(item)}>{hasReceipt ? 'View purchase' : product.pricing === 'free' ? 'Get free' : 'Buy now'}</button>
         ) : (
           <>
             <p className="directory-muted">{product.accessReady === false ? 'Access link coming soon' : 'Contact the creator for access and pricing.'}</p>

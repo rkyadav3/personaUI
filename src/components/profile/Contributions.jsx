@@ -8,7 +8,7 @@ import ItemForm from '../commerce/ItemForm.jsx';
 import FormDialog from '../FormDialog.jsx';
 
 export function OfferingForm({ contribution, contributions = contribution ? [contribution] : [], offering, onDone }) {
-  const item = offering ? { ...offering, kind: 'offering', contributionId: offering.contribution_id || contribution?.id, assetId: offering.delivery_asset_id || '', deliveryKind: offering.delivery_kind || 'file' } : null;
+  const item = offering ? { ...offering, kind: 'offering', contributionId: offering.contribution_id || contribution?.id, assetId: offering.delivery_asset_id || '', deliveryKind: offering.delivery_kind || 'file', expectedItemVersion: offering.updated_at } : null;
   return <ItemForm item={item} initialCategoryId={contribution?.id} categories={contributions} onDone={onDone} />;
 }
 

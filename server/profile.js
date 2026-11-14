@@ -10,6 +10,7 @@ import { previewEngage, publicEngage } from './engage.js';
 import { publicUrl, hostedMediaTree } from './site.js';
 import { raw, run } from './supabase.js';
 import { canViewProfile } from '../shared/governance.js';
+import { normalizeQuantity } from '../shared/commerce.js';
 
 const MAX_TEXT = 6000, MAX_PER_HOUR = 12;
 const str = (v, n = 300) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
@@ -267,6 +268,7 @@ export async function saveOffering(db, a) {
     contribution_id: c.id, title, description: prose(a.description, 1500), pricing: PRICING.includes(a.pricing) ? a.pricing : 'unspecified',
     price: Number.isFinite(price) && price >= 0 && price < 1e9 ? price : null, currency: str(a.currency, 6) || null, details, active: a.active !== false,
   };
+  if (Object.hasOwn(a, 'quantity')) row.quantity = normalizeQuantity(a.quantity);
   if (a.deliveryUrl) throw new Error('Upload a delivery file instead of using an external access link.');
   if (a.assetId !== undefined || a.deliveryKind === 'service') {
     if (a.assetId && a.deliveryKind !== 'service') await getAsset(db, a.assetId, 'delivery');
@@ -308,7 +310,7 @@ export function buildPublic(profile, contributions) {
     contributions: v.contributions
       ? contributions.filter(k => k.enabled && k.visible).map(k => ({
         category: k.category, subtype: k.subtype, description: k.description, intent: k.intent,
-        offerings: (k.offerings || []).filter(o => o.active).map(o => ({ id: o.id, title: o.title, description: o.description, pricing: o.pricing, price: o.price, currency: o.currency, details: hostedMediaTree(Object.fromEntries(Object.entries(o.details || {}).filter(([key]) => key !== 'buy_link'))), accessReady: !!o.delivery_asset_id || o.delivery_kind === 'service', createdAt: o.created_at || null, ...offerStats(o) })),
+        offerings: (k.offerings || []).filter(o => o.active).map(o => ({ id: o.id, title: o.title, description: o.description, pricing: o.pricing, price: o.price, currency: o.currency, quantity: o.quantity ?? null, details: hostedMediaTree(Object.fromEntries(Object.entries(o.details || {}).filter(([key]) => key !== 'buy_link'))), accessReady: !!o.delivery_asset_id || o.delivery_kind === 'service', createdAt: o.created_at || null, ...offerStats(o) })),
       }))
       : [],
   };

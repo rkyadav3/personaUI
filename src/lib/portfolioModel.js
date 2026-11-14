@@ -34,7 +34,7 @@ export function resolveSite(data, slug, heroOverride) {
     if ((page.placement || {})[k.category] === 'hidden') continue;
     for (const o of k.offerings || []) {
       const item = { kind: 'offering', category: k.subtype || k.category, id: o.id, title: o.title, summary: o.description || '', icon: CAT_ICON[k.category] || 'spark', status: k.subtype || SINGULAR[k.category] || k.category,
-        price: fmtPrice(o, cur), pricing: o.pricing, amount: o.pricing === 'free' ? 0 : o.price, currency: String(o.currency || cur).toUpperCase(), accessReady: o.accessReady,
+        price: fmtPrice(o, cur), pricing: o.pricing, amount: o.pricing === 'free' ? 0 : o.price, currency: String(o.currency || cur).toUpperCase(), accessReady: o.accessReady, quantity: o.quantity ?? null,
         checkout: page.cart && ['free', 'paid'].includes(o.pricing) ? { kind: 'offering', id: String(o.id) } : null,
         image: o.image || '', url: o.link || '', linkLabel: o.pricing === 'paid' ? 'Buy / book' : 'Open', views: o.views || 0, clicks: o.clicks || 0, ratingAvg: o.ratingAvg || 0, ratingCount: o.ratingCount || 0 };
       offerOptions.push({ id: o.id, title: o.title });   // the contact form lets a visitor pick one of these

@@ -9,6 +9,7 @@ import CheckoutDialog from './CheckoutDialog.jsx';
 import OfferingRating from '../home/OfferingRating.jsx';
 import { normalizeCustomization } from '../../../shared/customization.js';
 import { sortDisplayItems } from '../../lib/customizationDisplay.js';
+import { readReceipt } from '../../lib/publicActions.js';
 import '../../styles/profileActions.css';
 
 export function ShopCard({ item, slug, user, preview, onCheckout, display = normalizeCustomization() }) {
@@ -17,7 +18,8 @@ export function ShopCard({ item, slug, user, preview, onCheckout, display = norm
   useSeen(ref, !preview && offering, () => track({ kind: 'view', id: item.id }));
   let purchasable = !!item.checkout;
   if (item.pricing === 'paid') { try { minorUnits(item.amount, item.currency); } catch { purchasable = false; } }
-  const unavailable = item.accessReady === false || !purchasable;
+  const soldOut = item.quantity === 0, unavailable = soldOut || item.accessReady === false || !purchasable;
+  const hasReceipt = !preview && item.checkout && !!readReceipt(slug, item.checkout);
   const image = cleanImg(item.image), info = cleanUrl(item.url);
   return (
     <article className="persona-shop-card" ref={ref}>
@@ -29,10 +31,11 @@ export function ShopCard({ item, slug, user, preview, onCheckout, display = norm
       {display.storeDescriptions && item.summary && <p>{item.summary}</p>}
       <div className="persona-shop-footer">
         {display.storePrices && <strong>{item.price}</strong>}
-        {item.checkout && <button type="button" className="persona-button primary" disabled={unavailable && !preview} onClick={() => { if (!preview && offering) track({ kind: 'click', id: item.id }); onCheckout(item); }}>{item.pricing === 'free' ? 'Get free' : 'Buy now'}</button>}
+        {item.checkout && <button type="button" className="persona-button primary" disabled={unavailable && !preview && !hasReceipt} onClick={() => { if (!preview && offering) track({ kind: 'click', id: item.id }); onCheckout(item); }}>{hasReceipt ? 'View purchase' : soldOut ? 'Sold out' : item.pricing === 'free' ? 'Get free' : 'Buy now'}</button>}
       </div>
       {item.ratingCount > 0 && <small className="persona-muted">★ {Number(item.ratingAvg || 0).toFixed(1)} ({item.ratingCount} ratings)</small>}
-      {item.checkout && unavailable && <small className="persona-muted">{item.accessReady === false ? 'Delivery file coming soon' : 'Contact the owner for pricing'}</small>}
+      {item.quantity != null && <small className="persona-muted">{soldOut ? 'Sold out' : `${item.quantity} available`}</small>}
+      {item.checkout && unavailable && !soldOut && <small className="persona-muted">{item.accessReady === false ? 'Delivery file coming soon' : 'Contact the owner for pricing'}</small>}
       {info && <a className="persona-info-link" href={info} {...(/^https?:\/\//i.test(info) ? { target: '_blank', rel: 'noopener noreferrer nofollow' } : {})}>{item.linkLabel && !item.checkout ? item.linkLabel : 'More details'} ↗</a>}
       {offering && slug && <details className="persona-rating-details"><summary>Rate this offering</summary><OfferingRating product={{ ...item, slug }} user={user} preview={preview} /></details>}
     </article>

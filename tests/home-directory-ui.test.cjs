@@ -9,6 +9,20 @@ const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const { StaticRouter } = require('react-router-dom/server');
 const render = element => renderToStaticMarkup(React.createElement(StaticRouter, {}, element));
+
+test('sold-out directory products retain access to an existing saved receipt', () => {
+  const { ProductDetails } = require('../src/components/home/ProductDialog.jsx');
+  const product = { slug: 'quantity-fixture', kind: 'product', id: 'book', title: 'Book', pricing: 'paid', price: 10, currency: 'INR', accessReady: true, quantity: 0 };
+  const previousStorage = global.localStorage;
+  try {
+    global.localStorage = { getItem: () => null };
+    const soldOut = render(React.createElement(ProductDetails, { product, onCheckout() {} }));
+    assert.match(soldOut, /Sold out/);
+    assert.doesNotMatch(soldOut, /<button[^>]*>Buy now/);
+    global.localStorage = { getItem: () => JSON.stringify({ requestId: '223ecb9d-6e31-4e2e-bb6e-5ce70c74e5ef', receiptToken: Buffer.alloc(32, 7).toString('base64url') }) };
+    assert.match(render(React.createElement(ProductDetails, { product, onCheckout() {} })), /<button[^>]*>View purchase/);
+  } finally { global.localStorage = previousStorage; }
+});
 const feed = { name: 'Persona', members: [{ slug: 'ravi', name: 'Ravi Kumar Yadav', designation: 'Technology & Product Development Enthusiast', expertise: ['AI/ML', 'IoT'], purpose: 'Builds useful tools.', photo: 'https://public.test/ravi.png', views: 12400, ratingAvg: 4.9, ratingCount: 128, engagements: 98 }], products: [{ id: 1, slug: 'ravi', member: 'Ravi Kumar Yadav', kind: 'offering', title: 'Building AI Products', typeLabel: 'Book', pricing: 'paid', price: 499, currency: 'INR', accessReady: true }] };
 
 test('custom tag labels appear on featured profiles and directory cards', () => {

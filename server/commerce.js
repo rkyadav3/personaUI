@@ -38,7 +38,7 @@ export function createCommerceRepository(database = raw) {
       if (!offering) return null;
       const [contribution] = await query(db().from('contributions').select('category').eq('owner_id', owner).eq('id', offering.contribution_id).eq('enabled', true).eq('visible', true).limit(1));
       if (!contribution || normalizePage(site?.page).placement[contribution.category] === 'hidden') return null;
-      return { kind: 'offering', id: String(offering.id), title: offering.title, pricing: offering.pricing, amount: offering.price, currency: String(offering.currency || 'INR').toUpperCase(), assetId: offering.delivery_asset_id, deliveryKind: offering.delivery_kind || 'file' };
+      return { kind: 'offering', id: String(offering.id), title: offering.title, pricing: offering.pricing, amount: offering.price, currency: String(offering.currency || 'INR').toUpperCase(), quantity: offering.quantity ?? null, assetId: offering.delivery_asset_id, deliveryKind: offering.delivery_kind || 'file' };
     },
     async account(owner) {
       const [row] = await query(db().from('payment_accounts').select('enabled').eq('owner_id', owner).limit(1));
@@ -54,6 +54,7 @@ export function createCommerceRepository(database = raw) {
     webhookOrder: async order => (await query(db().from('purchases').select('*').eq('razorpay_order_id', order).limit(1)))[0] || null,
     webhookPayment: async payment => (await query(db().from('purchases').select('*').eq('razorpay_payment_id', payment).limit(1)))[0] || null,
     insert: record => query(db().from('purchases').insert(record).select('*').single()),
+    inventoryReady: () => query(db().from('purchases').select('inventory_reserved').limit(0)),
     attach: (owner, id, order) => query(db().from('purchases').update({ razorpay_order_id: order, updated_at: new Date().toISOString() }).eq('owner_id', owner).eq('id', id).eq('status', 'pending').select('*').single()),
     fail: (owner, id) => query(db().from('purchases').update({ status: 'failed', updated_at: new Date().toISOString() }).eq('owner_id', owner).eq('id', id).eq('status', 'pending')),
     complete: a => query(db().rpc('complete_purchase', { p_owner: a.ownerId, p_purchase: a.purchaseId, p_order: a.orderId, p_payment: a.paymentId, p_amount: a.amount, p_currency: a.currency })),

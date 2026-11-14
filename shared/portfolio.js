@@ -3,6 +3,7 @@
 // layout re-flows, so a profile with three fields and a profile with fifty both look finished.
 // Shared by the editor, the page and the server. Whatever comes in, what comes out is safe to store and render.
 import { ENQUIRY_TYPES } from './enquiryTypes.js';
+import { normalizeQuantity } from './commerce.js';
 
 export const PUBLIC_NAV_PAGES = ['home', 'activity', 'store', 'chat', 'contact'];
 export const PORTFOLIO_PAGES = [...PUBLIC_NAV_PAGES, 'work', 'products', 'experience', 'talks', 'updates', 'about'];
@@ -85,7 +86,7 @@ export function normalizePortfolio(input) {
       ...productPrice(p), deliveryUrl: cleanImg(p?.deliveryUrl),
       assetId: p?.deliveryKind !== 'service' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p?.assetId || '') ? p.assetId : '',
       deliveryKind: p?.deliveryKind === 'service' ? 'service' : 'file',
-      category: clean(p?.category, 100),
+      category: clean(p?.category, 100), quantity: normalizeQuantity(p?.quantity),
       ...(typeof p?.accessReady === 'boolean' ? { accessReady: p.accessReady } : {}),
     })).filter(p => p.title),
     experience: list(i.experience, 20).map(e => ({ role: clean(e?.role, 80), company: clean(e?.company, 80), period: clean(e?.period, 40), summary: long(e?.summary, 500) })).filter(e => e.role || e.company),

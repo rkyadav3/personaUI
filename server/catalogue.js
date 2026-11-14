@@ -3,6 +3,7 @@ import { getSettings, savePage } from './site.js';
 import { getProfile, saveOffering, deleteOffering } from './profile.js';
 import { HttpError } from './http.js';
 import { randomUUID } from 'node:crypto';
+import { normalizeQuantity } from '../shared/commerce.js';
 
 export async function listItems(db) {
   const [site, profile] = await Promise.all([getSettings(db), getProfile(db)]);
@@ -13,6 +14,7 @@ export async function listItems(db) {
   ] };
 }
 export async function saveItem(db, input) {
+  if (Object.hasOwn(input, 'quantity')) { try { input = { ...input, quantity: normalizeQuantity(input.quantity) }; } catch (error) { throw new HttpError(400, error.message); } }
   if (!['product', 'offering'].includes(input.kind)) throw new HttpError(400, 'Choose a valid item type.');
   if (!['free', 'paid', 'unspecified'].includes(input.pricing)) throw new HttpError(400, 'Choose a valid price type.');
   if (input.pricing === 'paid' && (!Number.isFinite(Number(input.price)) || Number(input.price) <= 0 || Number(input.price) >= 1e9)) throw new HttpError(400, 'Enter a valid positive price.');
