@@ -85,12 +85,15 @@ function chatFixture(t, { rows = [], generated = 'My answer [1].', embedFails = 
   const previous = { url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_KEY };
   process.env.SUPABASE_URL = 'https://db.example.test'; process.env.SUPABASE_SERVICE_KEY = serviceKey;
   t.after(() => { for (const [key, value] of [['SUPABASE_URL', previous.url], ['SUPABASE_SERVICE_KEY', previous.key]]) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } });
+  rows = rows.map((row, index) => ({ id: index + 1, ...row }));
   const logs = [];
   t.mock.method(console, 'error', () => {});
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     if (url.includes('/users?')) return new Response(JSON.stringify(owner ? [{ id: owner, tags: ownerTags }] : []), { status: ownerFails ? 500 : 200 });
     if (url.includes('/profiles?')) return new Response(JSON.stringify(published ? [{ id: 1 }] : []), { status: 200 });
     if (url.includes(':embedContent')) return new Response(JSON.stringify({ embedding: { values: [1] } }), { status: embedFails ? 500 : 200 });
+    if (url.includes('/chunks?')) return new Response(JSON.stringify(rows.map(row => ({ ...row, owner_id: owner, source_type: 'file', source_id: row.id }))), { headers: { 'Content-Type': 'application/json' } });
+    if (url.includes('/files?')) return new Response(JSON.stringify(rows.map(row => ({ id: row.id, owner_id: owner }))), { headers: { 'Content-Type': 'application/json' } });
     if (url.includes('/rpc/hybrid_search')) return new Response(JSON.stringify(rows), { status: searchFails ? 500 : 200 });
     if (url.includes(':generateContent')) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: generated }] } }] }), { status: generateFails ? 500 : 200 });
     if (url.endsWith('/chat_log')) { logs.push(JSON.parse(options.body)); if (logThrows) throw new Error('Offline'); return new Response(null, { status: logFails ? 500 : 201 }); }

@@ -73,22 +73,25 @@ export function normalizePortfolio(input) {
     stats: list(i.stats, 4).map(s => ({ value: clean(s?.value, 12), label: clean(s?.label, 30) })).filter(s => s.value),
     projectsKicker: clean(i.projectsKicker, 30), projectsTitle: clean(i.projectsTitle, 40),
     projects: list(i.projects, 24).map(p => ({
-      title: clean(p?.title, 80), tag: clean(p?.tag, 40), summary: clean(p?.summary, 240), description: long(p?.description, 1600),
+      title: clean(p?.title, 80), tag: clean(p?.tag, 40), summary: long(p?.summary, 240), description: long(p?.description, 1600),
       image: cleanImg(p?.image), tech: clean(p?.tech, 160), award: clean(p?.award, 60), awardSub: clean(p?.awardSub, 60), year: clean(p?.year, 10),
       demoUrl: cleanUrl(p?.demoUrl), demoLabel: clean(p?.demoLabel, 24), repoUrl: cleanUrl(p?.repoUrl), repoLabel: clean(p?.repoLabel, 24), featured: p?.featured === true,
     })).filter(p => p.title),
     productsKicker: clean(i.productsKicker, 40), productsTitle: clean(i.productsTitle, 40),
     products: list(i.products, 24).map((p, index) => ({
       id: /^[a-zA-Z0-9_-]{1,80}$/.test(p?.id || '') ? p.id : `legacy-${index}`,
-      title: clean(p?.title, 80), summary: clean(p?.summary, 240), icon: pick(p?.icon, ICON_NAMES), status: clean(p?.status, 20),
+      title: clean(p?.title, 80), summary: long(p?.summary, 240), icon: pick(p?.icon, ICON_NAMES), status: clean(p?.status, 20),
       price: clean(p?.price, 24), image: cleanImg(p?.image), url: cleanUrl(p?.url), linkLabel: clean(p?.linkLabel, 24),
       ...productPrice(p), deliveryUrl: cleanImg(p?.deliveryUrl),
+      assetId: p?.deliveryKind !== 'service' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p?.assetId || '') ? p.assetId : '',
+      deliveryKind: p?.deliveryKind === 'service' ? 'service' : 'file',
+      category: clean(p?.category, 100),
       ...(typeof p?.accessReady === 'boolean' ? { accessReady: p.accessReady } : {}),
     })).filter(p => p.title),
-    experience: list(i.experience, 20).map(e => ({ role: clean(e?.role, 80), company: clean(e?.company, 80), period: clean(e?.period, 40), summary: clean(e?.summary, 500) })).filter(e => e.role || e.company),
-    talks: list(i.talks, 24).map(t => ({ title: clean(t?.title, 100), event: clean(t?.event, 100), date: clean(t?.date, 30), summary: clean(t?.summary, 300), url: cleanUrl(t?.url) })).filter(t => t.title),
-    recognition: list(i.recognition, 24).map((r, index) => ({ id: recordId(r?.id, 'recognition', index), kind: pick(r?.kind, ['recognition', 'award'], 'recognition'), title: clean(r?.title, 100), issuer: clean(r?.issuer, 100), date: clean(r?.date, 30), summary: clean(r?.summary, 500), url: cleanUrl(r?.url) })).filter(r => r.title),
-    certificates: list(i.certificates, 24).map(c => ({ title: clean(c?.title, 100), issuer: clean(c?.issuer, 100), date: clean(c?.date, 30), summary: clean(c?.summary, 500), url: cleanUrl(c?.url) })).filter(c => c.title),
+    experience: list(i.experience, 20).map(e => ({ role: clean(e?.role, 80), company: clean(e?.company, 80), period: clean(e?.period, 40), summary: long(e?.summary, 500) })).filter(e => e.role || e.company),
+    talks: list(i.talks, 24).map(t => ({ title: clean(t?.title, 100), event: clean(t?.event, 100), date: clean(t?.date, 30), summary: long(t?.summary, 300), url: cleanUrl(t?.url) })).filter(t => t.title),
+    recognition: list(i.recognition, 24).map((r, index) => ({ id: recordId(r?.id, 'recognition', index), kind: pick(r?.kind, ['recognition', 'award'], 'recognition'), title: clean(r?.title, 100), issuer: clean(r?.issuer, 100), date: clean(r?.date, 30), summary: long(r?.summary, 500), url: cleanUrl(r?.url) })).filter(r => r.title),
+    certificates: list(i.certificates, 24).map(c => ({ title: clean(c?.title, 100), issuer: clean(c?.issuer, 100), date: clean(c?.date, 30), summary: long(c?.summary, 500), url: cleanUrl(c?.url) })).filter(c => c.title),
     testimonials: list(i.testimonials, 24).map(t => ({ author: clean(t?.author, 100), role: clean(t?.role, 100), quote: long(t?.quote, 1200), url: cleanUrl(t?.url) })).filter(t => t.author && t.quote),
     about: { title: clean(i.about?.title, 60), body: long(i.about?.body, 3000), skills: clean(i.about?.skills, 400) },
     navLabels: Object.fromEntries(PORTFOLIO_PAGES.map(k => [k, clean(i.navLabels?.[k], 16)]).filter(([, v]) => v)),
@@ -106,5 +109,5 @@ export function normalizePortfolio(input) {
 
 export function publicPortfolio(input) {
   const portfolio = normalizePortfolio(input);
-  return { ...portfolio, products: portfolio.products.map(({ deliveryUrl, ...product }) => ({ ...product, accessReady: !!deliveryUrl })) };
+  return { ...portfolio, products: portfolio.products.map(({ deliveryUrl, assetId, ...product }) => ({ ...product, accessReady: !!assetId || product.deliveryKind === 'service' })) };
 }

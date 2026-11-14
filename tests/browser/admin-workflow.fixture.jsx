@@ -22,6 +22,8 @@ let templates = [{ id: 1, name: 'Research summary', html: '<h2>Context</h2><p>In
 let posts = [{ id: 1, title: 'Design principles', html: '<h2>Design principles</h2><p>Start with the user.</p>', topic_id: 1, status: 'published', updated_at: '2026-11-02' }];
 const reviews = new Map(), turns = [];
 let nextId = 10;
+let storeCategories = [{ id: 1, category: 'Books', description: 'Books and guides', intent: 'mixed', enabled: true, visible: true, offerings: [] }];
+let storeItems = [{ id: 7, kind: 'offering', contributionId: 1, categoryName: 'Books', title: 'A practical design guide', description: 'Learn to build useful products.\n\nIncludes examples and exercises.', pricing: 'paid', price: 499, currency: 'INR', details: {}, active: true }];
 const counts = () => ({ files: files.length, posts: posts.filter(p => p.status === 'published').length, topics: topics.length, chunks: 5, embedded: 5 });
 const profile = { name: user.name, status: 'published', visibility: VISIBILITY_DEFAULTS, expertise: ['Product design'] };
 const page = { name: user.name, page: PAGE_DEFAULTS, portfolio: PORTFOLIO_DEFAULTS, bg: normalizeBg(), contributions: [], updates: [] };
@@ -30,6 +32,11 @@ window.fixturePreviewError = fixtureParams.get('previewError') === '1';
 
 async function operation(op, args) {
   switch (op) {
+    case 'items.list': return { items: storeItems, categories: storeCategories, version: 'fixture-version' };
+    case 'items.save': { const existing = storeItems.find(item => String(item.id) === String(args.id)); if (existing) Object.assign(existing, args); else storeItems.push({ ...args, id: nextId++, categoryName: storeCategories.find(value => String(value.id) === String(args.contributionId))?.category || 'Uncategorized' }); return {}; }
+    case 'items.delete': storeItems = storeItems.filter(value => String(value.id) !== String(args.id)); return {};
+    case 'contributions.save': { const existing = storeCategories.find(value => String(value.id) === String(args.id)); if (existing) Object.assign(existing, args); else storeCategories.push({ ...args, id: nextId++, enabled: true, visible: true, offerings: [] }); return {}; }
+    case 'contributions.delete': storeCategories = storeCategories.filter(value => String(value.id) !== String(args.id)); return {};
     case 'auth.me': return { user };
     case 'auth.logout': return {};
     case 'profile.get': return { profile, contributions: [] };
@@ -92,6 +99,11 @@ async function operation(op, args) {
   }
 }
 window.fetch = async (url, options) => {
+  if (url === '/api/my-purchases') {
+    const input = JSON.parse(options.body);
+    const value = input.op === 'request' ? { sent: true } : input.op === 'verify' ? { accessToken: 'fixture-verified' } : { page: 1, total: 1, rows: [{ id: 'fixture-purchase', title: 'Design guide', status: 'free', amount: 0, currency: 'INR', buyer: { name: 'Buyer', email: input.contact }, deliveryKind: 'service', fulfillmentStatus: 'pending', receipt: { requestId: '11111111-1111-4111-8111-111111111111', receiptToken: 'fixture-token' } }] };
+    return new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
+  }
   if (url !== '/api/admin') throw new Error('External requests are disabled in this fixture.');
   const { op, args = {} } = JSON.parse(options.body);
   window.fixtureRequests ||= [];
@@ -100,5 +112,5 @@ window.fetch = async (url, options) => {
   catch (error) { return new Response(JSON.stringify({ error: error.message }), { status: 503, headers: { 'Content-Type': 'application/json' } }); }
 };
 const requestedRoute = fixtureParams.get('route') || '/admin/files';
-const initialRoute = /^\/admin(?:\/|\?|$)/.test(requestedRoute) ? requestedRoute : '/admin/files';
+const initialRoute = /^\/admin(?:\/|\?|$)/.test(requestedRoute) || requestedRoute === '/p/ui-fixture/purchases' ? requestedRoute : '/admin/files';
 createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[initialRoute]}><App /></MemoryRouter>);

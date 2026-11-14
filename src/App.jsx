@@ -23,9 +23,11 @@ const PlatformPayments = lazy(() => import('./pages/PlatformPayments.jsx'));
 const MainSiteSettings = lazy(() => import('./pages/MainSiteSettings.jsx'));
 const Register = lazy(() => import('./pages/Register.jsx'));
 const ContentManager = lazy(() => import('./pages/ContentManager.jsx'));
+const Store = lazy(() => import('./pages/Store.jsx'));
 const LegacyContentRedirect = lazy(() => import('./pages/LegacyContentRedirect.jsx'));
 const Enquiries = lazy(() => import('./pages/Enquiries.jsx'));
 const Purchases = lazy(() => import('./pages/Purchases.jsx'));
+const MyPurchases = lazy(() => import('./pages/MyPurchases.jsx'));
 const Questions = lazy(() => import('./pages/Questions.jsx'));
 function LegacySuperAdmin() {
   const [params] = useSearchParams();
@@ -44,6 +46,7 @@ export default function App() {
       <Route path="/invite/:code" element={<Register />} />
       <Route path="/login" element={<Navigate to="/admin" replace />} />
       <Route path="/p/:slug" element={<PublicProfile />} />
+      <Route path="/p/:slug/purchases" element={<MyPurchases />} />
       <Route path="/p/:slug/:sub" element={<PublicProfile />} />
       <Route path="/admin" element={<Layout />}>
         <Route index element={<Overview />} />
@@ -60,7 +63,7 @@ export default function App() {
         <Route path="superadmin" element={<LegacySuperAdmin />} />
         <Route path="page" element={<LegacyLookRedirect />} />
         <Route path="portfolio" element={<LegacyPortfolioRedirect />} />
-        <Route path="store" element={<ContentManager store />} />
+        <Route path="store" element={<Store />} />
         <Route path="activity" element={<ContentManager />} />
         <Route path="updates" element={<LegacyContentRedirect />} />
         <Route path="enquiries" element={<Enquiries />} />

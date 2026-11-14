@@ -4,14 +4,14 @@ const { normalizePage } = require('../shared/pageSettings.js'), { normalizePortf
 const drafts = require('../src/lib/editorDrafts.js');
 function harness(tab = 'hero') {
   const states = [], refs = [], effects = [], pendingEffects = [], requests = [], revoked = [];
-  let slot = 0, sequence = 0;
+  let slot = 0, sequence = 0, uploading = false;
   const user = { id: `editor-${Math.random()}`, slug: 'owner' };
   const react = {
     useState(initial) { const index = slot++; if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial; return [states[index], next => { states[index] = typeof next === 'function' ? next(states[index]) : next; }]; },
     useRef(initial) { return refs[slot++] ||= { current: initial }; },
     useEffect(callback, deps) { const index = slot++, before = effects[index]; if (!before || deps.some((value, i) => value !== before.deps[i])) pendingEffects.push(() => { before?.cleanup?.(); effects[index] = { deps, cleanup: callback() }; }); },
   };
-  const element = (type, props) => ({ type, props });
+  const element = (type, props) => ['UploadGroup', 'PortfolioEditorContent'].includes(type?.name) ? type(props) : ({ type, props });
   const module = { exports: {} }, source = transformSync(fs.readFileSync('src/pages/PortfolioEditor.jsx', 'utf8'), { loader: 'jsx', format: 'cjs', jsx: 'automatic' }).code;
   vm.runInNewContext(source, { module, exports: module.exports, structuredClone, URLSearchParams, URL: { createObjectURL: () => `blob:${++sequence}`, revokeObjectURL: url => revoked.push(url) }, window: { addEventListener() {}, removeEventListener() {} }, require(name) {
     if (name === 'react') return react;
@@ -21,12 +21,13 @@ function harness(tab = 'hero') {
     if (name.endsWith('/api.js')) return { api: (op, args) => new Promise((resolve, reject) => requests.push({ op, args, resolve, reject })) };
     if (name.endsWith('/image.js')) return { prepareImage: async () => ({ blob: new Blob(['image']), type: 'image/webp' }) };
     if (name.endsWith('/storage.js')) return { uploadToSigned: async () => {} };
+    if (name.endsWith('/MediaUpload.jsx')) return { UploadGroup: ({ children }) => children(uploading) };
     if (name.endsWith('/publicPageSettings.js')) return require('../src/lib/publicPageSettings.js');
     if (name.endsWith('/editorDrafts.js')) return drafts;
     if (name.startsWith('../../shared/')) return require(`../shared/${name.split('/').at(-1)}`);
     return {};
   } });
-  return { requests, revoked, render() { slot = 0; const tree = module.exports.default(); while (pendingEffects.length) pendingEffects.shift()(); return tree; }, close() { effects.forEach(effect => effect?.cleanup?.()); drafts.clearEditorDraft(`${user.id}:appearance`); } };
+  return { requests, revoked, setUploading(value) { uploading = value; }, render() { slot = 0; const tree = module.exports.default(); while (pendingEffects.length) pendingEffects.shift()(); return tree; }, close() { effects.forEach(effect => effect?.cleanup?.()); drafts.clearEditorDraft(`${user.id}:appearance`); } };
 }
 function find(node, predicate) {
   if (!node || typeof node !== 'object') return null;
@@ -62,4 +63,15 @@ test('canonical Store and legacy Products editor links retain the small heading 
     assert.ok(find(h.render(), node => node.props.label === 'Store small heading'), tab);
     h.close();
   }
+});
+
+test('pending media blocks settings save and preview handoff until the upload finishes', async () => {
+  const h = await loaded(); button(h.render(), 'Remove photo').props.onClick(); h.render();
+  h.setUploading(true);
+  const tree = h.render();
+  assert.equal(button(tree, 'Saving…').props.disabled, true);
+  let prevented = false;
+  tree.props.onClickCapture({ target: { closest: () => ({ tagName: 'A' }) }, preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  h.setUploading(false); assert.equal(button(h.render(), 'Save changes').props.disabled, false); h.close();
 });

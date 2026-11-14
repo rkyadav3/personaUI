@@ -21,8 +21,9 @@ import { customizationProblem } from '../../shared/customization.js';
 import ScaledPreview from '../components/portfolio/ScaledPreview.jsx';
 import { clearEditorDraft, readEditorDraft, saveEditorDraft, rebaseEditorDraft, editorDraftChanged } from '../lib/editorDrafts.js';
 import { Txt, Repeater } from '../components/portfolio/EditorFields.jsx';
+import { UploadGroup } from '../components/MediaUpload.jsx';
 
-function Tabs({ items, active, onChange, prefix, label, controls = 'portfolio-area-panel' }) {
+function Tabs({ items, active, onChange, prefix, label, disabled, controls = 'portfolio-area-panel' }) {
   const entries = Object.entries(items);
   function keydown(event, index) {
     let next = index;
@@ -34,7 +35,7 @@ function Tabs({ items, active, onChange, prefix, label, controls = 'portfolio-ar
     event.preventDefault(); onChange(entries[next][0]);
     event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next]?.focus();
   }
-  return <div className="pp-tabs" role="tablist" aria-label={label}>{entries.map(([key, text], index) => <button type="button" key={key} id={`${prefix}-${key}`} role="tab" aria-selected={active === key} aria-controls={controls} tabIndex={active === key ? 0 : -1} className={active === key ? 'on' : ''} onClick={() => onChange(key)} onKeyDown={event => keydown(event, index)}>{text}</button>)}</div>;
+  return <div className="pp-tabs" role="tablist" aria-label={label}>{entries.map(([key, text], index) => <button type="button" key={key} disabled={disabled} id={`${prefix}-${key}`} role="tab" aria-selected={active === key} aria-controls={controls} tabIndex={active === key ? 0 : -1} className={active === key ? 'on' : ''} onClick={() => onChange(key)} onKeyDown={event => keydown(event, index)}>{text}</button>)}</div>;
 }
 
 export function PortfolioPreviewState({ error, missing, onRetry }) {
@@ -44,6 +45,9 @@ export function PortfolioPreviewState({ error, missing, onRetry }) {
 }
 
 export default function PortfolioEditor() {
+  return <UploadGroup>{uploading => <PortfolioEditorContent uploading={uploading} />}</UploadGroup>;
+}
+function PortfolioEditorContent({ uploading }) {
   const { user } = useAuth();
   const draftKey = `${user.id}:appearance`, draftSnapshot = useRef(null), urls = useRef(new Set());
   const [params, setParams] = useSearchParams();
@@ -55,7 +59,8 @@ export default function PortfolioEditor() {
   const [previewError, setPreviewError] = useState(''), [mobile, setMobile] = useState(false), [historyCount, setHistoryCount] = useState(0);
   const history = useRef([]), previous = useRef(null), skipHistory = useRef(false);
   const [bg, setBg] = useState(normalizeBg()), [pendingBg, setPendingBg] = useState(null), [removedBg, setRemovedBg] = useState(false);
-  const [pending, setPending] = useState(null), [removed, setRemoved] = useState(false), [busy, setBusy] = useState(false), [msg, setMsg] = useState(null);
+  const [pending, setPending] = useState(null), [removed, setRemoved] = useState(false), [saving, setBusy] = useState(false), [msg, setMsg] = useState(null);
+  const busy = saving || uploading;
   useEffect(() => {
     const next = { page, pf, bg, pending, pendingBg, removed, removedBg };
     if (saved && previous.current && !skipHistory.current && JSON.stringify(next) !== JSON.stringify(previous.current)) { history.current = [...history.current.slice(-49), previous.current]; setHistoryCount(history.current.length); }
@@ -107,6 +112,7 @@ export default function PortfolioEditor() {
     finally { setBusy(false); }
   }
   async function save() {
+    if (busy) return;
     const problem = customizationProblem(page.customization);
     if (problem) { setMsg({ kind: 'error', t: problem }); return; }
     setBusy(true); setMsg(null);
@@ -133,7 +139,7 @@ export default function PortfolioEditor() {
   const preview = data && { ...data, page: normPage, portfolio: normPf, bgImage: background, bg: normalizeBg(bg) };
   const real = data || {};
   return (
-    <div className="portfolio-editor">
+    <div className="portfolio-editor" onClickCapture={event => { if (uploading && event.target.closest('a')) event.preventDefault(); }}>
       <div className="head" style={{ marginBottom: 8 }}>
         <div><h1>Public page editor</h1><p className="muted" style={{ margin: 0 }}>Customize layout, style and featured content. Manage records in Store and Activity. Preview changes before publishing.</p></div>
         <div className="row">
@@ -145,7 +151,7 @@ export default function PortfolioEditor() {
       </div>
       <Notice kind={msg?.kind}>{msg?.t}</Notice>
       {msg?.kind === 'error' && <button type="button" className="btn" disabled={busy} onClick={async () => { setBusy(true); try { const next = await api('site.get'); history.current = []; setHistoryCount(0); skipHistory.current = true; setSaved(next); setPage(next.page); setPf(next.portfolio); setBg(next.bg); setPending(null); setPendingBg(null); setRemoved(false); setRemovedBg(false); setMsg({ kind: 'info', t: 'Latest saved settings loaded. The local draft was discarded.' }); } catch (error) { setMsg({ kind: 'error', t: error.message }); } finally { setBusy(false); } }}>Reload saved settings and discard draft</button>}
-      <div className="portfolio-areas"><Tabs items={AREAS} active={area} prefix="portfolio-area" label="Portfolio settings" onChange={key => setTab(Object.keys(AREA_TABS[key])[0])} /></div>
+      <div className="portfolio-areas"><Tabs items={AREAS} active={area} disabled={busy} prefix="portfolio-area" label="Portfolio settings" onChange={key => setTab(Object.keys(AREA_TABS[key])[0])} /></div>
       <div className="pp-editor">
         <fieldset disabled={busy} className="pp-form editor-fieldset" id="portfolio-area-panel" role="tabpanel" aria-labelledby={`portfolio-area-${area}`}>
           {Object.keys(AREA_TABS[area]).length > 1 && <Tabs items={AREA_TABS[area]} active={tab} prefix="portfolio-content" controls="portfolio-content-panel" label={`${AREAS[area]} settings`} onChange={setTab} />}

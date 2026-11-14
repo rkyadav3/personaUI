@@ -13,11 +13,11 @@ export function normalizePurchaseRecovery(input = {}) {
 }
 
 export function normalizeBuyer(input = {}) {
-  const value = { name: text(input?.name, 100), email: text(input?.email, 160).toLowerCase(), phone: text(input?.phone, 40) };
+  const value = { name: text(input?.name, 100), email: text(input?.email, 160).toLowerCase(), phone: text(input?.phone, 40).replace(/[^0-9+]/g, '') };
   const errors = {};
   if (value.name.length < 2) errors.name = 'Please enter your name.';
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.email)) errors.email = 'Enter a valid email address.';
-  if (value.phone && value.phone.replace(/\D/g, '').length < 7) errors.phone = 'Enter a valid phone number.';
+  if (value.phone && !/^\+[1-9][0-9]{6,14}$/.test(value.phone)) errors.phone = 'Include the country code, for example +919876543210.';
   return { ok: !Object.keys(errors).length, value, errors };
 }
 

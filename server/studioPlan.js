@@ -156,8 +156,8 @@ export function studioModelContext(state, entities, user) {
     if (!spec || spec.admin && !user?.isSuperAdmin) throw new HttpError(403, 'You do not have permission for that admin area.');
       if (name === 'analytics') return [name, { report: redact(state.analytics), definitions: { sales: 'Lifetime paid orders including subsequently refunded orders', views: 'Lifetime profile views', exchanges: 'Lifetime visitor question-and-answer pairs, not unique visitors', enquiries: 'Lifetime contact enquiries', revenue: 'Lifetime net after refunds, before gateway fees and payouts; minor currency units', dailySales: 'Paid orders per UTC day during the last 30 days' } }];
     const rows = studioRecords(state, name);
-    const referenceRoots = { files: ['folders', 'topics'], folders: ['folders'], posts: ['topics', 'templates'], offerings: ['contributions'], contributions: ['offerings'], responses: ['updates'] };
-    const references = Object.fromEntries((referenceRoots[name] || []).map(root => [root, (state[root] || []).slice(0, 80).map(row => fieldsOf(row, ['id', 'name', 'title', 'category', 'subtype', 'eventId']))]));
+    const referenceRoots = { products: ['assets'], files: ['folders', 'topics'], folders: ['folders'], posts: ['topics', 'templates'], offerings: ['contributions', 'assets'], contributions: ['offerings'], responses: ['updates'] };
+    const references = Object.fromEntries((referenceRoots[name] || []).map(root => [root, (state[root] || []).slice(0, 80).map(row => fieldsOf(row, ['id', 'name', 'title', 'category', 'subtype', 'eventId', 'purpose', 'mime']))]));
     if (name === 'customization') { const choices = customizationReferences(state.settings?.portfolio, state.offerings); references.store = choices.homeFeaturedItems; references.awards = choices.homeAwards; }
 
     return [name, { total: rows.length, references, records: rows.slice(0, 80).map(row => {
@@ -173,7 +173,8 @@ export function studioModelContext(state, entities, user) {
       };
       const values = Object.fromEntries(['id', 'name', 'title', 'subject', 'status', 'response', 'eventId', 'label', 'configured', 'isLocked', 'isAdmin', ...spec.fields, ...(readFields[name] || [])].filter(key => owns(row, key)).map(key => [key, row[key]]));
       if (name === 'posts' || name === 'templates') values.body = studioText(row.html);
-      if (row.deliveryUrl) values.accessReady = true;
+      if (row.assetId || row.deliveryKind === 'service') values.accessReady = true;
+      if (name === 'assets') Object.assign(values, fieldsOf(row, ['purpose', 'mime']));
       return redact(values);
     }) }];
   }));
@@ -270,7 +271,7 @@ export function makeStudioPlan(proposal, input, user) {
         else {
           const merged = studioMerge(before || (name === 'products' ? { pricing: 'unspecified', currency: 'INR' } : {}), values);
           if (STABLE_ARRAYS.has(name)) merged.id = before?.id || randomUUID();
-          if (name === 'products') price(merged, 'amount');
+          if (name === 'products') { price(merged, 'amount'); if (owns(values, 'assetId') && values.assetId) { expected('assets'); reference(state, 'assets', values.assetId); if (state.assets.find(row => row.id === values.assetId)?.purpose !== 'delivery') fail('Choose a private delivery file from this account.'); } }
           if (name === 'projects' && merged.featured) list.forEach(row => { row.featured = false; });
           const normalized = normalizePortfolio({ [name]: [merged] })[name][0];
           if (!normalized) fail(`Give the ${name} item a title or required value.`);
@@ -371,17 +372,21 @@ export function makeStudioPlan(proposal, input, user) {
       const after = studioMerge(before || { pricing: 'unspecified', active: true, details: {} }, values);
       after.contributionId = reference(state, 'contributions', after.contributionId); if (!after.contributionId) fail('Choose your offering category first.');
       const cleanText = (value, max) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-      after.title = cleanText(after.title, 160); after.description = cleanText(after.description, 1500);
-      requireText(after.title, 'Offering title'); price(after, 'price'); after.deliveryUrl = cleanImg(after.deliveryUrl); after.currency = String(after.currency || 'INR').toUpperCase();
+      after.title = cleanText(after.title, 160); after.description = typeof after.description === 'string' ? after.description.replace(/\r\n?/g, '\n').trim().slice(0, 1500) : '';
+      requireText(after.title, 'Item title'); price(after, 'price'); delete after.deliveryUrl; after.currency = String(after.currency || 'INR').toUpperCase();
+      if (owns(values, 'assetId') && values.assetId) { expected('assets'); reference(state, 'assets', values.assetId); if (state.assets.find(row => row.id === values.assetId)?.purpose !== 'delivery') fail('Choose a private delivery file from this account.'); }
+      if (after.deliveryKind && !['file', 'service'].includes(after.deliveryKind)) fail('Choose file or service delivery.');
+      if (after.deliveryKind === 'service') after.assetId = '';
       if (after.pricing !== 'paid') after.price = null;
       const category = state.contributions.find(row => row.id === after.contributionId).category;
       const allowed = (OFFERING_FIELDS[category] || []).map(field => field.key);
+      delete after.details.buy_link;
       if (Object.keys(after.details || {}).some(key => !allowed.includes(key))) fail('Uneditable offering detail field for this category.');
       for (const field of OFFERING_FIELDS[category] || []) if (owns(after.details, field.key)) {
         const value = after.details[field.key];
         if (typeof value !== 'string' && value !== null) fail('Offering detail fields must be text.');
         if (value && field.options && !field.options.includes(value)) fail('Choose a valid offering detail value.');
-        const normalized = cleanText(value, field.type === 'textarea' ? 1000 : 300);
+        const normalized = field.type === 'textarea' && typeof value === 'string' ? value.replace(/\r\n?/g, '\n').trim().slice(0, 1000) : cleanText(value, 300);
         if (normalized) after.details[field.key] = normalized; else delete after.details[field.key];
       }
       push(name, mode, before, after, 'offerings.save', { ...after, id: before?.id }); continue;

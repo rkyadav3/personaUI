@@ -123,6 +123,7 @@
 .pf-about.has-photo{grid-template-columns:minmax(0,300px) minmax(0,1fr);align-items:start;max-width:1020px}
 .pf-photo.about{max-width:300px;aspect-ratio:4/5;border-radius:var(--r);-webkit-mask-image:none;mask-image:none}
 .pf-body{color:var(--ink2);font-size:1.02rem;line-height:1.7;margin-bottom:14px;white-space:pre-line;overflow-wrap:anywhere}
+.pf :is(.pf-body,.pf-pre,.pf-activity-record p,.pf-activity-record blockquote){max-width:72ch;white-space:pre-wrap;line-height:1.75}.pf :is(h1,h2,h3){text-wrap:balance;overflow-wrap:anywhere}.pf :is(p,blockquote){overflow-wrap:anywhere}.pf :is(.pf-card,.pf-activity-record)>:last-child{margin-bottom:0}
 .pf-h3{font-size:1.05rem;margin:24px 0 10px}
 .pf-contact{display:grid;gap:8px;margin-bottom:14px}.pf-contact li{display:flex;gap:10px;align-items:center;overflow-wrap:anywhere}.pf-contact a{text-decoration:none}.pf-contact a:hover{color:var(--a1)}
 

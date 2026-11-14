@@ -1,6 +1,7 @@
 import { Field } from '../Ui.jsx';
+import MediaUpload, { UploadGroup } from '../MediaUpload.jsx';
 /** One labelled text input or textarea. */
-export const Txt = ({ label, value, onChange, max, ph, rows, hint }) => (
+export const Txt = ({ label, value, onChange, max, ph, rows, hint, upload }) => (upload || !rows && /picture|video.*link|link.*video|certificate link|source link|public details link|main link/i.test(label)) ? <MediaUpload label={label} value={value} onChange={onChange} accept={/picture/i.test(label) ? 'image/jpeg,image/png,image/webp,image/gif' : undefined} /> : (
   <Field label={label}>
     {rows
       ? <textarea rows={rows} value={value || ''} maxLength={max} placeholder={ph} onChange={e => onChange(e.target.value)} />
@@ -14,7 +15,7 @@ export function Repeater({ items, onChange, blank, max, noun, title, children })
   const patch = (i, p) => onChange(items.map((x, j) => (j === i ? { ...x, ...p } : x)));
   const move = (i, d) => { const a = [...items], j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; onChange(a); };
   return (
-    <>
+    <UploadGroup>{uploading => <fieldset className="editor-fieldset" disabled={uploading}>
       {items.map((it, i) => (
         <div className="card inner" key={i}>
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
@@ -30,7 +31,7 @@ export function Repeater({ items, onChange, blank, max, noun, title, children })
       ))}
       <button type="button" className="btn" disabled={items.length >= max} onClick={() => onChange([...items, { ...blank, id: crypto.randomUUID() }])}>+ Add {noun.toLowerCase()}</button>
       {items.length >= max && <span className="hint"> Maximum {max}.</span>}
-    </>
+    </fieldset>}</UploadGroup>
   );
 }
 

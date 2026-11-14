@@ -11,14 +11,14 @@ const source = () => ({
     { id: 1, owner_id: 'a', contribution_id: 10, title: 'Building AI Products', description: 'From idea to scale', pricing: 'paid', price: 499, currency: 'INR', active: true, rating_sum: 49, rating_count: 10, clicks: 20, views: 30, delivery_url: 'https://private.test/book', details: { cover_image: 'https://public.test/book.png', buy_link: 'https://public.test/info' } },
     { id: 2, owner_id: 'a', contribution_id: 11, title: 'AI course', pricing: 'free', active: true, rating_sum: 24, rating_count: 5, clicks: 8, details: { content_type: 'Course' } },
   ],
-  sites: [{ owner_id: 'a', hero_path: 'a/portrait.png', bg_path: 'a/background.png', page: { hero: { x: 30, y: 70, zoom: 1.2 } }, portfolio: { products: [{ id: 'guide', title: 'A practical guide', pricing: 'paid', amount: 99, deliveryUrl: 'https://private.test/guide' }] } }],
+  sites: [{ owner_id: 'a', hero_path: 'a/portrait.png', bg_path: 'a/background.png', page: { hero: { x: 30, y: 70, zoom: 1.2 } }, portfolio: { products: [{ id: 'guide', title: 'A practical guide', pricing: 'paid', amount: 99, assetId: '11111111-1111-4111-8111-111111111111' }] } }],
 });
 
 test('home feed uses real portraits and aggregates visible offering reviews and interactions', () => {
   assert.equal(typeof home.buildHomeFeed, 'function');
   const data = home.buildHomeFeed(source());
   const member = data.members[0];
-  assert.match(member.photo, /a\/portrait.png$/);
+  assert.match(member.photo, /^\/api\/media\?owner=a&path=a%2Fportrait.png$/);
   assert.deepEqual(member.photoFocus, { x: 30, y: 70, zoom: 1.2 });
   assert.equal(member.views, 12400);
   assert.equal(member.ratingCount, 15);

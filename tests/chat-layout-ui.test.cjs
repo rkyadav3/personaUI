@@ -75,7 +75,7 @@ test('Chat can recommend Store products without interaction data and explains un
   const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
   const html = render(React.createElement(PortfolioSite, { data: { name: 'Ravi', portfolio: { products: [{ id: 'guide', title: 'New guide', pricing: 'free', accessReady: false }] } }, slug: 'ravi' }), '/p/ravi');
   assert.match(html, /Popular products/); assert.match(html, /New guide/);
-  assert.match(html, /Access link coming soon/);
+  assert.match(html, /Delivery file coming soon/);
   assert.match(html, /<button[^>]*disabled=""[^>]*>Get free<\/button>/);
 });
 

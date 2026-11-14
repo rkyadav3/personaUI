@@ -6,8 +6,18 @@ import { loadRazorpay, newReceipt, paymentRequest, readReceipt, recoverPurchase,
 import Dialog from './Dialog.jsx';
 import '../../styles/profileActions.css';
 
-export function PurchaseConfirmation({ row }) {
+export function PurchaseConfirmation({ row, slug, receipt }) {
+  const [downloading, setDownloading] = useState(false), [error, setError] = useState('');
   const link = ['paid', 'free'].includes(row.status) ? cleanImg(row.deliveryUrl) : '';
+  async function download() {
+    setDownloading(true); setError('');
+    try {
+      const result = await paymentRequest('download', { slug, ...receipt });
+      if (!/^https:\/\//.test(result.url || '')) throw new Error('The download could not be opened. Please try again.');
+      window.location.assign(result.url);
+    } catch (failure) { setError(failure.message); }
+    finally { setDownloading(false); }
+  }
   return (
     <div className="persona-confirm" role="status">
       <span className="persona-success-icon" aria-hidden="true">✓</span>
@@ -20,7 +30,10 @@ export function PurchaseConfirmation({ row }) {
         <div><dt>Buyer</dt><dd>{row.buyer?.name} · {row.buyer?.email}</dd></div>
       </dl>
       {link && <a className="persona-button primary" href={link} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Open access / download ↗</a>}
-      <p className="persona-muted">Bookmark the access link. You can reopen this receipt from the item in this browser.</p>
+      {row.downloadReady && receipt && <button type="button" className="persona-button primary" disabled={downloading} onClick={download}>{downloading ? 'Preparing download…' : 'Download file'}</button>}
+      {row.deliveryKind === 'service' && <p className="persona-muted">Your booking is recorded. The owner will arrange the service using your contact details.</p>}
+      {error && <p className="persona-error" role="alert">{error}</p>}
+      <p className="persona-muted">Reopen this receipt in this browser or verify your email or phone in My purchases.</p>
     </div>
   );
 }
@@ -127,7 +140,7 @@ export default function CheckoutDialog({ item, slug, owner, preview, onClose }) 
     <Dialog titleId={titleId} onClose={onClose} busy={working} suspended={phase === 'paying'}>
       <span className="persona-kicker">{preview ? 'Checkout preview' : 'Profile shop'}</span>
       <h2 id={titleId}>{item.title}</h2>
-      {ready ? <PurchaseConfirmation row={row} /> : (
+      {ready ? <PurchaseConfirmation row={row} slug={slug} receipt={receipt} /> : (
         <>
           {item.summary && <p className="persona-muted">{item.summary}</p>}
           <strong className="persona-price">{row ? formatAmount(row.amount, row.currency) : item.price}</strong>
@@ -136,9 +149,9 @@ export default function CheckoutDialog({ item, slug, owner, preview, onClose }) 
             <form onSubmit={submit} className="persona-form">
               {['name', 'email', 'phone'].map(key => (
                 <label key={key} className="persona-field" htmlFor={`${titleId}-${key}`}>
-                  {key === 'name' ? 'Full name *' : key === 'email' ? 'Email *' : 'Phone (optional)'}
+                  {key === 'name' ? 'Full name *' : key === 'email' ? 'Email *' : 'Phone with country code (optional)'}
                   <input id={`${titleId}-${key}`} type={key === 'name' ? 'text' : key === 'email' ? 'email' : 'tel'} autoComplete={key === 'phone' ? 'tel' : key}
-                    maxLength={key === 'name' ? 100 : key === 'email' ? 160 : 40} value={buyer[key]} required={key !== 'phone'} disabled={working || !!row}
+                    maxLength={key === 'name' ? 100 : key === 'email' ? 160 : 40} placeholder={key === 'phone' ? '+919876543210' : undefined} value={buyer[key]} required={key !== 'phone'} disabled={working || !!row}
                     aria-invalid={!!errors[key]} aria-describedby={errors[key] ? `${titleId}-${key}-error` : undefined} onChange={e => setBuyer(b => ({ ...b, [key]: e.target.value }))} />
                   {errors[key] && <small id={`${titleId}-${key}-error`} className="persona-error">{errors[key]}</small>}
                 </label>
@@ -152,7 +165,7 @@ export default function CheckoutDialog({ item, slug, owner, preview, onClose }) 
               {row?.status === 'pending' && !row.razorpay && <p className="persona-muted">Your payment order is being prepared. Check the receipt in a moment.</p>}
             </form>
           )}
-          {!preview && !recoveryOpen && <div className="persona-recovery-entry"><span>Already purchased?</span><button type="button" className="persona-button" disabled={working} onClick={openRecovery}>Recover receipt</button></div>}
+          {!preview && !recoveryOpen && <div className="persona-recovery-entry"><span>Already purchased?</span><a className="persona-button" href={`/p/${slug}/purchases`}>My purchases</a><button type="button" className="persona-button" disabled={working} onClick={openRecovery}>Use an old payment receipt</button></div>}
           {error && <p className="persona-notice error" role="alert">{error}</p>}
           {phase === 'paying' && <p role="status" className="persona-muted">Complete the payment in Razorpay.</p>}
         </>

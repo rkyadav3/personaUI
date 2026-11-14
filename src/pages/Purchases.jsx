@@ -53,21 +53,22 @@ export function SharedPaymentSettings() {
     <Notice kind={data.configured ? 'success' : 'info'}>{data.configured ? `Payments are configured${data.testMode ? ' in test mode' : ''}.` : 'The platform administrator needs to configure Razorpay credentials and the payment encryption key.'}</Notice>
     {!data.webhookConfigured && <Notice kind="info">Set the shared Razorpay webhook secret to receive payment and refund updates.</Notice>}
     <label className="toggle"><input type="checkbox" checked={enabled ?? data.enabled} onChange={e => setEnabled(e.target.checked)} disabled={busy} />Enable paid checkout on my profile</label>
-    <p className="hint">Free claims work without Razorpay. Add access or download links under Offerings → Offerings &amp; categories or Settings → Public page editor → Store.</p>
+    <p className="hint">Free claims work without Razorpay. Upload delivery files or configure services in Store → Items.</p>
     <button className="btn primary" disabled={busy || enabled === null} onClick={save}>{busy ? 'Saving…' : 'Save payment preference'}</button>
     <Notice kind={msg?.kind}>{msg?.t}</Notice>
   </section>;
 }
 
 function PurchaseList() {
-  const [status, setStatus] = useState(''), [page, setPage] = useState(1), [open, setOpen] = useState(null);
-  const { data, error, reload } = useOp('purchases.list', { status, page });
+  const [status, setStatus] = useState(''), [page, setPage] = useState(1), [open, setOpen] = useState(null), [search, setSearch] = useState(''), [contact, setContact] = useState('');
+  const { data, error, reload } = useOp('purchases.list', { status, page, contact });
   if (!data) return <Loading error={error} />;
   const summary = data.summary || {};
   return <>
     <Stats items={[{ n: summary.total || 0, label: 'Purchases & claims' }, { n: summary.paid || 0, label: 'Paid purchases' }, { n: summary.free || 0, label: 'Free claims' }, { n: summary.pending || 0, label: 'Pending payment' }]} />
     {(summary.revenue || []).length > 0 && <p className="muted">Revenue after refunds: {summary.revenue.map(x => formatAmount(x.amount, x.currency)).join(' · ')}</p>}
     <div className="row" style={{ marginBottom: 16 }}>
+      <form className="row" onSubmit={event => { event.preventDefault(); setContact(search.trim()); setPage(1); setOpen(null); }}><input type="search" aria-label="Buyer email or phone" value={search} placeholder="Exact buyer email or phone" onChange={event => setSearch(event.target.value)} /><button className="btn" type="submit">Find buyer</button>{contact && <button className="btn" type="button" onClick={() => { setSearch(''); setContact(''); setPage(1); }}>Clear search</button>}</form>
       <select aria-label="Purchase status" value={status} onChange={e => { setStatus(e.target.value); setPage(1); setOpen(null); }}><option value="">All statuses</option>{Object.entries(STATUS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>
       <button className="btn small" onClick={reload}>Refresh</button>
     </div>

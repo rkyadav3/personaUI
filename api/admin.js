@@ -13,6 +13,8 @@ import * as events from '../server/events.js';
 import * as commerce from '../server/commerce.js';
 import * as site from '../server/site.js';
 import * as store from '../server/store.js';
+import * as assets from '../server/assets.js';
+import * as catalogue from '../server/catalogue.js';
 import { listQuestions } from '../server/chatHistory.js';
 import { listStudioHistory } from '../server/studioChatHistory.js';
 import { scoped } from '../server/tenant.js';
@@ -70,6 +72,12 @@ const PUBLIC = {
 // Signed-in ops. `db` is the tenant-scoped client; `s` is the store module bound to it.
 const activityService = createActivityService();
 const OPS = {
+  'items.list': ({ db }) => catalogue.listItems(db),
+  'items.save': ({ db }, a) => catalogue.saveItem(db, a),
+  'items.delete': async ({ db }, a) => { await catalogue.deleteItem(db, a); return { ok: true }; },
+  'assets.sign': ({ db }, a) => assets.signAsset(db, a),
+  'assets.register': ({ db }, a) => assets.registerAsset(db, a),
+  'assets.open': ({ db }, a) => assets.downloadAsset(db, a.id),
   'activity.resume': ctx => activityService.resume(ctx),
   'activity.touch': ctx => activityService.touch(ctx),
   'activity.report': ctx => activityService.report(ctx),

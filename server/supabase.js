@@ -1,6 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
 let client;
+// OTP verification installs a session in memory. Never run it on the shared
+// service-role client, even when session persistence is disabled.
+export function createAuthClient() {
+  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error('Missing Supabase authentication configuration.');
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+}
 /** The UNscoped service-role client. Only auth code and the tenant wrapper may use it directly. */
 export function raw() {
   if (!client) {

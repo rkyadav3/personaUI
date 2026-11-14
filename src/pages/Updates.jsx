@@ -9,6 +9,7 @@ import { useOp } from '../lib/hooks.js';
 import { fmtStamp, fromLocalInput, toLocalInput } from '../lib/when.js';
 import { normalizeEventForm, splitSchedule } from '../../shared/engage.js';
 import { Confirm, Field, Loading, Notice } from '../components/Ui.jsx';
+import MediaUpload, { UploadGroup } from '../components/MediaUpload.jsx';
 
 const blank = kind => ({ kind, title: '', body: '', startsAt: '', endsAt: '', location: '', url: '', linkLabel: '', status: 'published', pinned: false });
 const COPY = {
@@ -19,25 +20,26 @@ const COPY = {
 
 export function UpdateEditor({ item, onDone }) {
   const [f, setF] = useState({ ...blank(item.kind), ...item, rsvp: normalizeEventForm(item.rsvp), startsAt: toLocalInput(item.startsAt), endsAt: toLocalInput(item.endsAt) });
-  const [err, setErr] = useState(''), [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(''), [busy, setBusy] = useState(false), [uploading, setUploading] = useState(false);
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const sched = f.kind !== 'update', event = f.kind === 'event';
   const form = patch => set('rsvp', { ...f.rsvp, ...patch });
 
   async function submit(e) {
-    e.preventDefault(); setErr(''); setBusy(true);
+    e.preventDefault(); if (busy || uploading) return; setErr(''); setBusy(true);
     try { await api('updates.save', { ...f, startsAt: fromLocalInput(f.startsAt), endsAt: fromLocalInput(f.endsAt) }); onDone(true); }
     catch (ex) { setErr(ex.message); setBusy(false); }
   }
   return (
     <form className="card inner" onSubmit={submit}>
+      <fieldset className="editor-fieldset" disabled={busy || uploading}>
       <Field label="Title *"><input type="text" required maxLength={120} value={f.title} onChange={e => set('title', e.target.value)} placeholder={sched ? 'e.g. Live Q&A on career switching' : 'e.g. My new book launches this month'} autoFocus /></Field>
       <Field label="Details"><textarea rows={4} maxLength={2000} value={f.body} onChange={e => set('body', e.target.value)} placeholder="What should visitors know?" /></Field>
       <div className="cols c2">
         <Field label={sched ? 'Starts *' : 'Happens on (optional)'}><input type="datetime-local" required={sched} value={f.startsAt} onChange={e => set('startsAt', e.target.value)} /></Field>
         {sched && <Field label="Ends (optional)"><input type="datetime-local" value={f.endsAt} min={f.startsAt || undefined} onChange={e => set('endsAt', e.target.value)} /></Field>}
         <Field label="Where (optional)"><input type="text" maxLength={160} value={f.location} onChange={e => set('location', e.target.value)} placeholder="Online (Google Meet), Jaipur, Studio 2…" /></Field>
-        <Field label="Link (optional)"><input type="text" maxLength={500} value={f.url} onChange={e => set('url', e.target.value)} placeholder="https://…" /></Field>
+        <MediaUpload label="Link or attachment (optional)" value={f.url} onBusy={setUploading} onChange={value => set('url', value)} />
         <Field label="Link button text"><input type="text" maxLength={24} value={f.linkLabel} onChange={e => set('linkLabel', e.target.value)} placeholder={sched ? 'Join / Register' : 'Learn more'} /></Field>
         <Field label="Visibility"><select value={f.status} onChange={e => set('status', e.target.value)}><option value="published">Published: visible on my profile</option><option value="draft">Draft: only I can see it</option></select></Field>
       </div>
@@ -60,6 +62,7 @@ export function UpdateEditor({ item, onDone }) {
       </section>}
       <Notice kind="error">{err}</Notice>
       <div className="row"><button className="btn primary" disabled={busy}>{busy ? 'Saving…' : item.id ? 'Save changes' : f.status === 'published' ? 'Publish' : 'Save draft'}</button><button type="button" className="btn" disabled={busy} onClick={() => onDone(false)}>Cancel</button></div>
+      </fieldset>
     </form>
   );
 }
@@ -86,6 +89,9 @@ function EventResponses({ event }) {
 }
 
 export default function Updates({ embedded = false } = {}) {
+  return <UploadGroup>{uploading => <fieldset className="editor-fieldset" disabled={uploading} onClickCapture={event => { if (uploading && event.target.closest('a')) event.preventDefault(); }}><UpdatesContent embedded={embedded} /></fieldset>}</UploadGroup>;
+}
+function UpdatesContent({ embedded }) {
   const { user } = useAuth();
   const { data, error, reload } = useOp('updates.list');
   const [kind, setKind] = useAdminTab({ values: Object.keys(COPY), defaultValue: 'update', parameter: 'kind' });

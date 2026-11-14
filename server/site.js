@@ -1,6 +1,6 @@
 import { isSuperAdminEmail } from './auth.js';
-// Background image + look of each user's public page. The image lives in a PUBLIC bucket (visitors must see it),
-// under the owner's id; the database row says which file is current.
+import { getAsset } from './assets.js';
+// Uploaded images are private in storage; public media routes enforce profile access.
 import { randomUUID } from 'node:crypto';
 import { BG_BUCKET, normalizeBg } from '../shared/siteSettings.js';
 import { normalizePage } from '../shared/pageSettings.js';
@@ -11,11 +11,21 @@ import { canViewProfile } from '../shared/governance.js';
 import { HttpError } from './http.js';
 
 const EXT = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' };
-export const publicUrl = path => `${process.env.SUPABASE_URL}/storage/v1/object/public/${BG_BUCKET}/${path}`;
+export const publicUrl = path => `/api/media?owner=${encodeURIComponent(String(path).split('/')[0])}&path=${encodeURIComponent(path)}`;
+export function hostedMediaUrl(url) {
+  const prefix = `${process.env.SUPABASE_URL}/storage/v1/object/public/${BG_BUCKET}/`;
+  return typeof url === 'string' && url.startsWith(prefix) ? publicUrl(url.slice(prefix.length)) : url;
+}
+export function hostedMediaTree(value) {
+  if (typeof value === 'string') return hostedMediaUrl(value);
+  if (Array.isArray(value)) return value.map(hostedMediaTree);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, hostedMediaTree(item)]));
+  return value;
+}
 const row = async db => (await run(db.from('site_settings').select('*').limit(1)))[0] || null;
 const view = r => ({ version: r?.updated_at || null, uploadedImageUrl: r?.bg_path ? publicUrl(r.bg_path) : null, uploadedHeroUrl: r?.hero_path ? publicUrl(r.hero_path) : null, imageUrl: normalizeBg(r?.bg).imageUrl || (r?.bg_path ? publicUrl(r.bg_path) : null), bg: normalizeBg(r?.bg), heroUrl: normalizePage(r?.page).hero.imageUrl || (r?.hero_path ? publicUrl(r.hero_path) : null), page: normalizePage(r?.page), portfolio: normalizePortfolio(r?.portfolio) });
 
-export async function getSettings(db) { return view(await row(db)); }
+export async function getSettings(db) { return hostedMediaTree(view(await row(db))); }
 
 /** Step 1 of an upload: a one-time signed URL so the image goes straight from the browser to storage. */
 export async function signBackground(db, { type }) {
@@ -52,6 +62,12 @@ export async function savePage(db, { page, portfolio, portfolioPatch, heroPath, 
   if (page !== undefined) patch.page = normalizePage(page);                       // each editor sends only what it owns
   if (portfolio !== undefined) {
     patch.portfolio = normalizePortfolio(portfolio);
+    for (const product of patch.portfolio.products) {
+      const previous = normalizePortfolio(cur?.portfolio).products.find(item => item.id === product.id);
+      if (product.deliveryUrl && product.deliveryUrl !== previous?.deliveryUrl) throw new Error('Upload a delivery file instead of using an external access link.');
+      if (product.assetId && product.assetId !== previous?.assetId) await getAsset(db, product.assetId, 'delivery');
+      if (product.assetId) product.deliveryUrl = '';
+    }
     const ids = new Set();
     const remapped = new Map();
     patch.portfolio.products = patch.portfolio.products.map(product => {
@@ -105,5 +121,5 @@ export async function publicSettings(slug, viewer = null) {
   const [u] = await run(db.from('users').select('id,email,tags,profile_private,locked_until').eq('slug', slug).limit(1));
   if (isSuperAdminEmail(u?.email) || !canViewProfile(u, viewer)) return null;
   const [r] = await run(db.from('site_settings').select('bg_path,bg').eq('owner_id', u.id).limit(1));
-  return view(r);
+  return hostedMediaTree(view(r));
 }

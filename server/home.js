@@ -3,7 +3,7 @@
 import { env } from './config.js';
 import { registrationMode, isSuperAdminEmail } from './auth.js';
 import { buildPublic, safeUrl } from './profile.js';
-import { publicUrl } from './site.js';
+import { publicUrl, hostedMediaTree } from './site.js';
 import { raw, run } from './supabase.js';
 import { normalizePage } from '../shared/pageSettings.js';
 import { publicPortfolio } from '../shared/portfolio.js';
@@ -74,7 +74,7 @@ export function buildHomeFeed({
       offerings: offerings.filter(o => o.owner_id === p.owner_id && o.contribution_id === c.id)
     }));
     const pub = buildPublic(p, mine);
-    const portfolio = publicPortfolio(site?.portfolio);
+    const portfolio = hostedMediaTree(publicPortfolio(site?.portfolio));
     const contactPath = portfolio.enquiry.enabled || pub.contact?.email || pub.contact?.phone ? `/p/${slug}/contact` : `/p/${slug}/chat`;
     const mineOffers = [];
     if (page.sections.store) for (const k of pub.contributions) for (const o of k.offerings) {

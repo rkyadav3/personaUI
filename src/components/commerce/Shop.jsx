@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { cleanImg, cleanUrl } from '../../../shared/portfolio.js';
 import { minorUnits } from '../../../shared/commerce.js';
 import { useSeen } from '../../lib/useSeen.js';
@@ -31,7 +32,7 @@ export function ShopCard({ item, slug, user, preview, onCheckout, display = norm
         {item.checkout && <button type="button" className="persona-button primary" disabled={unavailable && !preview} onClick={() => { if (!preview && offering) track({ kind: 'click', id: item.id }); onCheckout(item); }}>{item.pricing === 'free' ? 'Get free' : 'Buy now'}</button>}
       </div>
       {item.ratingCount > 0 && <small className="persona-muted">★ {Number(item.ratingAvg || 0).toFixed(1)} ({item.ratingCount} ratings)</small>}
-      {item.checkout && unavailable && <small className="persona-muted">{item.accessReady === false ? 'Access link coming soon' : 'Contact the owner for pricing'}</small>}
+      {item.checkout && unavailable && <small className="persona-muted">{item.accessReady === false ? 'Delivery file coming soon' : 'Contact the owner for pricing'}</small>}
       {info && <a className="persona-info-link" href={info} {...(/^https?:\/\//i.test(info) ? { target: '_blank', rel: 'noopener noreferrer nofollow' } : {})}>{item.linkLabel && !item.checkout ? item.linkLabel : 'More details'} ↗</a>}
       {offering && slug && <details className="persona-rating-details"><summary>Rate this offering</summary><OfferingRating product={{ ...item, slug }} user={user} preview={preview} /></details>}
     </article>
@@ -48,6 +49,7 @@ export default function Shop({ items, slug, owner, user, preview = false, custom
   const sorted = sortDisplayItems(items.filter(item => active === 'all' || (item.category || (item.kind === 'product' ? 'Products' : 'Offerings')) === active), display.storeSort);
   return (
     <>
+      {slug && !preview && <p className="persona-purchases-link"><Link to={`/p/${slug}/purchases`}>My purchases</Link></p>}
       {display.storeFilters && categories.length > 1 && <label className="pf-store-filter">Category<select value={active} onChange={event => { setCategory(event.target.value); setCount(limit); }}><option value="all">All items</option>{categories.map(name => <option key={name}>{name}</option>)}</select></label>}
       <div className={`persona-shop-grid shop-${display.storeLayout} shop-${display.storeCardSize} image-${display.storeImageRatio}`} style={{ '--store-columns': display.storeColumns }}>{sorted.slice(0, count).map(item => <ShopCard key={`${item.kind}:${item.id}`} item={item} slug={slug} user={user} preview={preview} onCheckout={setSelected} display={display} />)}</div>
       {sorted.length > count && <button type="button" className="pf-btn" onClick={() => setCount(value => value + limit)}>Show more items</button>}

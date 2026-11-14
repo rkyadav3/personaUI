@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Field } from '../Ui.jsx';
 import { Txt, Repeater } from './EditorFields.jsx';
+import MediaUpload from '../MediaUpload.jsx';
 import { ICON_NAMES, PRODUCT_STATUS } from '../../../shared/portfolio.js';
 import { CHECKOUT_CURRENCIES } from '../../../shared/commerce.js';
 export default function ContentFields({ tab, pf, set }) { return <>
@@ -42,7 +43,7 @@ export default function ContentFields({ tab, pf, set }) { return <>
                   <Field label="Free or paid"><select value={x.pricing || 'unspecified'} onChange={e => p({ pricing: e.target.value, price: '' })}><option value="free">Free</option><option value="paid">Paid</option><option value="unspecified">Information only</option></select></Field>
                   {x.pricing === 'paid' && <div className="cols c2"><Field label="Price"><input type="number" min={0.01} max={9999999.99} step="0.01" value={x.amount ?? ''} onChange={e => p({ amount: e.target.value, price: '' })} /></Field>
                     <Field label="Currency"><select value={x.currency || 'INR'} onChange={e => p({ currency: e.target.value })}>{CHECKOUT_CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></Field></div>}
-                  {['free', 'paid'].includes(x.pricing) && <Txt label="Access / download link after checkout" value={x.deliveryUrl} max={600} ph="https://…" hint="Released to the buyer after a free claim or verified payment. Add a link to enable checkout." onChange={v => p({ deliveryUrl: v })} />}
+                  {['free', 'paid'].includes(x.pricing) && <MediaUpload purpose="delivery" label="Private delivery file" value={x.assetId} onChange={assetId => p({ assetId, deliveryUrl: '' })} />}
                   <Txt label="Picture link" value={x.image} ph="https://…" onChange={v => p({ image: v })} />
                   <div className="cols c2"><Txt label="Public details link" value={x.url} ph="https://…" onChange={v => p({ url: v })} /><Txt label="Details button text" value={x.linkLabel} max={24} ph="More details" onChange={v => p({ linkLabel: v })} /></div>
                 </>}

@@ -26,7 +26,7 @@ test('the profile home page renders all seven shop items and its published Event
 test('the shop explains unavailable access links and prevents live checkout', () => {
   const html = renderToStaticMarkup(React.createElement(ShopCard, { item: { title: 'Soon', kind: 'product', id: 'soon', checkout: { kind: 'product', id: 'soon' }, pricing: 'free', accessReady: false }, onCheckout() {} }));
   assert.match(html, /disabled/);
-  assert.match(html, /Access link coming soon/);
+  assert.match(html, /Delivery file coming soon/);
 });
 
 test('a completed receipt displays its buyer, amount and usable access link', () => {
@@ -69,11 +69,12 @@ test('the native checkout dialog leaves the page’s top layer while Razorpay is
   assert.equal(html, '');
 });
 
-test('editing an existing offering preserves its private access link', () => {
+test('editing a legacy offering offers a hosted delivery upload', () => {
   const { OfferingForm } = require('../src/components/profile/Contributions.jsx');
   assert.equal(typeof OfferingForm, 'function');
   const html = renderToStaticMarkup(React.createElement(OfferingForm, { contribution: { id: 1, category: 'Books' }, offering: { title: 'Book', pricing: 'free', delivery_url: 'https://example.test/private-access', details: {} }, onDone() {} }));
-  assert.match(html, /value="https:\/\/example.test\/private-access"/);
+  assert.match(html, /Choose file for Private delivery file/);
+  assert.doesNotMatch(html, /value="https:/);
 });
 
 test('uploaded portrait crop settings reach the circular photo and removal restores initials', () => {

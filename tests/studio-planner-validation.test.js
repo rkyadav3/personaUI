@@ -23,6 +23,14 @@ function snapshot() {
 }
 const plan = (actions, state = snapshot()) => makeStudioPlan({ actions }, state, owner);
 
+test('assistant title edits retain offering paragraphs and remove obsolete sale links', () => {
+  const state = snapshot(); state.offerings[0].description = 'First paragraph.\n\nSecond paragraph.';
+  state.offerings[0].details = { buy_link: 'https://old-sale.test' };
+  const result = plan([{ entity: 'offerings', action: 'update', id: 8, values: { title: 'Renamed' } }], state);
+  assert.equal(result.steps[0].args.description, state.offerings[0].description);
+  assert.equal(result.steps[0].args.details.buy_link, undefined);
+});
+
 test('activity analytics can never become an assistant write action', () => {
   for (const action of ['create', 'update', 'delete']) {
     assert.throws(() => plan([{ entity: 'analytics', action, id: 'current', values: { sales: 999 } }]), /unsupported/);
@@ -143,7 +151,7 @@ test('remaining admin areas produce complete reviews with safe defaults and exis
   const cases = [
     ['folders', { name: 'New folder', parentId: 3 }, 'folders.create'], ['topics', { name: 'New topic', description: 'Research' }, 'topics.create'],
     ['templates', { name: 'My template', body: '## Introduction' }, 'templates.save'], ['updates', { kind: 'event', title: 'Meetup', startsAt: '2026-12-01T10:00:00Z', rsvp: { questions: [{ label: 'What brings you here?', required: true }] } }, 'updates.save'],
-    ['contributions', { category: 'Content', intent: 'free', description: 'Helpful guides' }, 'contributions.save'], ['offerings', { contributionId: 7, title: 'Paid guide', pricing: 'paid', price: 100, deliveryUrl: 'https://example.test/access' }, 'offerings.save'],
+    ['contributions', { category: 'Content', intent: 'free', description: 'Helpful guides' }, 'contributions.save'], ['offerings', { contributionId: 7, title: 'Paid guide', pricing: 'paid', price: 100, deliveryKind: 'service' }, 'offerings.save'],
     ['invites', { label: 'Team', maxUses: 3, days: 7 }, 'invites.create'],
   ];
   for (const [entity, values, op] of cases) { const result = plan([{ entity, action: 'create', values }]); assert.equal(result.steps[0].op, op); assert.equal(result.changes[0].kind, 'create'); }

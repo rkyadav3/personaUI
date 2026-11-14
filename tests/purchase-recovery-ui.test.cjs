@@ -11,7 +11,7 @@ const { renderToStaticMarkup } = require('react-dom/server');
 test('checkout offers recovery separately from creating another paid order', () => {
   const CheckoutDialog = require('../src/components/commerce/CheckoutDialog.jsx').default;
   const html = renderToStaticMarkup(React.createElement(CheckoutDialog, { slug: 'alice', item: { title: 'Book', pricing: 'paid', checkout: { kind: 'offering', id: '5' } }, onClose() {} }));
-  assert.match(html, /Already purchased/); assert.match(html, /Recover receipt/);
+  assert.match(html, /Already purchased/); assert.match(html, /My purchases/); assert.match(html, /Use an old payment receipt/);
 });
 
 test('the recovery form asks for the purchase email and payment ID with accessible errors', () => {

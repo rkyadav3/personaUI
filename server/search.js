@@ -1,6 +1,7 @@
 // Run the same hybrid search the website uses (for the Test retrieval box).
 import { env } from './config.js';
 import { embed } from './embed.js';
+import { publishedPassages } from './knowledgeBoundary.js';
 
 const STOP = new Set('a an and are as at be by for from has have in is it its of on or that the this to was were will with i my me you your do does what how why who which when'.split(' '));
 
@@ -14,5 +15,5 @@ export async function search(db, q, k = 6) {
     min_similarity: parseFloat(env('MIN_SIMILARITY', 0.6)), min_keyword_rank: parseFloat(env('MIN_KEYWORD_RANK', 0.2)),
   });
   if (error) throw new Error(error.message);
-  return data;
+  return publishedPassages(db, data);
 }

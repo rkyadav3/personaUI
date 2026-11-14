@@ -19,9 +19,9 @@ export function createPublicRepository(database = raw) {
     const [user] = await query(database().from('users').select('id,email,slug,name,tags,profile_private,locked_until').eq('slug', slug).limit(1));
     return isSuperAdminEmail(user?.email) ? null : user || null;
   }
-  async function owner(slug) {
+  async function owner(slug, viewer = null) {
     const user = await accountOwner(slug);
-    if (!canViewProfile(user)) return null;
+    if (!canViewProfile(user, viewer)) return null;
     const profile = (await query(database().from('profiles').select('*').eq('owner_id', user.id).eq('status', 'published').limit(1)))[0];
     return profile ? { ...user, profile } : null;
   }

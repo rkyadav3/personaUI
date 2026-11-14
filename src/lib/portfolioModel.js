@@ -46,7 +46,7 @@ export function resolveSite(data, slug, heroOverride) {
   const projects = p.projects.map(x => ({ ...x, techList: split(x.tech) }));
   const featured = projects.find(x => x.featured) || projects[0] || null;
   const others = featured ? projects.filter(x => x !== featured) : [];
-  const products = page.sections.store ? [...p.products.map(({ deliveryUrl, ...x }) => ({ kind: 'product', ...x, accessReady: x.accessReady ?? !!deliveryUrl, price: x.pricing === 'unspecified' ? x.price : fmtPrice({ pricing: x.pricing, price: x.amount, currency: x.currency }, cur), checkout: page.cart && ['free', 'paid'].includes(x.pricing) ? { kind: 'product', id: x.id } : null })), ...offers, ...talkOffers] : [];
+    const products = page.sections.store ? [...p.products.map(({ deliveryUrl, assetId, ...x }) => ({ kind: 'product', ...x, accessReady: x.accessReady ?? (!!assetId || x.deliveryKind === 'service'), price: x.pricing === 'unspecified' ? x.price : fmtPrice({ pricing: x.pricing, price: x.amount, currency: x.currency }, cur), checkout: page.cart && ['free', 'paid'].includes(x.pricing) ? { kind: 'product', id: x.id } : null })), ...offers, ...talkOffers] : [];
   const exp = data.experience || null;
   const experience = page.sections.experience ? (p.experience.length ? p.experience : (exp?.employers || []).map(e => ({ role: e.role, company: e.company, period: e.duration, summary: '' }))) : [];
   const experienceNote = page.sections.experience && !p.experience.length ? (exp?.description || '') : '';

@@ -1,4 +1,5 @@
 import { isSuperAdminEmail } from './auth.js';
+import { getAsset } from './assets.js';
 // AI-powered registration: free text -> structured draft (never saved or published until the user confirms).
 import { CATEGORIES, INTENTS, OFFERING_FIELDS, PRICING, VISIBILITY_DEFAULTS } from '../shared/profileSchema.js';
 import { generateJSON } from './gemini.js';
@@ -6,12 +7,13 @@ import { normalizePage } from '../shared/pageSettings.js';
 import { cleanImg, publicPortfolio } from '../shared/portfolio.js';
 import { normalizeBg } from '../shared/siteSettings.js';
 import { previewEngage, publicEngage } from './engage.js';
-import { publicUrl } from './site.js';
+import { publicUrl, hostedMediaTree } from './site.js';
 import { raw, run } from './supabase.js';
 import { canViewProfile } from '../shared/governance.js';
 
 const MAX_TEXT = 6000, MAX_PER_HOUR = 12;
 const str = (v, n = 300) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
+const prose = (value, max) => typeof value === 'string' ? value.replace(/\r/g, '').trim().slice(0, max) : '';
 const strOrNull = (v, n) => str(v, n) || null;
 const list = (v, n) => (Array.isArray(v) ? v.slice(0, n) : []);
 const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
@@ -257,15 +259,30 @@ export async function saveOffering(db, a) {
   const title = str(a.title, 160);
   if (!title) throw new Error('Give the offering a title.');
   const details = {};
-  for (const f of OFFERING_FIELDS[c.category] || []) { const v = str(a.details?.[f.key], f.type === 'textarea' ? 1000 : 300); if (v) details[f.key] = v; }
+  for (const f of OFFERING_FIELDS[c.category] || []) { const v = f.type === 'textarea' ? prose(a.details?.[f.key], 1000) : str(a.details?.[f.key], 300); if (v) details[f.key] = v; }
   const price = a.price === '' || a.price == null ? null : Number(a.price);
+  if (a.pricing === 'paid' && (!Number.isFinite(price) || price <= 0 || price >= 1e9)) throw new Error('Enter a valid positive price.');
+  if (a.deliveryKind !== undefined && !['file', 'service'].includes(a.deliveryKind)) throw new Error('Choose file or service delivery.');
   const row = {
-    contribution_id: c.id, title, description: str(a.description, 1500), pricing: PRICING.includes(a.pricing) ? a.pricing : 'unspecified',
+    contribution_id: c.id, title, description: prose(a.description, 1500), pricing: PRICING.includes(a.pricing) ? a.pricing : 'unspecified',
     price: Number.isFinite(price) && price >= 0 && price < 1e9 ? price : null, currency: str(a.currency, 6) || null, details, active: a.active !== false,
   };
-  if (a.deliveryUrl !== undefined) row.delivery_url = cleanImg(a.deliveryUrl);
+  if (a.deliveryUrl) throw new Error('Upload a delivery file instead of using an external access link.');
+  if (a.assetId !== undefined || a.deliveryKind === 'service') {
+    if (a.assetId && a.deliveryKind !== 'service') await getAsset(db, a.assetId, 'delivery');
+    row.delivery_asset_id = a.deliveryKind === 'service' ? null : a.assetId || null;
+    row.delivery_url = '';
+  }
+  if (a.deliveryKind !== undefined) row.delivery_kind = a.deliveryKind === 'service' ? 'service' : 'file';
   if (row.pricing !== 'paid') row.price = null;
-  if (a.id) { await run(db.from('offerings').update(row).eq('id', a.id)); return { id: a.id }; }
+  if (a.id) {
+    let write = db.from('offerings').update(row).eq('id', a.id);
+    if (a.expectedItemVersion !== undefined) {
+      write = write.eq('updated_at', a.expectedItemVersion).select('id');
+      if (!(await run(write))?.length) throw new Error('This item changed in another editor. Your draft is retained; reload the saved item before saving.');
+    } else await run(write);
+    return { id: a.id };
+  }
   return (await run(db.from('offerings').insert(row).select('id')))[0];
 }
 export const deleteOffering = (db, id) => run(db.from('offerings').delete().eq('id', id));
@@ -291,18 +308,18 @@ export function buildPublic(profile, contributions) {
     contributions: v.contributions
       ? contributions.filter(k => k.enabled && k.visible).map(k => ({
         category: k.category, subtype: k.subtype, description: k.description, intent: k.intent,
-        offerings: (k.offerings || []).filter(o => o.active).map(o => ({ id: o.id, title: o.title, description: o.description, pricing: o.pricing, price: o.price, currency: o.currency, details: o.details, accessReady: !!cleanImg(o.delivery_url), createdAt: o.created_at || null, ...offerStats(o) })),
+        offerings: (k.offerings || []).filter(o => o.active).map(o => ({ id: o.id, title: o.title, description: o.description, pricing: o.pricing, price: o.price, currency: o.currency, details: hostedMediaTree(Object.fromEntries(Object.entries(o.details || {}).filter(([key]) => key !== 'buy_link'))), accessReady: !!o.delivery_asset_id || o.delivery_kind === 'service', createdAt: o.created_at || null, ...offerStats(o) })),
       }))
       : [],
   };
 }
 
-export const safeUrl = u => { try { const x = new URL(String(u || '')); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : null; } catch { return null; } };
+export const safeUrl = u => { if (typeof u === 'string' && /^\/api\/media\?[^\\]*$/.test(u)) return u; try { const x = new URL(String(u || '')); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : null; } catch { return null; } };
 
 /** What the public profile page receives: the visibility-filtered profile (buildPublic) plus the page look.
  *  Links and pictures are checked here (http/https only) and moved out of `details`, so the browser never renders a raw URL. */
 function decorate(pub, slug, site, engage = { updates: [], schedule: [] }) {
-  return {
+  return hostedMediaTree({
     ...pub, slug,
     updates: engage.updates, schedule: engage.schedule, events: engage.events || [],
     hero: site?.hero_path ? publicUrl(site.hero_path) : null,
@@ -316,7 +333,7 @@ function decorate(pub, slug, site, engage = { updates: [], schedule: [] }) {
         return { ...o, image: safeUrl(cover_image), link: safeUrl(buy_link), details: rest };
       }),
     })),
-  };
+  });
 }
 
 export async function publicProfile(slug, viewer = null, db = raw()) {

@@ -43,7 +43,7 @@ test('public portfolio data never contains private delivery links', () => {
 
 test('access readiness survives public data normalization without exposing the delivery link', () => {
   const data = portfolio.publicPortfolio({ products: [
-    { id: 'ready', title: 'Ready guide', pricing: 'free', deliveryUrl: 'https://example.test/private-file' },
+    { id: 'ready', title: 'Ready guide', pricing: 'free', assetId: '11111111-1111-4111-8111-111111111111' },
     { id: 'not-ready', title: 'Coming soon', pricing: 'paid', amount: 49 },
   ] });
   const model = resolveSite({ portfolio: data }, 'owner');

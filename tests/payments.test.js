@@ -146,10 +146,10 @@ test('the shared Razorpay webhook identifies the profile owner from the stored o
   assert.equal(f.rows[0].owner_id, 'owner-a'); assert.equal(f.rows[0].status, 'paid');
 });
 
-test('an item without an access link cannot take a payment or record a free claim', async () => {
+test('an item without a delivery file cannot take a payment or record a free claim', async () => {
   for (const pricing of ['paid', 'free']) {
     const f = fixture({ item: { pricing, deliveryUrl: '' } });
-    await assert.rejects(f.service.create(input), /access|download/i); assert.equal(f.rows.length, 0);
+    await assert.rejects(f.service.create(input), /delivery file/i); assert.equal(f.rows.length, 0);
   }
 });
 

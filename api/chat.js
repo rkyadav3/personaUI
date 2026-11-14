@@ -4,6 +4,8 @@
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models';
 import { sessionUser, isSuperAdminEmail } from '../server/auth.js';
 import { canViewProfile } from '../shared/governance.js';
+import { scoped } from '../server/tenant.js';
+import { publishedPassages } from '../server/knowledgeBoundary.js';
 const NOT_FOUND = "I don't have anything about that in my research yet.";
 const STOP = new Set('a an and are as at be by for from has have in is it its of on or that the this to was were will with i my me you your do does what how why who which when'.split(' '));
 
@@ -95,10 +97,11 @@ export default async function handler(req, res) {
     owner = await ownerId(req.body.slug, await sessionUser(req));
     if (!owner) return res.status(404).json({ reply: "I couldn't find this persona.", sources: [] });
     const vec = await embedQuery(q);
-    const rows = await rpc('hybrid_search', {
+    const candidates = await rpc('hybrid_search', {
       query_embedding: vec, keyword_query: keywordQuery(q), match_count: 8,
       min_similarity: +process.env.MIN_SIMILARITY || 0.6, min_keyword_rank: +process.env.MIN_KEYWORD_RANK || 0.2, p_owner: owner
     });
+    const rows = await publishedPassages(scoped(owner), candidates);
     const used = {};
     for (const r of rows) {                       // at most two chunks per source, five in total
       used[r.source_name] = (used[r.source_name] || 0) + 1;

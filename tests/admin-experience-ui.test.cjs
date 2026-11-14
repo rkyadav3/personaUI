@@ -16,7 +16,7 @@ test('Add category appears above the existing offering categories', () => {
   const Contributions = require('../src/components/profile/Contributions.jsx').default;
   const html = render(Contributions, { items: [{ id: 1, category: 'Books', offerings: [] }], reload() {} }, '/admin/profile?tab=contrib');
   assert.ok(html.indexOf('Add category') < html.indexOf('<h3>Books'));
-  assert.match(html, />Add offering</);
+  assert.match(html, />Add item</);
 });
 test('main site settings include an actual live directory iframe', () => {
   const { MainSiteEditor } = require('../src/pages/MainSiteSettings.jsx');

@@ -80,7 +80,7 @@ test('read snapshots cover retained offerings and Event responses while omitting
   };
   const service = createStudioOperations({ rows: async (_, table) => values[table] || [], engage: { listUpdates: async () => [{ id: 9, kind: 'event', title: 'Meetup' }], listEnquiries: async () => ({ rows: [{ id: 10, name: 'Visitor', status: 'new' }] }) } });
   const state = await service.read(ctx(), ['profile', 'offerings', 'responses', 'enquiries']);
-  assert.equal(state.profile, null); assert.equal(state.offerings[0].contributionId, 3); assert.equal(state.offerings[0].deliveryUrl, 'https://example.test/access'); assert.equal(state.responses[0].eventId, 9); assert.equal(state.enquiries[0].status, 'new'); assert.doesNotMatch(JSON.stringify(state), /token_hash|secret/);
+  assert.equal(state.profile, null); assert.equal(state.offerings[0].contributionId, 3); assert.equal(state.offerings[0].deliveryUrl, undefined); assert.equal(state.responses[0].eventId, 9); assert.equal(state.enquiries[0].status, 'new'); assert.doesNotMatch(JSON.stringify(state), /token_hash|secret/);
 });
 
 test('settings, counts and safe payment readiness are loaded only for requested areas', async () => {

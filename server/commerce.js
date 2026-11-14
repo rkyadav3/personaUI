@@ -8,6 +8,8 @@ import { openSecret, sealSecret } from './paymentCrypto.js';
 import { createPaymentService, purchaseView } from './paymentService.js';
 import { createRazorpayGateway } from './razorpay.js';
 import { HttpError } from './http.js';
+import { getAsset, downloadAsset } from './assets.js';
+import { scoped } from './tenant.js';
 
 const sharedAccount = () => ({ enabled: true, keyId: process.env.RAZORPAY_KEY_ID || '', keySecret: process.env.RAZORPAY_KEY_SECRET || '', webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '' });
 function encryptionReady() {
@@ -18,6 +20,9 @@ const purchaseScope = row => `purchase:${row.owner_id}:${row.id}`;
 export function createCommerceRepository(database = raw) {
   const db = () => database();
   return {
+    hostedDeliveryOnly: true,
+    asset: (owner, id) => getAsset(scoped(owner, database), id, 'delivery'),
+    downloadAsset: (owner, id) => downloadAsset(scoped(owner, database), id, undefined, 'delivery'),
     ...createPublicRepository(database),
     async item(owner, ref) {
       const [profile] = await query(db().from('profiles').select('visibility').eq('owner_id', owner).eq('status', 'published').limit(1));
@@ -33,7 +38,7 @@ export function createCommerceRepository(database = raw) {
       if (!offering) return null;
       const [contribution] = await query(db().from('contributions').select('category').eq('owner_id', owner).eq('id', offering.contribution_id).eq('enabled', true).eq('visible', true).limit(1));
       if (!contribution || normalizePage(site?.page).placement[contribution.category] === 'hidden') return null;
-      return { kind: 'offering', id: String(offering.id), title: offering.title, pricing: offering.pricing, amount: offering.price, currency: String(offering.currency || 'INR').toUpperCase(), deliveryUrl: cleanImg(offering.delivery_url) };
+      return { kind: 'offering', id: String(offering.id), title: offering.title, pricing: offering.pricing, amount: offering.price, currency: String(offering.currency || 'INR').toUpperCase(), assetId: offering.delivery_asset_id, deliveryKind: offering.delivery_kind || 'file' };
     },
     async account(owner) {
       const [row] = await query(db().from('payment_accounts').select('enabled').eq('owner_id', owner).limit(1));
@@ -60,6 +65,7 @@ export const createPurchase = (input, meta) => service().create(input, meta);
 export const verifyPurchase = input => service().verify(input);
 export const purchaseReceipt = input => service().status(input);
 export const recoverPurchaseReceipt = (input, meta) => service().recover(input, meta);
+export const purchaseDownload = input => service().download(input);
 export const paymentWebhook = input => service().webhook(input);
 
 export async function paymentSettings(db) {
@@ -75,12 +81,17 @@ export async function savePaymentSettings(db, input) {
   return paymentSettings(db);
 }
 
-const PURCHASE_COLUMNS = 'id,request_id,item_kind,item_id,item_title,buyer_name,buyer_email,buyer_phone,amount,currency,status,refunded_amount,razorpay_order_id,razorpay_payment_id,delivery_url,fulfillment_status,admin_note,created_at,paid_at';
+const PURCHASE_COLUMNS = 'id,request_id,item_kind,item_id,item_title,buyer_name,buyer_email,buyer_phone,amount,currency,status,refunded_amount,razorpay_order_id,razorpay_payment_id,delivery_url,delivery_asset_id,delivery_kind,fulfillment_status,admin_note,created_at,paid_at';
 export async function listPurchases(db, input = {}) {
   const page = Math.max(1, Math.min(100000, Math.floor(Number(input.page) || 1))), size = 50;
   const status = ['paid', 'free', 'pending', 'failed', 'refunded'].includes(input.status) ? input.status : '';
   let request = db.from('purchases').select(PURCHASE_COLUMNS, { count: 'exact' });
   if (status) request = request.eq('status', status);
+  const contact = String(input.contact || '').trim().toLowerCase();
+  if (contact) {
+    if (contact.includes('@')) request = request.eq('buyer_email', contact);
+    else request = request.eq('buyer_phone', contact.replace(/[^0-9+]/g, ''));
+  }
   const [result, summary] = await Promise.all([request.order('created_at', { ascending: false }).range((page - 1) * size, page * size - 1), query(db.rpc('purchase_summary'))]);
   const rows = await query(result);
   return { rows: rows.map(row => ({ ...purchaseView(row), orderId: row.razorpay_order_id || null, note: row.admin_note || '' })), total: result.count || 0, page, pageSize: size, summary };

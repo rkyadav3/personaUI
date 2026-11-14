@@ -12,7 +12,7 @@ import { createActivityService } from './adminActivity.js';
 const lazy = path => new Proxy({}, { get: (_, key) => async (...args) => (await import(path))[key](...args) });
 const fields = (row, keys) => Object.fromEntries(keys.split(' ').filter(key => Object.hasOwn(row || {}, key)).map(key => [key, row[key]]));
 const identity = ctx => { if (!ctx?.user?.id || ctx.db?.uid !== ctx.user.id) throw new HttpError(401, 'Your signed-in identity and tenant scope must agree.'); };
-const dependencies = { customization: ['offerings'], files: ['folders', 'topics'], folders: ['files'], topics: ['files', 'posts'], posts: ['topics', 'templates'], templates: ['topics'], offerings: ['contributions'], contributions: ['offerings'], updates: ['responses'], responses: ['updates'] };
+const dependencies = { customization: ['offerings'], products: ['assets'], files: ['folders', 'topics'], folders: ['files'], topics: ['files', 'posts'], posts: ['topics', 'templates'], templates: ['topics'], offerings: ['contributions', 'assets'], contributions: ['offerings'], updates: ['responses'], responses: ['updates'] };
 
 /** The assistant can only call this fixed set of existing, owner-scoped admin services. */
 export function createStudioOperations({ store = storeDefault, profile = profileDefault, site = siteDefault, engage = engageDefault, events = eventsDefault, commerce = commerceDefault, invites = lazy('./invites.js'), indexer = lazy('./indexer.js'), rows = paged } = {}) {
@@ -27,7 +27,8 @@ export function createStudioOperations({ store = storeDefault, profile = profile
     posts: async ({ db }) => (await table(db, 'posts', 'id,title,html,status,topic_id,template_id')).map(row => ({ ...fields(row, 'id title html status'), topicId: row.topic_id ?? null, templateId: row.template_id ?? null })),
     templates: async ({ db }) => (await store.templates(db)).map(row => fields(row, 'id name html')),
     contributions: async ({ db }) => (await table(db, 'contributions', 'id,category,subtype,description,intent,enabled,visible')).map(row => fields(row, 'id category subtype description intent enabled visible')),
-    offerings: async ({ db }) => (await table(db, 'offerings', 'id,contribution_id,title,description,pricing,price,currency,details,active,delivery_url')).map(row => ({ ...fields(row, 'id title description pricing price currency details active'), contributionId: row.contribution_id, deliveryUrl: row.delivery_url || '' })),
+    offerings: async ({ db }) => (await table(db, 'offerings', 'id,contribution_id,title,description,pricing,price,currency,details,active,delivery_asset_id,delivery_kind')).map(row => ({ ...fields(row, 'id title description pricing price currency details active'), contributionId: row.contribution_id, assetId: row.delivery_asset_id || '', deliveryKind: row.delivery_kind || 'file' })),
+    assets: async ({ db }) => (await table(db, 'assets', 'id,name,purpose,mime,status')).filter(row => row.status === 'ready').map(row => fields(row, 'id name purpose mime')),
     updates: ({ db }) => engage.listUpdates(db),
     responses: async ({ db }) => (await table(db, 'event_responses', 'id,event_id,name,email,phone,response,public_name,note,answers,created_at,updated_at')).map(row => ({ ...fields(row, 'id name email phone response note answers'), eventId: row.event_id, publicName: row.public_name || '', createdAt: row.created_at, updatedAt: row.updated_at })),
     enquiries: async ({ db }) => (await engage.listEnquiries(db)).rows,

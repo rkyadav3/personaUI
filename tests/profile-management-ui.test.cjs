@@ -13,14 +13,14 @@ const categories = [{ id: 1, category: 'Books' }, { id: 2, category: 'Other Cont
 
 test('offering creation exposes the owner categories and preselects its starting category', () => {
   const html = render(React.createElement(OfferingForm, { contribution: categories[0], contributions: categories, onDone() {} }));
-  assert.match(html, /aria-label="Offering category"/);
+  assert.match(html, /aria-label="Item category"/);
   assert.match(html, /value="1" selected="">Books/);
-  assert.match(html, /value="2">Other Contributions: Workshops/);
+  assert.match(html, /value="2">Workshops/);
 });
 
 test('editing an offering preselects its saved category', () => {
   const html = render(React.createElement(OfferingForm, { contribution: categories[0], contributions: categories, offering: { id: 8, contribution_id: 2, title: 'Workshop', details: {} }, onDone() {} }));
-  assert.match(html, /value="2" selected="">Other Contributions: Workshops/);
+  assert.match(html, /value="2" selected="">Workshops/);
 });
 
 test('the admin navigation exposes Profile Q&A to ordinary profile owners', () => {

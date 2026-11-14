@@ -8,7 +8,6 @@ const area = (key, label) => ({ key, label, type: 'textarea' });
 const sel = (key, label, options) => ({ key, label, type: 'select', options });
 
 /** Category-specific offering fields. Title, description, pricing, price and active are common to all; these go in `details`. */
-const BUY = t('buy_link', 'Buy or booking link (https://…)');
 export const OFFERING_FIELDS_BASE = {
   'Books': [t('cover_image', 'Cover image URL'), sel('availability', 'Purchase availability', ['Available now', 'Pre-order', 'Coming soon', 'Out of stock'])],
   'Content': [sel('content_type', 'Content type', ['Article', 'Blog', 'Tutorial', 'Video', 'Course', 'Guide', 'Newsletter', 'Other']), t('access_info', 'Access information')],
@@ -19,10 +18,9 @@ export const OFFERING_FIELDS_BASE = {
   'Other Contributions': [t('availability', 'Availability'), t('booking_info', 'Booking or access information')],
 };
 
-/** Every category also gets a buy / booking link, so visitors of the persona page can act straight away. */
 /** Every offering can also have a picture (shown on its store card). */
 const COVER = t('cover_image', 'Cover image URL');
-export const OFFERING_FIELDS = Object.fromEntries(Object.entries(OFFERING_FIELDS_BASE).map(([k, v]) => [k, [...(v.some(f => f.key === 'cover_image') ? [] : [COVER]), ...v, BUY]]));
+export const OFFERING_FIELDS = Object.fromEntries(Object.entries(OFFERING_FIELDS_BASE).map(([k, v]) => [k, [...(v.some(f => f.key === 'cover_image') ? [] : [COVER]), ...v]]));
 
 export const VISIBILITY_DEFAULTS = {
   education: true, experience: true, designation: true, expertise: true, purpose: true, contributions: true,

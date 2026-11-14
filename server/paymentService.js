@@ -12,6 +12,8 @@ export function purchaseView(row) {
     buyer: { name: row.buyer_name, email: row.buyer_email, phone: row.buyer_phone || '' },
     paymentId: row.razorpay_payment_id || null, createdAt: row.created_at, paidAt: row.paid_at || null,
     fulfillmentStatus: row.fulfillment_status || 'pending',
+    downloadReady: completed(row) && row.delivery_kind !== 'service' && !!row.delivery_asset_id,
+    deliveryKind: row.delivery_kind || 'file',
     ...(completed(row) ? { deliveryUrl: cleanImg(row.delivery_url) } : {}),
     ...(['pending', 'failed'].includes(row.status) && row.razorpay_order_id ? { razorpay: { orderId: row.razorpay_order_id, keyId: row.razorpay_key_id } } : {}),
   };
@@ -90,8 +92,11 @@ export function createPaymentService({ repo, gateway, clock = Date.now, receiptS
       }
       const item = await repo.item(user.id, ref);
       if (!item || !['free', 'paid'].includes(item.pricing)) throw new HttpError(404, 'This shop item is no longer available.');
-      const delivery = cleanImg(item.deliveryUrl);
-      if (!delivery) throw new HttpError(409, 'The access or download link for this item is not ready yet. Please contact the profile owner.');
+      const assetId = item.deliveryKind === 'service' ? null : item.assetId;
+      const delivery = item.deliveryKind === 'service' ? '' : cleanImg(item.deliveryUrl);
+      if (assetId) await repo.asset(user.id, assetId);
+      const hosted = !!assetId || item.deliveryKind === 'service';
+      if (!hosted && (!delivery || repo.hostedDeliveryOnly)) throw new HttpError(409, 'The delivery file for this item is not ready yet. Please contact the profile owner.');
       let amount;
       try { amount = item.pricing === 'free' ? 0 : minorUnits(item.amount, item.currency); }
       catch (error) { throw new HttpError(400, error.message); }
@@ -103,7 +108,9 @@ export function createPaymentService({ repo, gateway, clock = Date.now, receiptS
         id, owner_id: user.id, request_id: input.requestId, receipt_token_hash: hashToken(input.receiptToken),
         item_kind: ref.kind, item_id: String(ref.id), item_title: item.title, amount, currency: item.currency || 'INR',
         buyer_name: buyer.value.name, buyer_email: buyer.value.email, buyer_phone: buyer.value.phone,
-        status: amount ? 'pending' : 'free', delivery_url: delivery, fulfillment_status: !amount && delivery ? 'fulfilled' : 'pending',
+        status: amount ? 'pending' : 'free', delivery_url: hosted ? '' : delivery,
+        ...(hosted ? { delivery_asset_id: assetId || null, delivery_kind: item.deliveryKind || 'file' } : {}),
+        fulfillment_status: !amount && (assetId || delivery) ? 'fulfilled' : 'pending',
         created_at: now, paid_at: amount ? null : now, refunded_amount: 0,
         razorpay_key_id: account?.keyId || null, payment_credentials: account ? repo.sealAccount(account, user.id, id) : null,
       };
@@ -126,6 +133,11 @@ export function createPaymentService({ repo, gateway, clock = Date.now, receiptS
         try { await repo.fail(user.id, id); } catch (markError) { console.error('purchase-state', markError?.code || markError?.name); }
         throw error;
       }
+    },
+    async download(input) {
+      const row = await receipt(input);
+      if (!completed(row) || row.delivery_kind === 'service' || !row.delivery_asset_id) throw new HttpError(403, 'A completed purchase is required to download this file.');
+      return repo.downloadAsset(row.owner_id, row.delivery_asset_id);
     },
     async status(input) {
       let row = await receipt(input);
