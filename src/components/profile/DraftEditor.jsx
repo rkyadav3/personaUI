@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { CATEGORIES, INTENTS } from '../../../shared/profileSchema.js';
 import { nextCategory } from '../../lib/draft.js';
 import { Field } from '../Ui.jsx';
+import FormDialog from '../FormDialog.jsx';
+
+const recordFields = { education: [['qualification', 'Qualification'], ['specialization', 'Field of study'], ['institution', 'Institution']], employer: [['company', 'Company'], ['role', 'Role'], ['duration', 'Duration']] };
 
 function Tags({ value, onChange }) {
   const [text, setText] = useState('');
@@ -17,9 +20,12 @@ function Tags({ value, onChange }) {
 
 /** Edits the structured draft. Used during registration (with contributions) and later (profile fields only). */
 export default function DraftEditor({ draft, onChange, withContributions = true }) {
+  const [adding, setAdding] = useState(null);
   const up = fn => { const n = structuredClone(draft); fn(n); onChange(n); };
   const p = draft.profile, x = p.experience, ks = draft.purpose.contributions;
   const val = v => v ?? '';
+  const start = kind => setAdding({ kind, record: kind === 'contribution' ? { category: nextCategory(ks), subtype: '', description: '', intent: 'unspecified' } : Object.fromEntries(recordFields[kind].map(([key]) => [key, ''])) });
+  const patchRecord = patch => setAdding(current => ({ ...current, record: { ...current.record, ...patch } }));
 
   return (
     <>
@@ -36,13 +42,13 @@ export default function DraftEditor({ draft, onChange, withContributions = true 
         <h3>Education</h3>
         {p.education.map((e, i) => (
           <div className="row sub" key={i}>
-            {[['qualification', 'Qualification'], ['specialization', 'Field of study'], ['institution', 'Institution']].map(([k, l]) => (
+            {recordFields.education.map(([k, l]) => (
               <input key={k} type="text" className="grow" aria-label={l} placeholder={l} value={e[k]} onChange={ev => up(n => { n.profile.education[i][k] = ev.target.value; })} />
             ))}
             <button type="button" className="btn" onClick={() => up(n => { n.profile.education.splice(i, 1); })}>Remove</button>
           </div>
         ))}
-        <button type="button" className="btn" onClick={() => up(n => { n.profile.education.push({ qualification: '', specialization: '', institution: '' }); })}>Add education</button>
+        <button type="button" className="btn" onClick={() => start('education')}>Add education</button>
       </section>
 
       <section className="card">
@@ -53,13 +59,13 @@ export default function DraftEditor({ draft, onChange, withContributions = true 
         <Field label="Summary"><textarea rows={3} value={x.description} onChange={e => up(n => { n.profile.experience.description = e.target.value; })} /></Field>
         {x.employers.map((e, i) => (
           <div className="row sub" key={i}>
-            {[['company', 'Company'], ['role', 'Role'], ['duration', 'Duration']].map(([k, l]) => (
+            {recordFields.employer.map(([k, l]) => (
               <input key={k} type="text" className="grow" aria-label={l} placeholder={l} value={e[k]} onChange={ev => up(n => { n.profile.experience.employers[i][k] = ev.target.value; })} />
             ))}
             <button type="button" className="btn" onClick={() => up(n => { n.profile.experience.employers.splice(i, 1); })}>Remove</button>
           </div>
         ))}
-        <button type="button" className="btn" onClick={() => up(n => { n.profile.experience.employers.push({ company: '', role: '', duration: '' }); })}>Add employer</button>
+        <button type="button" className="btn" onClick={() => start('employer')}>Add employer</button>
       </section>
 
       <section className="card">
@@ -87,10 +93,19 @@ export default function DraftEditor({ draft, onChange, withContributions = true 
                 <button type="button" className="btn" onClick={() => up(n => { n.purpose.contributions.splice(i, 1); })}>Remove</button>
               </div>
             ))}
-            <button type="button" className="btn" onClick={() => up(n => { n.purpose.contributions.push({ category: nextCategory(n.purpose.contributions), subtype: '', description: '', intent: 'unspecified' }); })}>Add contribution</button>
+            <button type="button" className="btn" onClick={() => start('contribution')}>Add contribution</button>
           </>
         )}
       </section>
+      {adding && <FormDialog title={`Add ${adding.kind}`} onClose={() => setAdding(null)}><form onSubmit={event => { event.preventDefault(); up(n => { const records = adding.kind === 'education' ? n.profile.education : adding.kind === 'employer' ? n.profile.experience.employers : n.purpose.contributions; records.push(adding.record); }); setAdding(null); }}>
+        {adding.kind === 'contribution' ? <>
+          <Field label="Category"><select value={adding.record.category} onChange={event => patchRecord({ category: event.target.value })}>{CATEGORIES.map(category => <option key={category}>{category}</option>)}</select></Field>
+          {adding.record.category === 'Other Contributions' && <Field label="What kind"><input required value={adding.record.subtype} onChange={event => patchRecord({ subtype: event.target.value })} /></Field>}
+          <Field label="Description"><input value={adding.record.description} onChange={event => patchRecord({ description: event.target.value })} /></Field>
+          <Field label="Free or paid"><select value={adding.record.intent} onChange={event => patchRecord({ intent: event.target.value })}>{INTENTS.map(intent => <option key={intent}>{intent}</option>)}</select></Field>
+        </> : recordFields[adding.kind].map(([key, label], index) => <Field key={key} label={label}><input required={index === 0} value={adding.record[key]} onChange={event => patchRecord({ [key]: event.target.value })} /></Field>)}
+        <div className="row"><button className="btn primary" type="submit">Add {adding.kind}</button><button className="btn" type="button" onClick={() => setAdding(null)}>Cancel</button></div>
+      </form></FormDialog>}
     </>
   );
 }

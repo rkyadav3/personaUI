@@ -8,6 +8,7 @@ import { uploadToSigned } from '../lib/storage.js';
 import { Confirm, Crumbs, Field, Loading, Notice, Progress } from '../components/Ui.jsx';
 import { FolderSelect, TopicSelect } from '../components/Selects.jsx';
 import AdminDialog from '../components/AdminDialog.jsx';
+import FormDialog from '../components/FormDialog.jsx';
 import AdminTabs from '../components/AdminTabs.jsx';
 import Icon from '../components/portfolio/Icon.jsx';
 import { LibraryFileList } from '../components/LibraryFileList.jsx';
@@ -300,7 +301,7 @@ export default function FileManager({ defaultTab = 'browse' }) {
       <AdminTabs label="File tools" value={currentTab} onChange={setTab} disabled={uploadBusy || noteBusy} items={[{ id: 'browse', label: 'Browse', icon: 'folder', count: files?.length }, { id: 'upload', label: 'Upload files', icon: 'upload' }, { id: 'note', label: 'Write a note', icon: 'pen' }]} />
 
       {/* TAB 1: BROWSE FILES */}
-      {currentTab === 'browse' && (
+      {['browse', 'upload', 'note'].includes(currentTab) && (
         <>
           <section className="card library-browser">
             <div className="library-toolbar">
@@ -350,8 +351,7 @@ export default function FileManager({ defaultTab = 'browse' }) {
 
       {/* TAB 2: UPLOAD FILES */}
       {currentTab === 'upload' && (
-        <section className="card" style={{ maxWidth: 680 }}>
-          <h3>Add files to your library</h3>
+        <FormDialog title="Add files to your library" busy={uploadBusy} onClose={() => setTab('browse')}><section>
           <p className="muted" style={{ fontSize: '.88rem', margin: '0 0 16px' }}>
             Supported formats: PDF, DOCX, TXT, Markdown, CSV, JSON, and ZIP archives (which unzip automatically into folders).
           </p>
@@ -400,13 +400,12 @@ export default function FileManager({ defaultTab = 'browse' }) {
           )}
 
           {uploadMsgs.map((m, i) => <Notice key={i} kind={m.kind}>{m.t}</Notice>)}
-        </section>
+        </section></FormDialog>
       )}
 
       {/* TAB 3: NEW NOTE */}
       {currentTab === 'note' && (
-        <section className="card" style={{ maxWidth: 680 }}>
-          <h3>Create a note</h3>
+        <FormDialog title="Create a note" busy={noteBusy} onClose={() => setTab('browse')}><section>
           <p className="muted" style={{ fontSize: '.88rem', margin: '0 0 16px' }}>
             Write structured notes, technical ideas, or summaries. Once published, your AI persona can cite this note when speaking to visitors.
           </p>
@@ -444,11 +443,11 @@ export default function FileManager({ defaultTab = 'browse' }) {
           <div className="row" style={{ marginTop: 12 }}>
             <button className="btn" disabled={noteBusy} onClick={() => handleCreateNote('draft')}>Save as Draft (Private)</button>
             <button className="btn primary" disabled={noteBusy} onClick={() => handleCreateNote('published')}>Create &amp; Publish to AI</button>
-            <button className="btn" onClick={() => setTab('browse')}>Cancel</button>
+            <button className="btn" disabled={noteBusy} onClick={() => setTab('browse')}>Cancel</button>
           </div>
 
           {noteMsgs.map((m, i) => <Notice key={i} kind={m.kind}>{m.t}</Notice>)}
-        </section>
+        </section></FormDialog>
       )}
     </>
   );

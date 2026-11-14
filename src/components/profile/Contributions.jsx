@@ -5,6 +5,7 @@ import { CATEGORIES, INTENTS } from '../../../shared/profileSchema.js';
 import { api } from '../../lib/api.js';
 import { Confirm, Field, Notice } from '../Ui.jsx';
 import ItemForm from '../commerce/ItemForm.jsx';
+import FormDialog from '../FormDialog.jsx';
 
 export function OfferingForm({ contribution, contributions = contribution ? [contribution] : [], offering, onDone }) {
   const item = offering ? { ...offering, kind: 'offering', contributionId: offering.contribution_id || contribution?.id, assetId: offering.delivery_asset_id || '', deliveryKind: offering.delivery_kind || 'file' } : null;
@@ -56,18 +57,20 @@ function Card({ c, contributions, reload, categoriesOnly }) {
 export default function Contributions({ items, reload, categoriesOnly = false }) {
   const [params] = useSearchParams();
   const [open, setOpen] = useState(params.get('action') === 'add'), [f, setF] = useState({ category: CATEGORIES[0], subtype: '', description: '', intent: 'unspecified' }), [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false), [, setParams] = useSearchParams();
+  const close = () => { if (busy) return; setOpen(false); if (params.get('action') === 'add') { const next = new URLSearchParams(params); next.delete('action'); setParams(next, { replace: true }); } };
   useEffect(() => { if (params.get('action') === 'add') setOpen(true); }, [params]);
   async function add(e) {
-    e.preventDefault(); setErr('');
-    try { await api('contributions.save', f); setOpen(false); setF({ ...f, subtype: '', description: '' }); reload(); } catch (ex) { setErr(ex.message.includes('duplicate') ? 'You already have that category.' : ex.message); }
+    e.preventDefault(); if (busy) return; setBusy(true); setErr('');
+    try { await api('contributions.save', f); setOpen(false); const next = new URLSearchParams(params); next.delete('action'); setParams(next, { replace: true }); setF({ ...f, subtype: '', description: '' }); reload(); } catch (ex) { setErr(ex.message.includes('duplicate') ? 'You already have that category.' : ex.message); }
+    finally { setBusy(false); }
   }
   return (
     <>
       {!items.length && <p className="muted">No categories yet. Add one to organize your items.</p>}
       
       {open ? (
-        <form className="card" onSubmit={add}>
-          <h3>Add a category</h3>
+        <FormDialog title="Add a category" busy={busy} onClose={close}><form onSubmit={add}>
           <div className="cols c2">
             <Field label="Category"><select value={f.category} onChange={e => setF({ ...f, category: e.target.value })}>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></Field>
             {f.category === 'Other Contributions' && <Field label="What kind"><input type="text" value={f.subtype} placeholder="e.g. Workshops" onChange={e => setF({ ...f, subtype: e.target.value })} /></Field>}
@@ -75,8 +78,9 @@ export default function Contributions({ items, reload, categoriesOnly = false })
           </div>
           <Field label="Description"><input type="text" value={f.description} onChange={e => setF({ ...f, description: e.target.value })} /></Field>
           <Notice kind="error">{err}</Notice>
-          <div className="row"><button className="btn primary">Add</button><button type="button" className="btn" onClick={() => setOpen(false)}>Cancel</button></div>
+          <div className="row"><button className="btn primary" disabled={busy}>{busy ? 'Adding…' : 'Add category'}</button><button type="button" className="btn" disabled={busy} onClick={close}>Cancel</button></div>
         </form>
+        </FormDialog>
       ) : <button className="btn" onClick={() => setOpen(true)}>Add category</button>}
       {items.map(c => <Card key={`${c.id}-${c.updated || ''}`} c={c} contributions={items} reload={reload} categoriesOnly={categoriesOnly} />)}
     </>

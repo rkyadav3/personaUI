@@ -5,6 +5,7 @@ import { useOp } from '../lib/hooks.js';
 import { api } from '../lib/api.js';
 import { fmtDate } from '../lib/format.js';
 import { Field, Loading, Notice } from '../components/Ui.jsx';
+import FormDialog from '../components/FormDialog.jsx';
 import { SUPPORT_CATEGORIES, SUPPORT_STATUSES } from '../../shared/platformSupport.js';
 import '../styles/support.css';
 
@@ -37,9 +38,9 @@ export function SupportList({ user, rows, reload }) {
   const owner = user?.isSuperAdmin, visible = rows.filter(row => filter === 'all' || row.status === filter);
   return <div className="support-page">
     <div className="support-heading"><div><h1>{owner ? 'Support inbox' : 'Support'}</h1><p className="muted">{owner ? 'Help admins with account, payment and platform issues.' : 'Get help from the SuperAdmin and keep every reply in one place.'}</p></div>
-      {!owner && <button type="button" className="btn primary" disabled={requestBusy} aria-expanded={creating} aria-controls="support-new-request" onClick={() => setCreating(value => !value)}>{creating ? 'Cancel new request' : 'New support request'}</button>}
+      {!owner && <button type="button" className="btn primary" disabled={requestBusy} aria-haspopup="dialog" onClick={() => setCreating(true)}>New support request</button>}
     </div>
-    {creating && <NewRequest onBusy={setRequestBusy} />}
+    {creating && <FormDialog title="New support request" busy={requestBusy} onClose={() => setCreating(false)}><NewRequest onBusy={setRequestBusy} onCancel={() => setCreating(false)} /></FormDialog>}
     <section className="support-requests" aria-label={owner ? 'Customer support requests' : 'Your support requests'}>
       <div className="support-list-tools"><h2>{owner ? 'Requests from admins' : 'Your requests'}</h2><div><Field label="Filter requests"><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">All statuses</option>{Object.entries(SUPPORT_STATUSES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field><button className="btn small" type="button" onClick={reload}>Refresh</button></div></div>
       {!visible.length ? <p className="support-empty">{rows.length ? 'No requests match this status.' : owner ? 'No support requests yet.' : 'No requests yet. Start a new request when you need help.'}</p> : <ul className="support-request-list">{visible.map(ticket => <li key={ticket.id}>
@@ -50,7 +51,7 @@ export function SupportList({ user, rows, reload }) {
   </div>;
 }
 
-function NewRequest({ onBusy }) {
+function NewRequest({ onBusy, onCancel }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({ title: '', category: 'technical', body: '' }), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const mounted = useRef(true);
@@ -61,9 +62,9 @@ function NewRequest({ onBusy }) {
     catch (failure) { if (mounted.current) setError(failure.message); }
     finally { if (mounted.current) { setBusy(false); onBusy(false); } }
   }
-  return <section id="support-new-request" className="support-new-request"><h2>New support request</h2><p className="muted">Describe what happened and what you need help with.</p>
+  return <section id="support-new-request" className="support-new-request"><p className="muted">Describe what happened and what you need help with.</p>
     <form onSubmit={submit}><fieldset disabled={busy} className="support-fields"><div className="support-form-row"><Field label="Subject"><input required autoFocus maxLength={160} value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} /></Field><Field label="Category"><select value={form.category} onChange={event => setForm({ ...form, category: event.target.value })}>{Object.entries(SUPPORT_CATEGORIES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field></div>
-      <Field label="Describe the issue"><textarea required maxLength={5000} rows={5} value={form.body} onChange={event => setForm({ ...form, body: event.target.value })} /></Field><Notice kind="error">{error}</Notice><button className="btn primary">{busy ? 'Sending…' : 'Send request'}</button></fieldset></form>
+      <Field label="Describe the issue"><textarea required maxLength={5000} rows={5} value={form.body} onChange={event => setForm({ ...form, body: event.target.value })} /></Field><Notice kind="error">{error}</Notice><div className="row"><button className="btn primary">{busy ? 'Sending…' : 'Send request'}</button><button type="button" className="btn" onClick={onCancel}>Cancel</button></div></fieldset></form>
   </section>;
 }
 

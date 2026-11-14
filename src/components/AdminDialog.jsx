@@ -6,6 +6,7 @@ export default function AdminDialog({ titleId, children, onClose, busy = false, 
   useEffect(() => {
     const dialog = ref.current, previous = document.activeElement;
     dialog.showModal();
+    dialog.querySelector('input:not([type="hidden"]):not(:disabled), select:not(:disabled), textarea:not(:disabled)')?.focus();
     return () => { if (dialog.open) dialog.close(); if (previous?.isConnected) previous.focus?.(); };
   }, []);
   return <dialog ref={ref} className="admin-dialog" aria-labelledby={titleId} aria-busy={busy}

@@ -4,6 +4,7 @@ import { api } from '../lib/api.js';
 import { useOp } from '../lib/hooks.js';
 import { Confirm, Crumbs, Field, Loading, Notice, Pill } from '../components/Ui.jsx';
 import Icon from '../components/portfolio/Icon.jsx';
+import FormDialog from '../components/FormDialog.jsx';
 import ContentNavigation from '../components/ContentNavigation.jsx';
 
 function Detail({ id }) {
@@ -31,12 +32,8 @@ function Detail({ id }) {
   const myFiles = (files || []).filter(f => f.topic_id === id);
   const myPosts = (posts || []).filter(p => p.topic_id === id);
 
-  async function newPost() {
-    return run(async () => {
-      const [tpl] = await api('templates.list');
-      const post = await api('posts.create', { html: tpl?.html || '', topicId: id, templateId: tpl?.id ?? null });
-      nav(`/admin/writing/${post.id}`);
-    });
+  function newPost() {
+    nav(`/admin/writing?action=add&topic=${encodeURIComponent(id)}`);
   }
 
   return (
@@ -112,6 +109,7 @@ function List({ embedded = false }) {
   const { data: topics, reload, error } = useOp('topics.list');
   const [name, setName] = useState(''), [desc, setDesc] = useState('');
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(null), [search, setSearch] = useState('');
+  const [creating, setCreating] = useState(false);
   const visibleTopics = (topics || []).filter(topic => `${topic.name} ${topic.description || ''}`.toLowerCase().includes(search.trim().toLowerCase()));
 
   return (
@@ -135,18 +133,17 @@ function List({ embedded = false }) {
         </div>
       </div>
 
-      <div className="cols c12">
-        <form className="card" onSubmit={async e => {
+      <button type="button" className="btn primary" onClick={() => { setMessage(null); setCreating(true); }}>New research topic</button>
+      {creating && <FormDialog title="Create new topic" busy={busy} onClose={() => setCreating(false)}><form onSubmit={async e => {
           e.preventDefault();
           if (!name.trim() || busy) return;
           setBusy(true); setMessage(null);
           try {
             await api('topics.create', { name: name.trim(), description: desc });
-            setName(''); setDesc(''); reload(); setMessage({ kind: 'success', text: 'Topic created. Assign it to a file or article to start organizing.' });
+            setName(''); setDesc(''); setCreating(false); reload(); setMessage({ kind: 'success', text: 'Topic created. Assign it to a file or article to start organizing.' });
           } catch (error) { setMessage({ kind: 'error', text: error.message }); }
           finally { setBusy(false); }
         }}>
-          <h3>Create New Topic</h3>
           <p className="muted" style={{ fontSize: '.86rem', margin: '0 0 14px' }}>
             Define a research subject or domain you work in.
           </p>
@@ -169,8 +166,9 @@ function List({ embedded = false }) {
           </Field>
           <button className="btn primary" disabled={busy || !name.trim()}><Icon n="plus" size={18} />{busy ? 'Creating…' : 'Create topic'}</button>
           {message && <Notice kind={message.kind}>{message.text}</Notice>}
-        </form>
+        </form></FormDialog>}
 
+      <div>
         <section className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h3 style={{ margin: 0 }}>All Research Topics ({topics?.length || 0})</h3>
@@ -181,7 +179,7 @@ function List({ embedded = false }) {
           <Field label="Find a topic"><input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search topics…" /></Field>
           {topics && !topics.length && (
             <p className="muted" style={{ textAlign: 'center', padding: '24px 0' }}>
-              No topics created yet. Add your first topic on the left to start grouping files.
+              No topics created yet. Add your first topic to start grouping files.
             </p>
           )}
 

@@ -14,9 +14,8 @@ export const ADMIN_SECTIONS = [
     { id: 'enquiries', label: 'Enquiries', to: '/admin/enquiries', icon: 'email' },
     { id: 'questions', label: 'Visitor Q&A', to: '/admin/questions', icon: 'chat' },
   ] },
-  { id: 'community', label: 'Invite', icon: 'users', description: 'Invite people and suggest improvements to the platform owner.', pages: [
+  { id: 'community', label: 'Invite', icon: 'users', description: 'Invite people and track who joins the platform.', pages: [
     { id: 'invites', label: 'Invite links', to: '/admin/invites', icon: 'email' },
-    { id: 'suggestions', label: 'Suggestions', to: '/admin/suggestions', icon: 'spark' },
   ] },
   { id: 'settings', label: 'Settings', icon: 'shield', description: 'Manage your profile, public pages, privacy and checkout, or get support.', pages: [
     { id: 'details', label: 'Profile', to: '/admin/profile', icon: 'users' },
@@ -24,6 +23,7 @@ export const ADMIN_SECTIONS = [
     { id: 'visibility', label: 'Privacy', to: '/admin/settings?tab=privacy', icon: 'shield' },
     { id: 'payments', label: 'Payments', to: '/admin/settings?tab=payments', icon: 'box' },
     { id: 'support', label: 'Support', to: '/admin/support', icon: 'chat' },
+    { id: 'suggestions', label: 'Suggestions', to: '/admin/suggestions', icon: 'spark' },
   ] },
 ];
 export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', description: 'Support admins, manage sales and improve the main site.', adminOnly: true, pages: [
@@ -48,7 +48,7 @@ export function adminLocation(pathname, search = '') {
     writing: ['pipelines', 'content'], templates: ['pipelines', 'content'], topics: ['pipelines', 'content'],
     files: ['pipelines', 'files'], add: ['pipelines', 'files'], knowledge: ['pipelines', 'knowledge'],
     store: ['store', 'catalogue'], activity: ['activity', 'records'], updates: ['activity', 'records'], purchases: ['payments', 'settings'].includes(tab) ? ['settings', 'payments'] : ['inbox', 'purchases'], enquiries: tab === 'form' ? ['settings', 'editor'] : ['inbox', 'enquiries'], questions: ['inbox', 'questions'],
-    settings: ['settings', settingsPage], support: ['settings', 'support'], superadmin: ['platform', tab === 'invites' ? 'invites' : 'customers'], invites: ['community', 'invites'], suggestions: ['community', 'suggestions'], users: ['platform', 'customers'],
+    settings: ['settings', settingsPage], support: ['settings', 'support'], superadmin: ['platform', tab === 'invites' ? 'invites' : 'customers'], invites: ['community', 'invites'], suggestions: ['settings', 'suggestions'], users: ['platform', 'customers'],
   };
   if (!path.startsWith('/admin/') || !Object.hasOwn(routes, route)) return null;
   const [group, page] = routes[route];

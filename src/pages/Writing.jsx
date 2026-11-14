@@ -9,6 +9,7 @@ import { Confirm, Field, Loading, Notice, Pill } from '../components/Ui.jsx';
 import { TopicSelect } from '../components/Selects.jsx';
 import Icon from '../components/portfolio/Icon.jsx';
 import ContentNavigation from '../components/ContentNavigation.jsx';
+import FormDialog from '../components/FormDialog.jsx';
 import Topics from './Topics.jsx';
 import { CONTENT_TABS } from '../lib/contentNavigation.js';
 
@@ -19,8 +20,7 @@ const TOOLBAR = [
   ['blockquote', 'code-block', 'link', 'image'], ['clean'],
 ];
 
-function TemplateRow({ t, reload }) {
-  const nav = useNavigate();
+function TemplateRow({ t, reload, onCreateArticle }) {
   const [name, setName] = useState(t.name), [html, setHtml] = useState(t.html);
   const [source, setSource] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(''), [expanded, setExpanded] = useState(false);
   async function run(action) {
@@ -38,7 +38,7 @@ function TemplateRow({ t, reload }) {
         <Notice kind="error">{error}</Notice>
         <div className="row" style={{ marginTop: 8 }}>
           <button className="btn small" disabled={busy || !name.trim()} onClick={() => run(async () => { await api('templates.save', { id: t.id, name: name.trim(), html }); reload(); })}>Save template</button>
-          <button className="btn small primary" disabled={busy} onClick={() => run(async () => { const p = await api('posts.create', { html, templateId: t.id }); nav(`/admin/writing/${p.id}`); })}>Use for new article</button>
+          <button className="btn small primary" disabled={busy} onClick={() => onCreateArticle({ ...t, html })}>Use for new article</button>
           <Confirm label="Delete" warn="Delete this template? Existing articles will be kept." onConfirm={() => run(async () => { await api('templates.delete', { id: t.id }); reload(); })} />
         </div>
       </div>}
@@ -48,7 +48,7 @@ function TemplateRow({ t, reload }) {
 
 function ListView({ defaultTab = 'posts' }) {
   const nav = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const requestedTab = params.get('tab') || defaultTab;
   const tab = CONTENT_TABS.some(item => item.id === requestedTab) ? requestedTab : 'posts';
 
@@ -62,7 +62,9 @@ function ListView({ defaultTab = 'posts' }) {
   const { data: tpls, reload: reloadTpls, error: tplsError } = useOp('templates.list');
 
   const [selectedTpl, setSelectedTpl] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [selectedTopic, setSelectedTopic] = useState(() => idOrNull(params.get('topic')));
+  const [creating, setCreating] = useState(() => params.get('action') === 'add' ? 'post' : null);
+  const [startingTemplate, setStartingTemplate] = useState(null);
   const [searchPost, setSearchPost] = useState('');
 
   // New Template form
@@ -77,7 +79,7 @@ function ListView({ defaultTab = 'posts' }) {
     if (busy) return;
     setBusy(true); setOperationError('');
     try {
-      const t = tpls?.find(x => String(x.id) === String(tid));
+      const t = startingTemplate || tpls?.find(x => String(x.id) === String(tid));
       const post = await api('posts.create', { html: t?.html || '', topicId: selectedTopic, templateId: t?.id ?? null });
       nav(`/admin/writing/${post.id}`);
     } catch (e) { setOperationError(e.message); } finally { setBusy(false); }
@@ -92,6 +94,7 @@ function ListView({ defaultTab = 'posts' }) {
       await api('templates.save', { name: newTplName.trim(), html: newTplHtml });
       setNewTplName('');
       setNewTplHtml('');
+      setCreating(null);
       reloadTpls();
     } catch (error) { setOperationError(error.message); } finally { setBusy(false); }
   }
@@ -130,11 +133,12 @@ function ListView({ defaultTab = 'posts' }) {
       {/* TAB 1: POSTS & ARTICLES */}
       {tab === 'posts' && (
         <>
-          <section className="card row" style={{ alignItems: 'flex-end', background: '#fafbfc', border: '1px solid #e2e8f0' }}>
+          <button type="button" className="btn primary" onClick={() => { setOperationError(''); setStartingTemplate(null); setCreating('post'); }}>New article</button>
+          {creating === 'post' && <FormDialog title="New article" busy={busy} onClose={() => setCreating(null)}><form className="admin-create-form" onSubmit={event => { event.preventDefault(); createPost(); }}>
             <div className="grow">
               <label className="f" style={{ margin: 0 }}>
                 Starting template (optional)
-                <select value={tid ?? ''} onChange={e => setSelectedTpl(e.target.value)}>
+                <select value={tid ?? ''} onChange={e => { setSelectedTpl(e.target.value); setStartingTemplate(null); }}>
                   <option value="">Blank article</option>
                   {(tpls || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
@@ -143,10 +147,11 @@ function ListView({ defaultTab = 'posts' }) {
             <div className="grow">
               <TopicSelect label="Assign to Topic" value={selectedTopic} onChange={setSelectedTopic} topics={topics || []} />
             </div>
-            <button className="btn primary" onClick={createPost} disabled={busy}>
-              <Icon n="plus" size={18} />{busy ? 'Creating…' : 'New article'}
+            <Notice kind="error">{operationError}</Notice>
+            <button className="btn primary" disabled={busy}>
+              <Icon n="plus" size={18} />{busy ? 'Creating…' : 'Start writing'}
             </button>
-          </section>
+          </form></FormDialog>}
 
           <section className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -202,9 +207,9 @@ function ListView({ defaultTab = 'posts' }) {
 
       {/* TAB 2: ARTICLE TEMPLATES */}
       {tab === 'templates' && (
-        <div className="cols c12 content-templates">
-          <form className="card" onSubmit={saveNewTemplate}>
-            <h3>Create New Template</h3>
+        <div className="content-templates">
+          <button type="button" className="btn primary" onClick={() => { setOperationError(''); setCreating('template'); }}>New template</button>
+          {creating === 'template' && <FormDialog title="Create new template" busy={busy} onClose={() => setCreating(null)}><form onSubmit={saveNewTemplate}>
             <p className="muted" style={{ fontSize: '.86rem', margin: '0 0 14px' }}>
               Define reusable structures, section headings, or boilerplate for your future articles.
             </p>
@@ -229,7 +234,8 @@ function ListView({ defaultTab = 'posts' }) {
               />
             </Field> : <div className="quill-wrap" aria-label="New template content"><ReactQuill theme="snow" value={newTplHtml} onChange={setNewTplHtml} readOnly={busy} modules={{ toolbar: TOOLBAR }} placeholder="Add headings and prompts for your article…" /></div>}
             <button className="btn primary" disabled={busy || !newTplName.trim()}>{busy ? 'Saving…' : 'Save template'}</button>
-          </form>
+            <Notice kind="error">{operationError}</Notice>
+          </form></FormDialog>}
 
           <section className="card">
             <h3>Saved Templates ({tpls?.length || 0})</h3>
@@ -238,7 +244,7 @@ function ListView({ defaultTab = 'posts' }) {
             </p>
             {!tpls && <Loading error={tplsError} />}
             {tpls && !tpls.length && <p className="muted">No templates yet. Create an outline to reuse across your articles.</p>}
-            {tpls?.map(t => <TemplateRow key={`${t.id}-${t.name}`} t={t} reload={reloadTpls} />)}
+            {tpls?.map(t => <TemplateRow key={`${t.id}-${t.name}`} t={t} reload={reloadTpls} onCreateArticle={template => { setSelectedTpl(String(template.id)); setStartingTemplate(template); setOperationError(''); setCreating('post'); const next = new URLSearchParams(params); next.set('tab', 'posts'); setParams(next); }} />)}
           </section>
         </div>
       )}

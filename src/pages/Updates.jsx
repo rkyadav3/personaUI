@@ -10,6 +10,7 @@ import { fmtStamp, fromLocalInput, toLocalInput } from '../lib/when.js';
 import { normalizeEventForm, splitSchedule } from '../../shared/engage.js';
 import { Confirm, Field, Loading, Notice } from '../components/Ui.jsx';
 import MediaUpload, { UploadGroup } from '../components/MediaUpload.jsx';
+import FormDialog from '../components/FormDialog.jsx';
 
 const blank = kind => ({ kind, title: '', body: '', startsAt: '', endsAt: '', location: '', url: '', linkLabel: '', status: 'published', pinned: false });
 const COPY = {
@@ -18,9 +19,10 @@ const COPY = {
   event: { tab: 'Events', add: 'Add Event', empty: 'No events yet. Add an event and let visitors tell you whether they are coming.', hint: 'Events appear on your profile home page with a Going / Not going response form and attendance counts.' },
 };
 
-export function UpdateEditor({ item, onDone }) {
+export function UpdateEditor({ item, onDone, onBusy, dialog = false }) {
   const [f, setF] = useState({ ...blank(item.kind), ...item, rsvp: normalizeEventForm(item.rsvp), startsAt: toLocalInput(item.startsAt), endsAt: toLocalInput(item.endsAt) });
   const [err, setErr] = useState(''), [busy, setBusy] = useState(false), [uploading, setUploading] = useState(false);
+  useEffect(() => { onBusy?.(busy || uploading); }, [busy, uploading, onBusy]);
   const set = (k, v) => setF(p => ({ ...p, [k]: v }));
   const sched = f.kind !== 'update', event = f.kind === 'event';
   const form = patch => set('rsvp', { ...f.rsvp, ...patch });
@@ -31,7 +33,7 @@ export function UpdateEditor({ item, onDone }) {
     catch (ex) { setErr(ex.message); setBusy(false); }
   }
   return (
-    <form className="card inner" onSubmit={submit}>
+    <form className={dialog ? 'admin-create-form' : 'card inner'} onSubmit={submit}>
       <fieldset className="editor-fieldset" disabled={busy || uploading}>
       <Field label="Title *"><input type="text" required maxLength={120} value={f.title} onChange={e => set('title', e.target.value)} placeholder={sched ? 'e.g. Live Q&A on career switching' : 'e.g. My new book launches this month'} autoFocus /></Field>
       <Field label="Details"><textarea rows={4} maxLength={2000} value={f.body} onChange={e => set('body', e.target.value)} placeholder="What should visitors know?" /></Field>
@@ -96,6 +98,7 @@ function UpdatesContent({ embedded }) {
   const { data, error, reload } = useOp('updates.list');
   const [kind, setKind] = useAdminTab({ values: Object.keys(COPY), defaultValue: 'update', parameter: 'kind' });
   const [edit, setEdit] = useState(null), [msg, setMsg] = useState(null), [responses, setResponses] = useState(null);
+  const [editorBusy, setEditorBusy] = useState(false);
   useEffect(() => { setEdit(null); setMsg(null); setResponses(null); }, [kind]);
 
   const list = useMemo(() => {
@@ -121,7 +124,8 @@ function UpdatesContent({ embedded }) {
       <p className="hint" style={{ marginTop: 0 }}>{COPY[kind].hint}</p>
       <Notice kind={msg?.kind}>{msg?.t}</Notice>
 
-      {edit ? <UpdateEditor key={edit.id || 'new'} item={edit} onDone={done} /> : <button className="btn primary" onClick={() => { setMsg(null); setEdit(blank(kind)); }}>{COPY[kind].add}</button>}
+      <button className="btn primary" onClick={() => { setMsg(null); setEdit(blank(kind)); }}>{COPY[kind].add}</button>
+      {edit && <FormDialog title={edit.id ? `Edit ${COPY[edit.kind].tab.toLowerCase()}` : COPY[edit.kind].add} busy={editorBusy} onClose={() => setEdit(null)}><UpdateEditor dialog key={edit.id || 'new'} item={edit} onBusy={setEditorBusy} onDone={changed => { setEditorBusy(false); done(changed); }} /></FormDialog>}
 
       <section className="card" style={{ marginTop: 18 }}>
         {!list.length && <p className="muted">{COPY[kind].empty}</p>}

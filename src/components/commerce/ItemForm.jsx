@@ -7,7 +7,7 @@ import MediaUpload from '../MediaUpload.jsx';
 import { CHECKOUT_CURRENCIES } from '../../../shared/commerce.js';
 import { OFFERING_FIELDS } from '../../../shared/profileSchema.js';
 
-export default function ItemForm({ item, initialCategoryId, categories, version, onDone, onUploadingChange }) {
+export default function ItemForm({ item, initialCategoryId, categories, version, onDone, onUploadingChange, onBusyChange, dialog = false }) {
   const { user } = useAuth() || {};
   const draftKey = user?.id ? `${user.id}:store:${item ? `${item.kind}:${item.id}` : 'new'}` : null;
   const base = useRef({ title: '', description: '', contributionId: initialCategoryId || '', pricing: 'free', price: '', currency: 'INR', active: true, assetId: '', deliveryKind: 'file', ...item, details: item?.details || {} });
@@ -19,6 +19,7 @@ export default function ItemForm({ item, initialCategoryId, categories, version,
   const track = key => value => setPending(current => { const next = new Set(current); if (value) next.add(key); else next.delete(key); return next; });
   snapshot.current = { form, version: expectedVersion };
   useEffect(() => { onUploadingChange?.(uploading); }, [uploading, onUploadingChange]);
+  useEffect(() => { onBusyChange?.(busy || uploading); }, [busy, uploading, onBusyChange]);
   useEffect(() => {
     alive.current = true;
     const unload = event => { if (JSON.stringify(snapshot.current.form) !== JSON.stringify(base.current)) { event.preventDefault(); event.returnValue = ''; } };
@@ -36,8 +37,8 @@ export default function ItemForm({ item, initialCategoryId, categories, version,
     catch (failure) { if (alive.current) setError(failure.message); }
     finally { if (alive.current) setBusy(false); }
   }
-  return <form className="card item-form" onSubmit={save}>
-    <h2>{item ? 'Edit item' : 'Add item'}</h2>
+  return <form className={dialog ? 'item-form item-form-dialog' : 'card item-form'} onSubmit={save}>
+    {!dialog && <h2>{item ? 'Edit item' : 'Add item'}</h2>}
     {cached.current && <Notice>Your unsaved item draft was restored. Cancel discards it.</Notice>}
     <fieldset className="editor-fieldset" disabled={busy || uploading}>
       <div className="cols c2"><Field label="Item name"><input required maxLength={item?.kind === 'product' ? 80 : 160} value={form.title} onChange={event => patch({ title: event.target.value })} /></Field>

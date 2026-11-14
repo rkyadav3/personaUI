@@ -17,7 +17,7 @@ begin
   if new.owner_id is null or (tg_op='UPDATE' and new.owner_id is distinct from old.owner_id) then
     raise exception 'Account ownership cannot be changed.';
   end if;
-  foreach pair in array tg_argv loop
+  foreach pair in array coalesce(tg_argv, array[]::text[]) loop
     field_name:=split_part(pair,':',1); target_table:=split_part(pair,':',2); target_id:=values_json->>field_name;
     if target_id is not null then
       execute format('select exists(select 1 from public.%I where id::text=$1 and owner_id=$2)',target_table)

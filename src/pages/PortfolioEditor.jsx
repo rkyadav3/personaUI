@@ -195,14 +195,14 @@ function PortfolioEditorContent({ uploading }) {
             <p className="hint">Choose highlighted awards below. <Link to="/admin/activity?tab=awards&return=%2Fadmin%2Fsettings%3Ftab%3Dhero">Manage awards in Activity</Link>.</p>
             <section className="card"><h3>What I do (list right of your photo)</h3>
               <p className="hint">Empty = your expertise from Profile &amp; Offerings.</p>
-              <Repeater items={pf.domains} onChange={domains => set({ domains })} blank={{ label: '', icon: '' }} max={8} noun="Item" title={d => d.label || 'New item'}>
+              <Repeater validate={item => normalizePortfolio({ domains: [item] }).domains.length ? '' : 'Add the text for this item.'} items={pf.domains} onChange={domains => set({ domains })} blank={{ label: '', icon: '' }} max={8} noun="Item" title={d => d.label || 'New item'}>
                 {(d, p) => <div className="cols c2"><Txt label="Text" value={d.label} max={40} ph="AI / Machine Learning" onChange={v => p({ label: v })} />
                   <Field label="Icon"><select value={d.icon || ''} onChange={e => p({ icon: e.target.value })}><option value="">Automatic</option>{ICON_NAMES.map(n => <option key={n} value={n}>{n}</option>)}</select></Field></div>}
               </Repeater>
             </section>
             <section className="card"><h3>Social &amp; contact links (up to 7)</h3>
               <p className="hint">Your published email is added automatically if you don’t add one.</p>
-              <Repeater items={pf.socials} onChange={socials => set({ socials })} blank={{ kind: 'github', url: '' }} max={7} noun="Link" title={s => SOCIAL_KINDS[s.kind] || 'Link'}>
+              <Repeater validate={item => normalizePortfolio({ socials: [item] }).socials.length ? '' : 'Add a valid link.'} items={pf.socials} onChange={socials => set({ socials })} blank={{ kind: 'github', url: '' }} max={7} noun="Link" title={s => SOCIAL_KINDS[s.kind] || 'Link'}>
                 {(s, p) => <div className="cols c2"><Field label="Type"><select value={s.kind} onChange={e => p({ kind: e.target.value })}>{Object.entries(SOCIAL_KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
                   <Txt label="Link" value={s.url} ph="https://github.com/you" onChange={v => p({ url: v })} /></div>}
               </Repeater>
@@ -212,7 +212,7 @@ function PortfolioEditorContent({ uploading }) {
           {tab === 'numbers' && (
             <section className="card"><h3>Numbers under your photo (up to 4)</h3>
               <p className="hint">Leave this empty and they are worked out for you (years of experience, projects, products). Add your own to replace them.</p>
-              <Repeater items={pf.stats} onChange={stats => set({ stats })} blank={{ value: '', label: '' }} max={4} noun="Number" title={s => `${s.value || '…'} ${s.label}`}>
+              <Repeater validate={item => normalizePortfolio({ stats: [item] }).stats.length ? '' : 'Add a number or value.'} items={pf.stats} onChange={stats => set({ stats })} blank={{ value: '', label: '' }} max={4} noun="Number" title={s => `${s.value || '…'} ${s.label}`}>
                 {(s, p) => <div className="cols c2"><Txt label="Number" value={s.value} max={12} ph="10+" onChange={v => p({ value: v })} /><Txt label="Label" value={s.label} max={30} ph="Projects Built" onChange={v => p({ label: v })} /></div>}
               </Repeater>
             </section>

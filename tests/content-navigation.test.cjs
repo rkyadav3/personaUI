@@ -4,14 +4,15 @@ Module._extensions['.jsx'] = (module, file) => module._compile(transformSync(fs.
 Module._extensions['.css'] = () => {};
 const React = require('react'), { renderToStaticMarkup } = require('react-dom/server'), { MemoryRouter } = require('react-router-dom');
 
-test('Settings has no invitations or suggestions and Invite retains both destinations', async () => {
+test('Suggestions is the last Settings destination after Support and Invite contains only invitations', async () => {
   const { ADMIN_SECTIONS, adminLocation } = await import('../src/lib/adminNavigation.js');
   const settings = ADMIN_SECTIONS.find(section => section.id === 'settings');
-  assert.ok(settings.pages.every(page => !['invites', 'suggestions'].includes(page.id)));
-  assert.deepEqual(ADMIN_SECTIONS.find(section => section.id === 'community').pages.map(page => page.id), ['invites', 'suggestions']);
+  assert.ok(settings.pages.every(page => page.id !== 'invites'));
+  assert.deepEqual(settings.pages.slice(-2).map(page => page.id), ['support', 'suggestions']);
+  assert.deepEqual(ADMIN_SECTIONS.find(section => section.id === 'community').pages.map(page => page.id), ['invites']);
   assert.equal(ADMIN_SECTIONS.find(section => section.id === 'community').label, 'Invite');
   assert.deepEqual(adminLocation('/admin/invites'), { group: 'community', page: 'invites' });
-  assert.deepEqual(adminLocation('/admin/suggestions'), { group: 'community', page: 'suggestions' });
+  assert.deepEqual(adminLocation('/admin/suggestions'), { group: 'settings', page: 'suggestions' });
 });
 
 test('articles, templates and topics share one Content navigation destination', async () => {

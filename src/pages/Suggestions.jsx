@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { fmtDate } from '../lib/format.js';
 import { Field, Loading, Notice } from '../components/Ui.jsx';
 import { SUGGESTION_KINDS, SUGGESTION_STATUSES } from '../../shared/governance.js';
+import FormDialog from '../components/FormDialog.jsx';
 import '../styles/governance.css';
 export default function Suggestions() {
   const { user } = useAuth();
@@ -14,15 +15,17 @@ export default function Suggestions() {
 }
 export function SuggestionManager({ user, rows, reload }) {
   const [form, setForm] = useState({ kind: 'add', title: '', body: '' }), [busy, setBusy] = useState(false), [notice, setNotice] = useState(null), [filter, setFilter] = useState('all');
+  const [creating, setCreating] = useState(false);
   async function submit(event) {
     event.preventDefault(); setBusy(true); setNotice(null);
-    try { await api('suggestions.create', form); setForm({ kind: 'add', title: '', body: '' }); await reload(); setNotice({ kind: 'success', text: 'Your suggestion was sent to the platform owner.' }); }
+    try { await api('suggestions.create', form); setForm({ kind: 'add', title: '', body: '' }); setCreating(false); await reload(); setNotice({ kind: 'success', text: 'Your suggestion was sent to the platform owner.' }); }
     catch (error) { setNotice({ kind: 'error', text: error.message }); }
     finally { setBusy(false); }
   }
   const visible = rows.filter(row => filter === 'all' || row.status === filter);
   return <><h1>Platform suggestions</h1><p className="muted">{user?.isSuperAdmin ? 'Review what admins want to add, remove or improve. Share a response and update each suggestion’s status.' : 'Help improve the platform. Suggest something to add, remove or update, and follow the owner’s response.'}</p>{notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
-    {user?.isAdmin && !user.isSuperAdmin && <section className="card"><h2>Suggest an improvement</h2><form className="governance-form" onSubmit={submit}><div className="row"><Field label="Suggestion type"><select value={form.kind} onChange={event => setForm({ ...form, kind: event.target.value })}>{Object.entries(SUGGESTION_KINDS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field><Field label="Title"><input type="text" required maxLength={160} placeholder="What would make the platform better?" value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} /></Field></div><Field label="Description"><textarea required maxLength={5000} rows={4} placeholder="Explain the change and how it would help." value={form.body} onChange={event => setForm({ ...form, body: event.target.value })} /></Field><button className="btn primary" disabled={busy}>{busy ? 'Sending…' : 'Send suggestion'}</button></form></section>}
+    {user?.isAdmin && !user.isSuperAdmin && <button type="button" className="btn primary" onClick={() => setCreating(true)}>Suggest an improvement</button>}
+    {creating && <FormDialog title="Suggest an improvement" busy={busy} onClose={() => setCreating(false)}><form className="governance-form" onSubmit={submit}><div className="row"><Field label="Suggestion type"><select value={form.kind} onChange={event => setForm({ ...form, kind: event.target.value })}>{Object.entries(SUGGESTION_KINDS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></Field><Field label="Title"><input type="text" required maxLength={160} placeholder="What would make the platform better?" value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} /></Field></div><Field label="Description"><textarea required maxLength={5000} rows={4} placeholder="Explain the change and how it would help." value={form.body} onChange={event => setForm({ ...form, body: event.target.value })} /></Field><Notice kind="error">{notice?.kind === 'error' ? notice.text : ''}</Notice><div className="row"><button className="btn primary" disabled={busy}>{busy ? 'Sending…' : 'Send suggestion'}</button><button type="button" className="btn" onClick={() => setCreating(false)}>Cancel</button></div></form></FormDialog>}
     <section className="card"><div className="head"><h2>{user?.isSuperAdmin ? 'Suggestions from admins' : 'Your suggestions'}</h2><Field label="Filter status"><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">All statuses</option>{SUGGESTION_STATUSES.map(value => <option key={value}>{value}</option>)}</select></Field></div>{!visible.length && <p className="muted">No suggestions here yet.</p>}{visible.map(row => <Suggestion key={`${row.id}:${row.updated_at || ''}`} row={row} owner={user?.isSuperAdmin} reload={reload} />)}</section>
   </>;
 }

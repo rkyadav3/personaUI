@@ -25,5 +25,8 @@
     "react-router-dom": "^6.30.6",
     "unpdf": "^1.9.1",
     "vite": "^5.4.21"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16"
   }
 }
