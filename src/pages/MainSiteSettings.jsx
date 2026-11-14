@@ -7,10 +7,14 @@ import { Field, Loading, Notice } from '../components/Ui.jsx';
 import { HOME_DEFAULTS, HOME_TEXT_LIMITS, normalizeHomeSettings } from '../../shared/homeSettings.js';
 import '../styles/governance.css';
 import MainSitePreview from '../components/MainSitePreview.jsx';
+import { useSearchParams } from 'react-router-dom';
+import AccountSettings from '../components/AccountSettings.jsx';
 
 const labels = { siteName: 'Site name', eyebrow: 'Intro label', headline: 'Headline opening', highlight: 'Highlighted words', headlineEnd: 'Headline ending', subtitle: 'Intro description', searchPlaceholder: 'Search placeholder', profilesTitle: 'Profiles section title', profilesDescription: 'Profiles section description', productsTitle: 'Products section title', footer: 'Footer text' };
 export default function MainSiteSettings() {
   const { user } = useAuth();
+  const [params] = useSearchParams();
+  if (user?.isSuperAdmin && params.get('tab') === 'account') return <AccountSettings />;
   return user?.isSuperAdmin ? <SettingsLoader /> : <Notice kind="error">Only the SuperAdmin can edit the main site.</Notice>;
 }
 function SettingsLoader() {

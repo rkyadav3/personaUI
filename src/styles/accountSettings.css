@@ -1,0 +1,8 @@
+.account-settings { max-width: 760px; }
+.account-setting-section { padding: 24px 0; border-top: 1px solid var(--border, #d8e1dc); }
+.account-setting-section h2 { margin: 0 0 8px; }
+.account-setting-section > p { max-width: 65ch; margin: 0 0 16px; }
+.account-setting-section form { margin-top: 20px; }
+.account-profile-address { overflow-wrap: anywhere; }
+.account-setting-section input::placeholder { color: #53635a; opacity: 1; }
+@media (max-width: 600px) { .account-setting-section .cols.c2 { grid-template-columns: 1fr; } }

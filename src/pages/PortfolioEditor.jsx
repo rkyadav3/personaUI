@@ -182,8 +182,8 @@ function PortfolioEditorContent({ uploading }) {
             <section className="card"><h3>Top of the home page</h3>
               <p className="hint">Leave a field empty to use a default made from your profile.</p>
               <div className="cols c2"><Txt label="Small greeting" value={pf.greeting} max={30} ph="Hi I’m" onChange={v => set({ greeting: v })} /><Txt label="Name shown" value={pf.heroName} max={60} ph={real.name?.split(' ')[0] || 'Your name'} onChange={v => set({ heroName: v })} /></div>
-              <Txt label="Big italic line" value={pf.titleLine} max={70} ph={real.designation || 'Product & AI Builder'} onChange={v => set({ titleLine: v })} />
-              <Txt label="Short intro (left of your photo)" value={pf.bio} max={320} rows={3} ph="I build AI products, intelligent systems and automation solutions that solve real-world problems." onChange={v => set({ bio: v })} />
+              <Txt label="Main introduction heading" value={pf.titleLine} max={70} ph="Your role or headline" onChange={v => set({ titleLine: v })} />
+              <Txt label="Short introduction" value={pf.bio} max={320} rows={3} ph="Describe yourself and what you offer" onChange={v => set({ bio: v })} />
               <Txt label="Brand text in the top bar" value={pf.brand} max={40} ph={real.name || ''} onChange={v => set({ brand: v })} />
               <label className="toggle"><input type="checkbox" checked={pf.availability.show} onChange={e => setIn('availability', { show: e.target.checked })} /> Show an availability badge</label>
               {pf.availability.show && <Txt label="Badge text" value={pf.availability.text} max={60} ph="Available for new opportunities" onChange={v => setIn('availability', { text: v })} />}
@@ -196,7 +196,7 @@ function PortfolioEditorContent({ uploading }) {
             <section className="card"><h3>What I do (list right of your photo)</h3>
               <p className="hint">Empty = your expertise from Profile &amp; Offerings.</p>
               <Repeater validate={item => normalizePortfolio({ domains: [item] }).domains.length ? '' : 'Add the text for this item.'} items={pf.domains} onChange={domains => set({ domains })} blank={{ label: '', icon: '' }} max={8} noun="Item" title={d => d.label || 'New item'}>
-                {(d, p) => <div className="cols c2"><Txt label="Text" value={d.label} max={40} ph="AI / Machine Learning" onChange={v => p({ label: v })} />
+                {(d, p) => <div className="cols c2"><Txt label="Text" value={d.label} max={40} ph="Your area of expertise" onChange={v => p({ label: v })} />
                   <Field label="Icon"><select value={d.icon || ''} onChange={e => p({ icon: e.target.value })}><option value="">Automatic</option>{ICON_NAMES.map(n => <option key={n} value={n}>{n}</option>)}</select></Field></div>}
               </Repeater>
             </section>
@@ -213,7 +213,7 @@ function PortfolioEditorContent({ uploading }) {
             <section className="card"><h3>Numbers under your photo (up to 4)</h3>
               <p className="hint">Leave this empty and they are worked out for you (years of experience, projects, products). Add your own to replace them.</p>
               <Repeater validate={item => normalizePortfolio({ stats: [item] }).stats.length ? '' : 'Add a number or value.'} items={pf.stats} onChange={stats => set({ stats })} blank={{ value: '', label: '' }} max={4} noun="Number" title={s => `${s.value || '…'} ${s.label}`}>
-                {(s, p) => <div className="cols c2"><Txt label="Number" value={s.value} max={12} ph="10+" onChange={v => p({ value: v })} /><Txt label="Label" value={s.label} max={30} ph="Projects Built" onChange={v => p({ label: v })} /></div>}
+                {(s, p) => <div className="cols c2"><Txt label="Number" value={s.value} max={12} ph="Your value" onChange={v => p({ value: v })} /><Txt label="Label" value={s.label} max={30} ph="What this value represents" onChange={v => p({ label: v })} /></div>}
               </Repeater>
             </section>
           )}
@@ -223,7 +223,7 @@ function PortfolioEditorContent({ uploading }) {
             <section className="card"><h3>About section on Home</h3>
               <Txt label="Page heading" value={pf.about.title} max={60} ph={`About ${real.name?.split(' ')[0] || 'me'}`} onChange={v => setIn('about', { title: v })} />
               <Txt label="Your story (blank line = new paragraph)" value={pf.about.body} max={3000} rows={9} hint={`Empty = your “purpose” from Profile & Offerings.`} onChange={v => setIn('about', { body: v })} />
-              <Txt label="Extra skills (comma separated)" value={pf.about.skills} max={400} ph="Python, React, Arduino" hint="Added to your expertise from Profile & Offerings." onChange={v => setIn('about', { skills: v })} />
+              <Txt label="Extra skills (comma separated)" value={pf.about.skills} max={400} ph="Your skills, separated by commas" hint="Added to your expertise from Profile & Offerings." onChange={v => setIn('about', { skills: v })} />
             </section>
           )}
 
@@ -233,7 +233,7 @@ function PortfolioEditorContent({ uploading }) {
               <div className="cols c2">{PUBLIC_NAV_PAGES.map(k => <Txt key={k} label={PAGE_LABELS[k]} value={pf.navLabels[k]} max={16} ph={PAGE_LABELS[k]} onChange={v => setIn('navLabels', { [k]: v })} />)}</div>
             </section>
             <section className="card"><h3>Footer</h3>
-              <Txt label="Footer line" value={pf.footerNote} max={120} ph="Building things that matter." onChange={v => set({ footerNote: v })} />
+              <Txt label="Footer line" value={pf.footerNote} max={120} ph="Your footer text (optional)" onChange={v => set({ footerNote: v })} />
             </section>
           </>}
           </div>

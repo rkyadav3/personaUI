@@ -1,8 +1,8 @@
 export const HOME_DEFAULTS = {
-  siteName: '', eyebrow: 'CREATIVE & TECHNOLOGY LEADERS', headline: 'Meet industry’s', highlight: 'top-rated', headlineEnd: 'professionals',
-  subtitle: 'Discover experts, builders and thought leaders. Explore their work and find your next collaboration.',
-  searchPlaceholder: 'Search profiles, expertise, or industries…', profilesTitle: '', profilesDescription: '', productsTitle: 'Top Products',
-  footer: 'Discover people. Explore possibilities.', accent: '#168032', background: '#ffffff', showFeatured: true, showProducts: true, showInviteLink: true, defaultSort: 'rated',
+  siteName: '', eyebrow: '', headline: 'Explore', highlight: 'profiles', headlineEnd: '',
+  subtitle: 'Browse profiles and discover what they offer.',
+  searchPlaceholder: 'Search profiles, expertise, or industries…', profilesTitle: '', profilesDescription: '', productsTitle: 'Store items',
+  footer: '', accent: '#168032', background: '#ffffff', showFeatured: true, showProducts: true, showInviteLink: true, defaultSort: 'rated',
 };
 export const HOME_TEXT_LIMITS = { siteName: 80, eyebrow: 100, headline: 100, highlight: 80, headlineEnd: 100, subtitle: 400, searchPlaceholder: 120, profilesTitle: 100, profilesDescription: 300, productsTitle: 100, footer: 200 };
 export function normalizeHomeSettings(input = {}) {

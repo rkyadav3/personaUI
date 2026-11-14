@@ -78,7 +78,7 @@ test('read snapshots cover retained offerings and Event responses while omitting
     offerings: [{ id: 4, contribution_id: 3, title: 'Book', delivery_url: 'https://example.test/access', active: true }],
     event_responses: [{ id: 8, event_id: 9, name: 'Visitor', response: 'going', token_hash: 'secret' }],
   };
-  const service = createStudioOperations({ rows: async (_, table) => values[table] || [], engage: { listUpdates: async () => [{ id: 9, kind: 'event', title: 'Meetup' }], listEnquiries: async () => ({ rows: [{ id: 10, name: 'Visitor', status: 'new' }] }) } });
+  const service = createStudioOperations({ site: { getSettings: async () => ({ page: { currency: 'INR' } }) }, rows: async (_, table) => values[table] || [], engage: { listUpdates: async () => [{ id: 9, kind: 'event', title: 'Meetup' }], listEnquiries: async () => ({ rows: [{ id: 10, name: 'Visitor', status: 'new' }] }) } });
   const state = await service.read(ctx(), ['profile', 'offerings', 'responses', 'enquiries']);
   assert.equal(state.profile, null); assert.equal(state.offerings[0].contributionId, 3); assert.equal(state.offerings[0].deliveryUrl, undefined); assert.equal(state.responses[0].eventId, 9); assert.equal(state.enquiries[0].status, 'new'); assert.doesNotMatch(JSON.stringify(state), /token_hash|secret/);
 });

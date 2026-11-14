@@ -32,7 +32,8 @@ window.fixturePreviewError = fixtureParams.get('previewError') === '1';
 
 async function operation(op, args) {
   switch (op) {
-    case 'items.list': return { items: storeItems, categories: storeCategories, version: 'fixture-version' };
+    case 'items.list': return { items: storeItems, categories: storeCategories, currency: page.page.currency, version: 'fixture-version' };
+    case 'items.currency': { page.page = { ...page.page, currency: args.currency }; if (args.applyToItems) storeItems = storeItems.map(item => ({ ...item, currency: args.currency })); return page; }
     case 'items.save': { const existing = storeItems.find(item => String(item.id) === String(args.id)); if (existing) Object.assign(existing, args); else storeItems.push({ ...args, id: nextId++, categoryName: storeCategories.find(value => String(value.id) === String(args.contributionId))?.category || 'Uncategorized' }); return {}; }
     case 'items.delete': storeItems = storeItems.filter(value => String(value.id) !== String(args.id)); return {};
     case 'contributions.save': { const existing = storeCategories.find(value => String(value.id) === String(args.id)); if (existing) Object.assign(existing, args); else storeCategories.push({ ...args, id: nextId++, enabled: true, visible: true, offerings: [] }); return {}; }

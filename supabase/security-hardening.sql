@@ -17,7 +17,8 @@ begin
   if p_matched is true then
     update public.users set failed_attempts=0,locked_until=null where id=p_user;
     return jsonb_build_object('status','authenticated','user',jsonb_build_object(
-      'id',current_user_row.id,'email',current_user_row.email,'name',current_user_row.name,'slug',current_user_row.slug,'tags',current_user_row.tags
+      'id',current_user_row.id,'email',current_user_row.email,'name',current_user_row.name,'slug',current_user_row.slug,'tags',current_user_row.tags,
+      'session_version',coalesce((to_jsonb(current_user_row)->>'session_version')::bigint,0),'slug_changed_at',to_jsonb(current_user_row)->'slug_changed_at'
     ));
   end if;
   failures := coalesce(current_user_row.failed_attempts,0)+1;

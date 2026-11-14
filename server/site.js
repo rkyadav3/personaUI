@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { BG_BUCKET, normalizeBg } from '../shared/siteSettings.js';
 import { normalizePage } from '../shared/pageSettings.js';
 import { normalizePortfolio } from '../shared/portfolio.js';
+import { CHECKOUT_CURRENCIES } from '../shared/commerce.js';
 import { env } from './config.js';
 import { raw, run } from './supabase.js';
 import { canViewProfile } from '../shared/governance.js';
@@ -43,10 +44,18 @@ export function saveSettings(db, { bg, path }, storageOverride) {
 }
 
 /** Save the look of the public profile page (/p/<slug>), and optionally switch its hero photo (the old file is deleted). */
-export async function savePage(db, { page, portfolio, portfolioPatch, heroPath, bg, path, expectedVersion }, storageOverride) {
+export async function savePage(db, { page, portfolio, portfolioPatch, heroPath, bg, path, expectedVersion, applyItemCurrency = false }, storageOverride) {
   const cur = await row(db);
   const conflict = () => { throw new HttpError(409, 'Your settings changed in another editor or assistant review. Reload the latest settings and review your changes again.'); };
   if (expectedVersion !== undefined && expectedVersion !== (cur?.updated_at || null)) conflict();
+  if (applyItemCurrency === true) {
+    const currency = String(page?.currency || '').trim().toUpperCase();
+    if (!CHECKOUT_CURRENCIES.includes(currency)) throw new HttpError(400, 'Choose a supported Store currency.');
+    if (expectedVersion === undefined || portfolio !== undefined || portfolioPatch !== undefined || heroPath !== undefined || bg !== undefined || path !== undefined || Object.keys(page || {}).some(key => key !== 'currency')) throw new HttpError(400, 'Apply Store currency separately from other page changes.');
+    const { error } = await db.rpc('save_store_currency', { p_owner: db.uid, p_currency: currency, p_expected_version: expectedVersion });
+    if (error) throw new HttpError(error.message?.includes('changed') ? 409 : 500, error.message || 'Store currency could not be saved.');
+    return getSettings(db);
+  }
   if (portfolioPatch !== undefined) {
     if (!portfolioPatch || typeof portfolioPatch !== 'object' || Array.isArray(portfolioPatch) || Object.keys(portfolioPatch).some(key => !Object.hasOwn(normalizePortfolio(), key))) throw new HttpError(400, 'Unknown portfolio field.');
     portfolio = { ...cur?.portfolio, ...portfolioPatch };

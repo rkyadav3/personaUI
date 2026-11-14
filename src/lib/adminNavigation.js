@@ -18,6 +18,7 @@ export const ADMIN_SECTIONS = [
     { id: 'invites', label: 'Invite links', to: '/admin/invites', icon: 'email' },
   ] },
   { id: 'settings', label: 'Settings', icon: 'shield', description: 'Manage your profile, public pages, privacy and checkout, or get support.', pages: [
+    { id: 'account', label: 'Account', to: '/admin/settings?tab=account', icon: 'shield' },
     { id: 'details', label: 'Profile', to: '/admin/profile', icon: 'users' },
     { id: 'editor', label: 'Public page editor', to: '/admin/settings', icon: 'template' },
     { id: 'visibility', label: 'Privacy', to: '/admin/settings?tab=privacy', icon: 'shield' },
@@ -34,15 +35,17 @@ export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', descrip
   { id: 'suggestions', label: 'Suggestions', to: '/superadmin/suggestions', icon: 'spark' },
   { id: 'support', label: 'Support', to: '/superadmin/support', icon: 'chat' },
   { id: 'settings', label: 'Main site settings', to: '/superadmin/settings', icon: 'template' },
+  { id: 'account', label: 'Account settings', to: '/superadmin/settings?tab=account', icon: 'shield' },
 ] };
 
 export function adminLocation(pathname, search = '') {
   const path = pathname.replace(/\/+$/, ''), tab = new URLSearchParams(search).get('tab');
+  if (path === '/superadmin/settings' && tab === 'account') return { group: 'platform', page: 'account' };
   if (path === '/superadmin' || path.startsWith('/superadmin/')) return { group: 'platform', page: SUPERADMIN_SECTION.pages.find(page => page.to === path || (page.id === 'support' && path.startsWith(`${page.to}/`)))?.id || 'dashboard' };
   if (path === '/admin') return { group: 'overview', page: 'overview' };
   const route = path.split('/')[2];
   const settingsTab = readSettingsTab(tab);
-  const settingsPage = settingsTab === 'privacy' ? 'visibility' : settingsTab === 'payments' ? 'payments' : 'editor';
+  const settingsPage = settingsTab === 'account' ? 'account' : settingsTab === 'privacy' ? 'visibility' : settingsTab === 'payments' ? 'payments' : 'editor';
   const routes = {
     portfolio: ['settings', settingsPage], page: ['settings', 'editor'], profile: tab === 'contrib' ? ['store', 'catalogue'] : tab === 'visibility' ? ['settings', 'visibility'] : ['settings', 'details'],
     writing: ['pipelines', 'content'], templates: ['pipelines', 'content'], topics: ['pipelines', 'content'],

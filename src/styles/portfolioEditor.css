@@ -11,3 +11,6 @@
 .portfolio-swatches{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}.portfolio-swatches button{border:3px solid #fff;border-radius:50%;width:35px;height:35px;cursor:pointer;box-shadow:0 0 0 1px #deebe1}.portfolio-swatches button[aria-pressed=true]{box-shadow:0 0 0 2px #0a973e}.portfolio-checks{display:grid;gap:10px;margin:15px 0}.portfolio-bg-thumbnail{width:100%;max-height:180px;object-fit:cover;border-radius:12px;margin:0 0 10px}.portfolio-question{border-top:1px solid #e2ede5;margin-top:12px;padding:12px 0}
 @media(max-width:1200px){.pp-editor{grid-template-columns:1fr}.pp-prev{position:static}.pp-prev-box .pf{min-height:750px}}
 @media(max-width:760px){.portfolio-editor .head{display:block}.portfolio-editor .head .row{margin-top:16px}.portfolio-areas .pp-tabs{gap:6px}.portfolio-areas .pp-tabs button{padding:9px 12px;font-size:.82rem}.pp-tabs button{min-height:40px;padding:8px 12px}.pp-editor{gap:22px}}
+.store-currency-settings summary { cursor: pointer; font-weight: 600; }
+.store-currency-settings form { margin-top: 18px; }
+.store-currency-settings p { max-width: 65ch; }

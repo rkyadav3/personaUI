@@ -3,12 +3,12 @@ import { getSettings, savePage } from './site.js';
 import { getProfile, saveOffering, deleteOffering } from './profile.js';
 import { HttpError } from './http.js';
 import { randomUUID } from 'node:crypto';
-import { normalizeQuantity } from '../shared/commerce.js';
+import { normalizeQuantity, CHECKOUT_CURRENCIES } from '../shared/commerce.js';
 
 export async function listItems(db) {
   const [site, profile] = await Promise.all([getSettings(db), getProfile(db)]);
   const categories = profile.contributions || [];
-  return { version: site.version, categories, items: [
+  return { version: site.version, currency: site.page.currency, categories, items: [
     ...site.portfolio.products.map(item => ({ ...item, kind: 'product', description: item.summary, price: item.amount, categoryName: item.category || 'Uncategorized', active: true })),
     ...categories.flatMap(category => (category.offerings || []).map(item => ({ ...item, kind: 'offering', contributionId: category.id, categoryName: category.subtype || category.category, assetId: item.delivery_asset_id || '', deliveryKind: item.delivery_kind || 'file', deliveryUrl: item.delivery_url || '', expectedItemVersion: item.updated_at }))),
   ] };
@@ -35,4 +35,12 @@ export async function deleteItem(db, input) {
   const site = await getSettings(db);
   if (input.expectedVersion !== site.version) throw new HttpError(409, 'Store content changed. Reload before deleting.');
   await savePage(db, { portfolioPatch: { products: site.portfolio.products.filter(item => item.id !== input.id) }, expectedVersion: site.version });
+}
+
+export async function saveStoreCurrency(db, { currency, applyToItems = false, expectedVersion }) {
+  currency = String(currency || '').trim().toUpperCase();
+  if (!CHECKOUT_CURRENCIES.includes(currency) || typeof applyToItems !== 'boolean') throw new HttpError(400, 'Choose a supported Store currency.');
+  const site = await getSettings(db);
+  if (expectedVersion !== site.version) throw new HttpError(409, 'Store settings changed. Reload before saving.');
+  return savePage(db, { page: applyToItems ? { currency } : { ...site.page, currency }, expectedVersion, applyItemCurrency: applyToItems === true });
 }

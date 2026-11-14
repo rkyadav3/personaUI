@@ -12,7 +12,7 @@ import { createActivityService } from './adminActivity.js';
 const lazy = path => new Proxy({}, { get: (_, key) => async (...args) => (await import(path))[key](...args) });
 const fields = (row, keys) => Object.fromEntries(keys.split(' ').filter(key => Object.hasOwn(row || {}, key)).map(key => [key, row[key]]));
 const identity = ctx => { if (!ctx?.user?.id || ctx.db?.uid !== ctx.user.id) throw new HttpError(401, 'Your signed-in identity and tenant scope must agree.'); };
-const dependencies = { customization: ['offerings'], products: ['assets'], files: ['folders', 'topics'], folders: ['files'], topics: ['files', 'posts'], posts: ['topics', 'templates'], templates: ['topics'], offerings: ['contributions', 'assets'], contributions: ['offerings'], updates: ['responses'], responses: ['updates'] };
+const dependencies = { customization: ['offerings'], products: ['assets'], files: ['folders', 'topics'], folders: ['files'], topics: ['files', 'posts'], posts: ['topics', 'templates'], templates: ['topics'], offerings: ['contributions', 'assets', 'settings'], contributions: ['offerings'], updates: ['responses'], responses: ['updates'] };
 
 /** The assistant can only call this fixed set of existing, owner-scoped admin services. */
 export function createStudioOperations({ store = storeDefault, profile = profileDefault, site = siteDefault, engage = engageDefault, events = eventsDefault, commerce = commerceDefault, invites = lazy('./invites.js'), indexer = lazy('./indexer.js'), rows = paged } = {}) {

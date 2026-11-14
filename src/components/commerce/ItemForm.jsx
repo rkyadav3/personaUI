@@ -7,10 +7,10 @@ import MediaUpload from '../MediaUpload.jsx';
 import { CHECKOUT_CURRENCIES, MAX_QUANTITY } from '../../../shared/commerce.js';
 import { OFFERING_FIELDS } from '../../../shared/profileSchema.js';
 
-export default function ItemForm({ item, initialCategoryId, categories, version, onDone, onUploadingChange, onBusyChange, dialog = false }) {
+export default function ItemForm({ item, initialCategoryId, defaultCurrency = 'INR', categories, version, onDone, onUploadingChange, onBusyChange, dialog = false }) {
   const { user } = useAuth() || {};
   const draftKey = user?.id ? `${user.id}:store:${item ? `${item.kind}:${item.id}` : 'new'}` : null;
-  const base = useRef({ title: '', description: '', contributionId: initialCategoryId || '', pricing: 'free', price: '', currency: 'INR', active: true, assetId: '', deliveryKind: 'file', ...item, details: item?.details || {} });
+  const base = useRef({ title: '', description: '', contributionId: initialCategoryId || '', pricing: 'unspecified', price: '', active: true, assetId: '', deliveryKind: 'file', ...item, currency: item?.currency || defaultCurrency, details: item?.details || {} });
   const cached = useRef(readEditorDraft(draftKey));
   const [form, setForm] = useState(() => cached.current?.form || base.current);
   const expectedVersion = cached.current ? cached.current.version : version;
@@ -47,7 +47,7 @@ export default function ItemForm({ item, initialCategoryId, categories, version,
       <MediaUpload label="Cover image" accept="image/jpeg,image/png,image/webp,image/gif" value={item?.kind === 'product' ? form.image : form.details.cover_image} onBusy={track('cover')} onChange={value => item?.kind === 'product' ? patch({ image: value }) : setForm(current => ({ ...current, details: { ...current.details, cover_image: value } }))} />
       <div className="cols c2"><Field label="Price type"><select value={form.pricing} onChange={event => patch({ pricing: event.target.value })}><option value="free">Free</option><option value="paid">Paid</option><option value="unspecified">Information only</option></select></Field>
         {['free', 'paid'].includes(form.pricing) && <Field label="Delivery"><select value={form.deliveryKind} onChange={event => patch({ deliveryKind: event.target.value, ...(event.target.value === 'service' ? { assetId: '' } : {}) })}><option value="file">Download a file</option><option value="service">Service / booking</option></select></Field>}</div>
-      {form.pricing === 'paid' && <div className="cols c2"><Field label="Price"><input type="number" required min="0.01" step="0.01" value={form.price ?? ''} onChange={event => patch({ price: event.target.value })} /></Field><Field label="Currency"><select value={form.currency || 'INR'} onChange={event => patch({ currency: event.target.value })}>{CHECKOUT_CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></Field></div>}
+      {form.pricing === 'paid' && <div className="cols c2"><Field label="Price"><input type="number" required min="0.01" step="0.01" value={form.price ?? ''} onChange={event => patch({ price: event.target.value })} /></Field><Field label="Currency"><select aria-label="Currency" value={form.currency || 'INR'} onChange={event => patch({ currency: event.target.value })}>{CHECKOUT_CURRENCIES.map(code => <option key={code}>{code}</option>)}</select></Field></div>}
       <Field label="Available quantity (optional)"><input aria-label="Available quantity (optional)" type="number" min={0} max={MAX_QUANTITY} step={1} value={form.quantity ?? ''} placeholder="Unlimited" onChange={event => patch({ quantity: event.target.value })} /><span className="hint">Leave blank for unlimited stock or slots. Zero means sold out. Pending checkouts reserve one unit.</span></Field>
       {['free', 'paid'].includes(form.pricing) && (form.deliveryKind === 'file' ? <MediaUpload purpose="delivery" label="Private delivery file" value={form.assetId} onBusy={track('delivery')} onChange={assetId => patch({ assetId })} /> : <p className="hint">Checkout records the booking. Arrange and track delivery with the buyer from Inbox → Purchases.</p>)}
       {item?.deliveryUrl && !form.assetId && <Notice>Replace the previous access link with a file uploaded here. Existing purchase receipts remain available.</Notice>}

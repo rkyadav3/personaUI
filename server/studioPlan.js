@@ -163,7 +163,7 @@ export function studioModelContext(state, entities, user) {
     const references = Object.fromEntries((referenceRoots[name] || []).map(root => [root, (state[root] || []).slice(0, 80).map(row => fieldsOf(row, ['id', 'name', 'title', 'category', 'subtype', 'eventId', 'purpose', 'mime']))]));
     if (name === 'customization') { const choices = customizationReferences(state.settings?.portfolio, state.offerings); references.store = choices.homeFeaturedItems; references.awards = choices.homeAwards; }
 
-    return [name, { total: rows.length, references, records: rows.slice(0, 80).map(row => {
+    return [name, { total: rows.length, references, ...(['products', 'offerings'].includes(name) ? { defaultCurrency: normalizePage(state.settings?.page).currency } : {}), records: rows.slice(0, 80).map(row => {
       const readFields = {
         files: ['mime', 'size'],
         purchases: ['buyer', 'amount', 'currency', 'kind', 'itemId', 'refundedAmount', 'createdAt', 'paidAt', 'paymentId', 'orderId'],
@@ -272,7 +272,7 @@ export function makeStudioPlan(proposal, input, user) {
         if (mode === 'create' && list.length >= ARRAYS[name]) fail(`This section is full (${ARRAYS[name]} items).`);
         if (mode === 'delete') { list.splice(index, 1); arrayTargets[name].splice(index, 1); }
         else {
-          const merged = studioMerge(before || (name === 'products' ? { pricing: 'unspecified', currency: 'INR' } : {}), values);
+          const merged = studioMerge(before || (name === 'products' ? { pricing: 'unspecified', currency: normalizePage(state.settings?.page).currency } : {}), values);
           if (STABLE_ARRAYS.has(name)) merged.id = before?.id || randomUUID();
           if (name === 'products') { price(merged, 'amount'); if (owns(values, 'assetId') && values.assetId) { expected('assets'); reference(state, 'assets', values.assetId); if (state.assets.find(row => row.id === values.assetId)?.purpose !== 'delivery') fail('Choose a private delivery file from this account.'); } }
           if (name === 'projects' && merged.featured) list.forEach(row => { row.featured = false; });
@@ -376,7 +376,9 @@ export function makeStudioPlan(proposal, input, user) {
       after.contributionId = reference(state, 'contributions', after.contributionId); if (!after.contributionId) fail('Choose your offering category first.');
       const cleanText = (value, max) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
       after.title = cleanText(after.title, 160); after.description = typeof after.description === 'string' ? after.description.replace(/\r\n?/g, '\n').trim().slice(0, 1500) : '';
-      requireText(after.title, 'Item title'); price(after, 'price'); delete after.deliveryUrl; after.currency = String(after.currency || 'INR').toUpperCase();
+      requireText(after.title, 'Item title'); price(after, 'price'); delete after.deliveryUrl;
+      if (!after.currency) expected('settings');
+      after.currency = String(after.currency || normalizePage(state.settings?.page).currency).toUpperCase();
       after.quantity = normalizeQuantity(after.quantity);
       if (owns(values, 'assetId') && values.assetId) { expected('assets'); reference(state, 'assets', values.assetId); if (state.assets.find(row => row.id === values.assetId)?.purpose !== 'delivery') fail('Choose a private delivery file from this account.'); }
       if (after.deliveryKind && !['file', 'service'].includes(after.deliveryKind)) fail('Choose file or service delivery.');

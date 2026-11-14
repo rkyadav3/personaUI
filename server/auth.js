@@ -68,7 +68,10 @@ export const publicUser = u => ({
   isAdmin: !isSuperAdminEmail(u.email),
   isSuperAdmin: isSuperAdminEmail(u.email),
   role: isSuperAdminEmail(u.email) ? 'superadmin' : 'admin',
-  tags: u.tags || []
+  tags: u.tags || [],
+  sessionVersion: Number(u.session_version || 0),
+  userIdChangedAt: u.slug_changed_at || null,
+  userIdNextChangeAt: u.slug_changed_at ? new Date(Date.parse(u.slug_changed_at) + 14 * 86400000).toISOString() : null,
 });
 
 export async function register({ name, email, password = '', confirm, invite }) {
@@ -123,20 +126,21 @@ export async function login({ email, password = '' }, db = raw()) {
 
 // ---- session cookie ----
 export async function startSession(res, user) {
-  const jwt = await new SignJWT({ email: user.email, name: user.name, slug: user.slug })
+  const jwt = await new SignJWT({ email: user.email, name: user.name, slug: user.slug, sessionVersion: user.sessionVersion || 0 })
     .setProtectedHeader({ alg: 'HS256' }).setSubject(user.id).setIssuedAt().setExpirationTime(`${MAX_AGE}s`).sign(secretKey());
   const secure = process.env.VERCEL || process.env.NODE_ENV === 'production' ? '; Secure' : '';
   res.setHeader('Set-Cookie', `${COOKIE}=${jwt}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${MAX_AGE}${secure}`);
 }
 export const endSession = res => res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`);
 
-export async function sessionUser(req) {
+export async function sessionUser(req, database) {
   const m = (req.headers.cookie || '').match(new RegExp(`(?:^|; )${COOKIE}=([^;]+)`));
   if (!m) return null;
   try {
     const { payload } = await jwtVerify(m[1], secretKey());
-    const [u] = await run(raw().from('users').select('*').eq('id', payload.sub));   // re-read so deleted users lose access at once
+    const [u] = await run((database || raw()).from('users').select('*').eq('id', payload.sub));   // re-read so deleted users lose access at once
     if (!u) return null;
+    if (Number(payload.sessionVersion || 0) !== Number(u.session_version || 0)) return null;
     const locked = parse(u.locked_until);
     if (locked && locked > now()) return null;
     return publicUser(u);

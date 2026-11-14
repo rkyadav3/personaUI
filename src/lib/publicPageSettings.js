@@ -12,7 +12,7 @@ export const EDITOR_PREVIEW = { hero: 'home', numbers: 'home', about: 'home', pr
 export function readSettingsTab(value) {
   if (value === 'visibility') return 'privacy';
   if (value === 'settings') return 'payments';
-  if (value === 'privacy' || value === 'payments' || Object.hasOwn(EDITOR_PREVIEW, value)) return value;
+  if (value === 'account' || value === 'privacy' || value === 'payments' || Object.hasOwn(EDITOR_PREVIEW, value)) return value;
   return 'hero';
 }
 

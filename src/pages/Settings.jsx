@@ -7,6 +7,7 @@ import { Loading, Notice } from '../components/Ui.jsx';
 import { api } from '../lib/api.js';
 import { useOp } from '../lib/hooks.js';
 import { readSettingsTab } from '../lib/publicPageSettings.js';
+import AccountSettings from '../components/AccountSettings.jsx';
 
 export function PrivacyPreferences({ value, onChange, onSave, busy, message }) {
   return <section className="card">
@@ -39,6 +40,7 @@ function PrivacySettings() {
 export default function Settings() {
   const [params] = useSearchParams();
   const tab = readSettingsTab(params.get('tab'));
+  if (tab === 'account') return <AccountSettings />;
   if (tab !== 'privacy' && tab !== 'payments') return <PortfolioEditor />;
   return <>
     <div className="head"><div><h1>{tab === 'privacy' ? 'Privacy settings' : 'Payment settings'}</h1><p className="muted">Manage {tab === 'privacy' ? 'the information you share with profile visitors' : 'paid checkout for your public Store'}.</p></div></div>

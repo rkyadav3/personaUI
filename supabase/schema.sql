@@ -70,13 +70,7 @@ alter table chat_log enable row level security;
 -- Private bucket for the uploaded files themselves.
 insert into storage.buckets (id, name, public) values ('files', 'files', false) on conflict (id) do nothing;
 
-insert into templates (name, html)
-select * from (values
-  ('Blank', '<p></p>'),
-  ('Research note', '<h1>Title</h1><h2>Question</h2><p></p><h2>Method</h2><p></p><h2>Findings</h2><p></p><h2>Open problems</h2><p></p>'),
-  ('Blog post', '<h1>Headline</h1><p>Opening paragraph.</p><h2>Section</h2><p></p>')
-) as t(name, html)
-where not exists (select 1 from templates);
+-- Accounts start with no prefilled templates. Owners can create their own in Content.
 
 -- ---------- functions ----------
 create or replace function chunk_sources()

@@ -1,6 +1,7 @@
 // One serverless function for the whole admin. The browser POSTs { op, args } and gets JSON back.
 import { env } from '../server/config.js';
 import * as auth from '../server/auth.js';
+import { changeAccount } from '../server/account.js';
 // Heavy modules are loaded on demand so common requests (sign-in, overview, profile) start fast.
 const indexer = new Proxy({}, { get: (_, k) => async (...a) => (await import('../server/indexer.js'))[k](...a) });
 const invites = new Proxy({}, { get: (_, k) => async (...a) => (await import('../server/invites.js'))[k](...a) });
@@ -72,8 +73,10 @@ const PUBLIC = {
 // Signed-in ops. `db` is the tenant-scoped client; `s` is the store module bound to it.
 const activityService = createActivityService();
 const OPS = {
+  'account.change': ({ user }, args) => changeAccount(user, args),
   'items.list': ({ db }) => catalogue.listItems(db),
   'items.save': ({ db }, a) => catalogue.saveItem(db, a),
+  'items.currency': ({ db }, a) => catalogue.saveStoreCurrency(db, a),
   'items.delete': async ({ db }, a) => { await catalogue.deleteItem(db, a); return { ok: true }; },
   'assets.sign': ({ db }, a) => assets.signAsset(db, a),
   'assets.register': ({ db }, a) => assets.registerAsset(db, a),
@@ -194,9 +197,11 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
       const user = await sessionUser(req);
       if (!user) throw new HttpError(401, 'Not signed in.');
-      const platformOp = /^(users\.|invites\.|suggestions\.|support\.|platform\.)/.test(op);
+      const platformOp = /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
-      return res.status(200).json(await fn({ db: platformOp ? null : tenantScope(user.id), user }, args));
+      const result = await fn({ db: platformOp ? null : tenantScope(user.id), user }, args);
+      if (op === 'account.change' && result.passwordChanged) auth.endSession(res);
+      return res.status(200).json(result);
     } catch (e) {
       const studio = typeof op === 'string' && op.startsWith('studio.');
       if (!(e instanceof HttpError)) console.error(op, studio ? e.name || 'error' : e);

@@ -36,7 +36,7 @@ export function StoreControls({ page, setPage }) {
       <Text label="Shop subtitle" value={page.storeSubtitle} max={140} onChange={value => setPage({ storeSubtitle: value })} />
       <Range label="Items before Show more" min={2} max={40} value={page.storeLimit} onChange={value => setPage({ storeLimit: value })} />
       <label className="toggle"><input type="checkbox" checked={page.cart} onChange={event => setPage({ cart: event.target.checked })} />Enable checkout for Store items</label>
-      <Text label="Currency for existing prices without one" value={page.currency} max={6} onChange={value => setPage({ currency: value })} />
+      <p className="hint">Store currency: {page.currency}. <Link to="/admin/store">Manage currency and prices in Store</Link>. Changing the page layout does not change item prices.</p>
       <p className="hint">Visible free and paid products appear on Home and Store. Manage prices and access links under <Link to="/admin/store?tab=categories">Offerings &amp; categories</Link> or <Link to="/admin/store?tab=products">Store products</Link>. Buyer records are under <Link to="/admin/purchases">Orders</Link>.</p>
       <div className="portfolio-checks">{Object.entries(SECTION_LABELS).map(([key, label]) => <label className="toggle" key={key}><input type="checkbox" checked={page.sections[key]} onChange={event => setIn('sections', { [key]: event.target.checked })} /> Show {label === 'Store' ? 'Shop' : label}</label>)}</div>
     </section>

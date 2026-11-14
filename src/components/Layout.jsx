@@ -42,7 +42,7 @@ export function StudioSidebar({ user, unread = 0, photo, onLogout, onNavigate, n
 export default function Layout({ superadmin = false }) { return <GlassShell studio><Inner superadmin={superadmin} /></GlassShell>; }
 
 function Inner({ superadmin }) {
-  const { user, logout } = useAuth(), { pathname } = useLocation(), navigate = useNavigate();
+  const { user, logout } = useAuth(), { pathname, search } = useLocation(), navigate = useNavigate();
   const activity = useAdminActivity(user);
   const [needs, setNeeds] = useState(null), [unread, setUnread] = useState(0), [photo, setPhoto] = useState(null), [navOpen, setNavOpen] = useState(false), [logoutError, setLogoutError] = useState('');
   useEffect(() => {
@@ -72,7 +72,7 @@ function Inner({ superadmin }) {
   if (superadmin && !user.isSuperAdmin) return <Navigate to="/admin" replace />;
   if (!superadmin && needs === null) return <Loading label="Opening your workspace…" />;
   const supportPage = pathname === '/admin/support' || pathname.startsWith('/admin/support/');
-  if (!superadmin && needs && !supportPage && !['/admin/profile', '/admin/superadmin', '/admin/users', '/admin/invites', '/admin/suggestions'].includes(pathname)) return <Navigate to="/admin/profile" replace />;
+  if (!superadmin && needs && !supportPage && !(pathname === '/admin/settings' && new URLSearchParams(search).get('tab') === 'account') && !['/admin/profile', '/admin/superadmin', '/admin/users', '/admin/invites', '/admin/suggestions'].includes(pathname)) return <Navigate to="/admin/profile" replace />;
   const overview = pathname.replace(/\/$/, '') === '/admin';
   return <div className={`studio-shell${navOpen ? ' nav-open' : ''}`}>
     <a className="studio-skip" href="#studio-main">Skip to content</a>

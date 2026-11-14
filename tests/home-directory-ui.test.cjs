@@ -34,7 +34,8 @@ test('custom tag labels appear on featured profiles and directory cards', () => 
 test('main home renders the reference layout with a featured profile, real metrics and products', () => {
   const { HomeDirectory } = require('../src/pages/Home.jsx');
   const html = render(React.createElement(HomeDirectory, { feed }));
-  for (const text of ['Meet industry', 'top-rated', 'professionals', 'Top Rated Profiles', 'Top Products', 'Ravi Kumar Yadav', 'Building AI Products', '₹499', '128 offering reviews', '12.4K', 'offering interactions']) assert.ok(html.includes(text), text);
+  for (const text of ['Explore', 'profiles', 'Top Rated Profiles', 'Store items', 'Ravi Kumar Yadav', 'Building AI Products', '₹499', '128 offering reviews', '12.4K', 'offering interactions']) assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /CREATIVE &amp; TECHNOLOGY LEADERS|Meet industry/);
   assert.match(html, /href="\/p\/ravi"/);
   assert.match(html, /aria-label="Search profiles, expertise, or industries"/);
   assert.match(html, /aria-label="Browse products"/);

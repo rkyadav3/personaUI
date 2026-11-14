@@ -16,7 +16,7 @@ const state = JSON.parse(sessionStorage.getItem(storageKey) || 'null') || {
   paymentEnabled: true,
 };
 const persist = () => sessionStorage.setItem(storageKey, JSON.stringify(state));
-const user = { id: 'fixture-owner', name: 'Fixture Owner', slug: 'fixture-owner', isAdmin: false };
+let user = JSON.parse(sessionStorage.getItem('fixture:account') || 'null') || { id: 'fixture-owner', name: 'Fixture Owner', email: 'owner@example.test', slug: 'fixture-owner', isAdmin: true };
 window.__settingsCalls = [];
 window.fetch = async (url, options) => {
   if (url === '/api/track') return Response.json({ ok: true });
@@ -25,6 +25,14 @@ window.fetch = async (url, options) => {
   window.__settingsCalls.push({ op, args });
   switch (op) {
     case 'auth.me': return Response.json({ user });
+    case 'auth.logout': user = null; return Response.json({ ok: true });
+    case 'account.change': {
+      if (args.currentPassword !== 'fixture-current-password') return Response.json({ error: 'Current password is incorrect.' }, { status: 403 });
+      if (args.kind === 'password') { user = null; sessionStorage.removeItem('fixture:account'); return Response.json({ passwordChanged: true }); }
+      if (user.userIdNextChangeAt && Date.parse(user.userIdNextChangeAt) > Date.now()) return Response.json({ error: 'You can change your user ID again in 14 days.' }, { status: 409 });
+      user = { ...user, slug: args.userId, userIdNextChangeAt: new Date(Date.now() + 14 * 86400000).toISOString() };
+      sessionStorage.setItem('fixture:account', JSON.stringify(user)); return Response.json({ user });
+    }
     case 'site.get': return Response.json(state.site);
     case 'profile.get': return Response.json({ profile: state.profile, contributions: [] });
     case 'enquiries.count': return Response.json({ new: 0 });
@@ -47,5 +55,5 @@ const initial = params.get('legacy') === 'portfolio' ? '/admin/portfolio?tab=pro
   : params.get('legacy') === 'payments' ? '/admin/purchases?tab=settings'
   : params.get('legacy') === 'contact' ? '/admin/enquiries?tab=form'
   : params.get('legacy') === 'look' ? '/admin/page'
-  : '/admin/settings';
+  : params.get('tab') === 'account' ? '/admin/settings?tab=account' : '/admin/settings';
 createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[initial]}><App /></MemoryRouter>);

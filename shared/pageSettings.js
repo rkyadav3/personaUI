@@ -59,7 +59,7 @@ export function normalizePage(input) {
     tagline: s(i.tagline, 120), about: s(i.about, 600), chips,
     storeTitle: s(i.storeTitle, 40) || d.storeTitle, storeSubtitle: s(i.storeSubtitle, 140), storeLimit: Math.round(num(i.storeLimit, 2, 40, d.storeLimit)),
     openLabel: s(i.openLabel, 24) || d.openLabel, talkLabel: s(i.talkLabel, 24) || d.talkLabel,
-    accent: ACCENTS[i.accent] ? i.accent : d.accent, currency: s(i.currency, 6) || d.currency, cart: typeof i.cart === 'boolean' ? i.cart : d.cart,
+    accent: ACCENTS[i.accent] ? i.accent : d.accent, currency: s(i.currency, 6).toUpperCase() || d.currency, cart: typeof i.cart === 'boolean' ? i.cart : d.cart,
     placement, sections,
     hero: { zoom: num(i.hero?.zoom, 1, 3, d.hero.zoom), x: num(i.hero?.x, 0, 100, d.hero.x), y: num(i.hero?.y, 0, 100, d.hero.y), imageUrl: cleanImg(i.hero?.imageUrl) },
     accentHex: HEX.test(i.accentHex) ? i.accentHex.toLowerCase() : '',

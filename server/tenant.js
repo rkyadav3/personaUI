@@ -6,6 +6,7 @@ export const TENANT_TABLES = new Set(['files', 'folders', 'topics', 'posts', 'te
 export const TENANT_RPCS = new Set(['hybrid_search', 'set_embeddings', 'chunk_sources', 'save_event_response', 'event_rsvp_summary', 'complete_purchase', 'record_purchase_refund', 'claim_public_action', 'purchase_summary', 'resume_admin_activity', 'touch_admin_activity', 'admin_analytics']);   // these get p_owner
 
 TENANT_TABLES.add('assets');
+TENANT_RPCS.add('save_store_currency');
 
 export function scoped(uid, database = raw) {
   if (!uid) throw new Error('Not signed in.');
