@@ -7,7 +7,7 @@ import { scriptedDatabase, hasEq, step } from './support/database.js';
 const alice = '11111111-1111-4111-8111-111111111111';
 const bob = '22222222-2222-4222-8222-222222222222';
 const workspace = { id: alice, owner_id: alice, name: 'Alice', slug: 'alice', type: 'individual', status: 'active' };
-const membership = { role: 'owner', status: 'active', workspace };
+const membership = { user_id: alice, role: 'owner', status: 'active', workspace };
 
 test('workspace access uses verified membership and rejects suspended or foreign workspaces', async () => {
   const { workspaceAccess } = await import('../server/workspaces.js');
@@ -20,8 +20,29 @@ test('workspace access uses verified membership and rejects suspended or foreign
     { ...membership, role: 'superadmin' },
     { ...membership, workspace: { ...workspace, status: 'suspended' } },
     { ...membership, workspace: null },
+    { ...membership, user_id: bob },
   ]) assert.throws(() => workspaceAccess({ id: alice }, changed));
   assert.throws(() => workspaceAccess({ id: alice, isSuperAdmin: true }, membership));
+});
+
+test('authorized workspace scope stamps authors and rejects ownership reassignment', async () => {
+  const { workspaceAccess, scopedWorkspace, createWorkspaceService } = await import('../server/workspaces.js');
+  const raw = scriptedDatabase({ table: 'files' }, { table: 'files' }, { table: 'files' });
+  const scope = scopedWorkspace(workspaceAccess({ id: alice }, membership), () => raw);
+  await scope.from('files').insert({ owner_id: bob, workspace_id: bob, created_by: bob, name: 'Notes' });
+  assert.equal(step(raw.calls[0], 'insert')[0].workspace_id, alice);
+  assert.equal(step(raw.calls[0], 'insert')[0].created_by, alice);
+  await scope.from('files').update({ owner_id: bob, workspace_id: bob, created_by: bob, name: 'Updated' });
+  assert.deepEqual(step(raw.calls[1], 'update')[0], { name: 'Updated', updated_by: alice });
+  assert.ok(hasEq(raw.calls[1], 'workspace_id', alice));
+  await scope.from('files').delete();
+  assert.ok(hasEq(raw.calls[2], 'workspace_id', alice));
+  assert.throws(() => scopedWorkspace(null), /required/);
+  const db = scriptedDatabase({ table: 'workspace_members', data: [membership] });
+  assert.equal((await createWorkspaceService({ database: () => db }).list({ id: alice }))[0].role, 'owner');
+  await assert.rejects(createWorkspaceService().list({ id: alice, isSuperAdmin: true }), /profile administrator/);
+  const viewer = scriptedDatabase({ table: 'workspace_members', data: [{ ...membership, role: 'viewer' }] });
+  await assert.rejects(createWorkspaceService({ database: () => viewer }).setup({ id: alice }, { type: 'organization' }), /administrator/);
 });
 
 test('workspace lookup filters the authenticated member and never accepts an owner supplied by a caller', async () => {
