@@ -67,6 +67,7 @@ export function createIntegrationService({ database = raw, publicRepository = cr
   }
   return {
     authenticate,
+    recordRejection: status => integrationQuery(database().rpc('record_api_rejection', { p_kind: status === 401 ? 'unauthorized' : status === 429 ? 'rate_limited' : 'forbidden' })),
     chat: (access, input) => perform(access, input, 'external_api'),
     platformChat: (access, input) => perform(access, input, 'own_platform'),
     session: access => integrationQuery(database().rpc('create_persona_session', { p_key: access.keyId })),

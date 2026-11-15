@@ -15,6 +15,9 @@ export function createPersonaHandler({ service = createIntegrationService(), ena
       const result = await service.chat(access, { message: body.message, requestId: body.requestId, sessionId: body.sessionId });
       return res.status(200).json(result);
     } catch (error) {
+      if ([401, 403, 429].includes(error.status) && service.recordRejection) {
+        try { await service.recordRejection(error.status); } catch { console.error('persona-api rejection telemetry unavailable'); }
+      }
       if ([409, 429].includes(error.status)) res.setHeader('Retry-After', error.status === 409 ? '2' : '60');
       return publicError(res, error, 'persona-api');
     }

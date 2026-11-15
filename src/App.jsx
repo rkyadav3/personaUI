@@ -15,6 +15,7 @@ const KnowledgeIndex = lazy(() => import('./pages/KnowledgeIndex.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Integrations = lazy(() => import('./pages/Integrations.jsx'));
+const WorkspaceOperations = lazy(() => import('./pages/WorkspaceOperations.jsx'));
 const PublicProfile = lazy(() => import('./pages/PublicProfile.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
 const Invites = lazy(() => import('./pages/Invites.jsx'));
@@ -80,6 +81,7 @@ export default function App() {
       <Route path="/superadmin" element={<Layout superadmin />}>
         <Route index element={<SuperAdmin />} />
         <Route path="customers" element={<SuperAdmin />} />
+        <Route path="workspaces" element={<WorkspaceOperations />} />
         <Route path="invites" element={<Invites />} />
         <Route path="suggestions" element={<Suggestions />} />
         <Route path="support" element={<Support />} />

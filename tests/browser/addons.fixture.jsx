@@ -21,6 +21,11 @@ window.fetch=async(url,options={})=>{
   if(op==='workspace.current')return json({workspace,role:'owner',workspaces:[workspace]});
   if(op==='enquiries.count')return json({new:0});
   if(op==='integrations.list')return json(data);
+  if(op==='platform.workspaces.list')return json({workspaces:[{...workspace,owner:{email:user.email},settings:data.settings}],page:1,hasNext:false});
+  if(op==='platform.workspaces.health')return json({checkedAt:new Date().toISOString(),api:{requests:12,failed:0,pending:0,stuck:0,p95Ms:650,platform:8,external:4},security:{activeKeys:1,expiringKeys:0,expiredKeys:0,revokedKeys:0,rejections:{}},probes:[{component:'generation',status:'unknown',detail:'No recent check.'},{component:'embedding',status:'unknown',detail:'No recent check.'}]});
+  if(op==='platform.workspaces.audit')return json({rows:[]});
+  if(op==='platform.workspaces.change'){if(window.addonsFixture.fail)return json({error:'Workspace save unavailable.'},503);if(args.status)workspace.status=args.status;Object.assign(data.settings,Object.fromEntries(Object.entries(args).filter(([key])=>key!=='workspaceId'&&key!=='status')));return json({ok:true});}
+  if(op==='platform.workspaces.check')return json({ok:true});
   if(op==='integrations.change'){
     if(window.addonsFixture.fail)return json({error:'Could not save your connection. Try again.'},503);
     if(args.action==='create')data.integrations.push({id:'22222222-2222-4222-8222-222222222222',name:args.name,site_origin:args.origin,enabled:true,keys:[{id:'key',prefix:'ps_fixture',expires_at:'2027-02-01',revoked_at:null}]});

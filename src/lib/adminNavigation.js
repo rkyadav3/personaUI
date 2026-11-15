@@ -31,6 +31,7 @@ export const ADMIN_SECTIONS = [
 export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', description: 'Support admins, manage sales and improve the main site.', adminOnly: true, pages: [
   { id: 'dashboard', label: 'SuperAdmin dashboard', to: '/superadmin', icon: 'chart' },
   { id: 'customers', label: 'Customers', to: '/superadmin/customers', icon: 'users' },
+  { id: 'workspaces', label: 'Workspace operations', to: '/superadmin/workspaces', icon: 'shield' },
   { id: 'sales', label: 'Sales & payments', to: '/superadmin/sales', icon: 'box' },
   { id: 'invites', label: 'Invite links', to: '/superadmin/invites', icon: 'email' },
   { id: 'suggestions', label: 'Suggestions', to: '/superadmin/suggestions', icon: 'spark' },

@@ -30,3 +30,11 @@ Existing tests emit React server-rendering useLayoutEffect warnings; no new fail
 - Verified: random hashed scoped keys, expiry/revocation, server source assignment, shared monthly admission, idempotent pending/completed results, changed-message rejection, public-knowledge cache invalidation and counter-only update compatibility.
 - Browser: create connection, failed-save input preservation, one-time key dismissal, disable/enable and mobile fit. Installed widget recovers with a new ID after a confirmed terminal failure.
 - Review fixes: explicit terminal-retry metadata, retained provider token evidence after history failure, cache invalidation for changed source/profile access and date validity, helper execute permission under service_role.
+
+## Stage 4 — Super Admin operations
+
+- RED: platform access/health tests initially failed for the missing operations module.
+- GREEN: 537 passing tests and production build. Operations SQL runs twice and executes under service_role.
+- Verified: normal-admin denial, workspace status synchronization, atomic quota/settings change plus audit, failed-limit rollback, actual measured counts and unknown/stale provider health.
+- Browser: limit form error preserves input; successful retry, workspace suspension and external API stop/restore work at desktop/mobile sizes.
+- Review refinements: represented profile names sync into workspace directory; audit shows before/changed values; rejection counters expose their actual hourly-bucket window.

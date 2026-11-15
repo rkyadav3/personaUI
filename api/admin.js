@@ -28,10 +28,12 @@ import { createSupportService } from '../server/platformSupport.js';
 import { createWorkspaceService, scopedWorkspace } from '../server/workspaces.js';
 import { createKnowledgePolicyService, listKnowledgeSources } from '../server/knowledgePolicy.js';
 import { createIntegrationService } from '../server/integrations.js';
+import { createWorkspaceOperationsService } from '../server/workspaceOperations.js';
 
 const workspaces = createWorkspaceService();
 const knowledgePolicies = createKnowledgePolicyService();
 const integrations = createIntegrationService();
+const workspaceOperations = createWorkspaceOperationsService();
 export function createWorkspaceOperations(service = workspaces) {
   const ready = user => { if (!user?.workspaceEnabled) throw new HttpError(503, 'Workspace setup is not enabled yet. Install the workspace migrations and enable WORKSPACES_ENABLED.'); };
   return {
@@ -204,6 +206,11 @@ const OPS = {
   'knowledge.policy': ({ workspace }, args) => knowledgePolicies.save(workspace, args),
   'integrations.list': ({ workspace }) => integrations.list(workspace),
   'integrations.change': ({ workspace }, args) => integrations.change(workspace, args),
+  'platform.workspaces.list': ({ user }, args) => workspaceOperations.list(user, args),
+  'platform.workspaces.change': ({ user }, args) => workspaceOperations.change(user, args),
+  'platform.workspaces.health': ({ user }) => workspaceOperations.health(user),
+  'platform.workspaces.check': ({ user }) => workspaceOperations.check(user),
+  'platform.workspaces.audit': ({ user }, args) => workspaceOperations.audit(user, args),
 };
 
 export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: tenantScope = scoped, operations = OPS, workspaceService = workspaces, workspaceScope = scopedWorkspace } = {}) {
