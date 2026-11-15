@@ -44,7 +44,10 @@ export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', descrip
 ] };
 
 export function adminSectionsFor(user) {
-  if (!user?.workspaceEnabled || ['owner', 'admin'].includes(user.workspaceRole)) return ADMIN_SECTIONS;
+  if (!user?.workspaceEnabled) return ADMIN_SECTIONS.map(section => ({
+    ...section, pages: section.pages.filter(page => !workspacePages.has(page.id)),
+  }));
+  if (['owner', 'admin'].includes(user.workspaceRole)) return ADMIN_SECTIONS;
   return ADMIN_SECTIONS.filter(section => ['overview', 'pipelines', 'settings'].includes(section.id)).map(section => ({
     ...section,
     pages: section.pages.filter(page => section.id === 'pipelines' ? user.workspaceRole === 'contributor' || ['files', 'knowledge'].includes(page.id) : section.id !== 'settings' || ['account', 'team', 'support', 'suggestions'].includes(page.id)),
@@ -52,10 +55,13 @@ export function adminSectionsFor(user) {
 }
 
 export function canOpenAdminPage(user, pathname, search = '') {
-  if (!user?.workspaceEnabled || ['owner', 'admin'].includes(user.workspaceRole)) return true;
   const location = adminLocation(pathname, search);
+  if (!user?.workspaceEnabled) return !workspacePages.has(location?.page);
+  if (['owner', 'admin'].includes(user.workspaceRole)) return true;
   return adminSectionsFor(user).some(section => section.id === location?.group && section.pages.some(page => page.id === location.page));
 }
+
+const workspacePages = new Set(['integrations', 'team', 'webhooks', 'export']);
 
 export function adminLocation(pathname, search = '') {
   const path = pathname.replace(/\/+$/, ''), tab = new URLSearchParams(search).get('tab');

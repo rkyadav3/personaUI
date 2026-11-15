@@ -240,6 +240,8 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (!user) throw new HttpError(401, 'Not signed in.');
       const platformOp = op === 'team.accept' || /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.|workspace\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
+      const workspaceOp = /^(workspace\.|integrations\.|team\.|webhooks\.|platform\.workspaces\.)/.test(op) || ['data.export', 'knowledge.sources', 'knowledge.policy'].includes(op);
+      if (workspaceOp && !user.workspaceEnabled) throw new HttpError(503, 'These account tools are not enabled on this deployment yet.');
       const access = !platformOp && user.workspaceEnabled ? await workspaceService.current(user) : null;
       if (access && args.workspaceId && args.workspaceId !== access.workspace.id) throw new HttpError(409, 'Your selected workspace changed. Refresh this page before continuing.');
       if (access) authorizeWorkspaceOperation(access.role, op);

@@ -48,3 +48,12 @@ Existing tests emit React server-rendering useLayoutEffect warnings; no new fail
 - Security review: pinned DNS/HTTPS targets, exact-byte HMAC with timestamp checks, encrypted signing secrets, credential-only external entry point, private shared Assistant scope, and signed body event-ID deduplication. No remaining code blockers after fixes.
 - Deployment: testing checkpoint 47eef64 is READY on Vercel with 12 functions. GET /api/persona reaches the authenticated Persona handler and rejects 405. POST without activation returns the explicit disabled-feature response; maintenance without configuration rejects before any database work.
 - Hosted evidence remains separate: SQL installation, feature flag/worker secrets, real connected-site chat and scheduled deliveries must be verified by the operator before production approval.
+
+## Hosted activation and individual Settings regression
+
+- User confirmed the combined SQL ran successfully in Supabase SQL Editor; no hosted SQL was executed by the agent.
+- WORKSPACES_ENABLED=true and independent random webhook encryption/maintenance secrets were configured only for Preview branch codex/organization-integrations. Preview redeployment persona-40i1tvw5m-rkyadav3.vercel.app is READY. Vercel-authenticated HTTP checks reach the hosted credential table and reject a nonexistent credential; maintenance rejects missing authorization. No global retention job was executed.
+- RED: a real admin-handler harness with workspaceEnabled=false reproduced HTTP 403 and "A workspace administrator is required." for an individual opening website Settings. Tests also caught disabled add-on navigation remaining visible.
+- GREEN: three activation regression tests pass; complete suite 552/552 and production build pass. Disabled tools are hidden and reject before data access. Enabled individual owners retain website settings and restricted members remain denied. Individual wording now uses Current profile; Webhooks includes a plain-language optional-use explanation.
+- Review caught the special invitation route bypassing the disabled-feature screen. The bypass now requires activation; tests/browser/workspace-activation.check.cjs exercises the actual Layout for Settings, all disabled direct routes and an invitation link, plus Privacy and actual 390px mobile layout.
+- Remaining hosted gates: designated account sign-in, real organization and existing-individual workflows, external website success/replay/revocation/quota, controlled receiver signature/retry checks, and backup-aware maintenance/retention validation.
