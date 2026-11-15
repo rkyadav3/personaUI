@@ -70,7 +70,9 @@ declare target uuid;
 begin
   if tg_op='UPDATE' and (to_jsonb(new)-'views'-'updated_at')=(to_jsonb(old)-'views'-'updated_at') then return null; end if;
   target:=case when tg_op='DELETE' then old.workspace_id else new.workspace_id end;
-  if target is null or not exists(select 1 from workspaces where id=target) then return null; end if;
+  if target is null then return null; end if;
+  perform 1 from workspaces where id=target for update;
+  if not found then return null; end if;
   insert into workspace_api_settings(workspace_id,knowledge_revision) values(target,2)
     on conflict(workspace_id) do update set knowledge_revision=workspace_api_settings.knowledge_revision+1;
   return null;
