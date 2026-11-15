@@ -1,6 +1,6 @@
-import { createIntegrationService } from '../server/integrations.js';
-import { HttpError, jsonBody, publicError } from '../server/http.js';
-import { workspaceEnabled } from '../server/workspaceVisibility.js';
+import { createIntegrationService } from './integrations.js';
+import { HttpError, jsonBody, publicError } from './http.js';
+import { workspaceEnabled } from './workspaceVisibility.js';
 
 export function createPersonaHandler({ service = createIntegrationService(), enabled = () => true } = {}) {
   return async (req, res) => {

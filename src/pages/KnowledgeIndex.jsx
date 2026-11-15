@@ -2,7 +2,7 @@ import AdminTabs from '../components/AdminTabs.jsx';
 import { useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAdminTab } from '../lib/adminTabs.js';
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import Icon from '../components/portfolio/Icon.jsx';
 import { useOp } from '../lib/hooks.js';
 import { Confirm, Loading, Notice, Pill, Progress } from '../components/Ui.jsx';
@@ -10,6 +10,8 @@ import { useAuth } from '../lib/auth.jsx';
 import KnowledgePolicies from '../components/KnowledgePolicies.jsx';
 
 export default function KnowledgeIndex() {
+  const workspaceRole = useOutletContext()?.workspace?.role;
+  const readOnly = workspaceRole === 'viewer';
   const user = useAuth()?.user;
   const { data: c, reload: reloadCounts, error } = useOp('index.counts');
   const { data: set } = useOp('index.settings');
@@ -95,7 +97,7 @@ export default function KnowledgeIndex() {
           </div>
           <button
             className="btn primary"
-            disabled={syncing}
+            disabled={syncing || readOnly}
             onClick={sync}
           >
             <Icon n="refresh" size={18} />{syncing ? 'Syncing…' : 'Sync published material'}
@@ -127,7 +129,7 @@ export default function KnowledgeIndex() {
 
       {/* Page Tabs */}
       <AdminTabs label="AI knowledge tools" value={activeTab} onChange={setActiveTab} items={[{ id: 'sync', label: 'Readiness & sync', icon: 'book' }, { id: 'test', label: 'Test a question', icon: 'search' }]} />
-      {user?.workspaceEnabled && <KnowledgePolicies />}
+      {user?.workspaceEnabled && <KnowledgePolicies readOnly={!!workspaceRole && !['owner', 'admin'].includes(workspaceRole)} />}
       <p className="hint">Questions from your public chat are in <Link to="/admin/questions">Activity → Visitor Q&amp;A</Link>.</p>
 
       {/* TAB 1: HOW IT WORKS & ADVANCED CONTROLS */}
@@ -190,7 +192,7 @@ export default function KnowledgeIndex() {
               onChange={e => setQ(e.target.value)}
               autoFocus
             />
-            <button className="btn primary" disabled={searchBusy || !q.trim()}>
+            <button className="btn primary" disabled={searchBusy || !q.trim() || readOnly}>
               {searchBusy ? 'Searching…' : 'Search Notes'}
             </button>
           </form>

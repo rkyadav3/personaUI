@@ -25,8 +25,12 @@ return async function handler(req, res) {
     if (!/^[a-z0-9-]{1,80}$/.test(slug)) throw new HttpError(404, 'Media not found.');
     const viewer = await viewerFor(req), repo = repository();
     const account = await repo.accountOwner(slug);
-    if (account?.id === viewer?.id && viewer.workspaceEnabled) await workspaceService.current(viewer, account.id);
-    const user = account?.id === viewer?.id && canViewProfile(account, viewer) ? account : await repo.owner(slug, viewer);
+    let membership = null;
+    if (viewer?.workspaceEnabled && account?.id) {
+      try { membership = await workspaceService.current(viewer, account.id); }
+      catch (error) { if (account.id === viewer.id || error.status !== 403) throw error; }
+    }
+    const user = membership && canViewProfile(account, { id: account.id }) || account?.id === viewer?.id && canViewProfile(account, viewer) ? account : await repo.owner(slug, viewer);
     if (!user) throw new HttpError(404, 'Media not found.');
     let asset;
     if (legacyPath) {

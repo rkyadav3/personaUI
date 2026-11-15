@@ -6,11 +6,13 @@ import { sessionUser, isSuperAdminEmail } from '../server/auth.js';
 import { canViewProfile } from '../shared/governance.js';
 import { scoped } from '../server/tenant.js';
 import { publishedPassages } from '../server/knowledgeBoundary.js';
-import { workspaceEnabled } from '../server/workspaceVisibility.js';
+import { workspaceEnabled, canViewWorkspaceProfile } from '../server/workspaceVisibility.js';
 import { buildPublic } from '../server/profile.js';
 import { organizationPassage } from '../server/organizationProfile.js';
 import { randomUUID } from 'node:crypto';
 import { HttpError } from '../server/http.js';
+import externalPersonaHandler from '../server/personaApi.js';
+import maintenanceHandler from '../server/maintenanceApi.js';
 const NOT_FOUND = "I don't have anything about that in my research yet.";
 const STOP = new Set('a an and are as at be by for from has have in is it its of on or that the this to was were will with i my me you your do does what how why who which when'.split(' '));
 
@@ -41,7 +43,7 @@ async function ownerId(slug, viewer) {
   const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/users?select=id,email,tags,profile_private,locked_until${workspaceEnabled() ? ',workspace_status,workspace_type' : ''}&slug=eq.${slug}&limit=1`, { headers: sbHeaders() });
   if (!r.ok) throw new Error(`owner lookup ${r.status}`);
   const account = (await r.json())[0];
-  if (isSuperAdminEmail(account?.email) || !canViewProfile(account, viewer)) return null;
+  if (isSuperAdminEmail(account?.email) || !await canViewWorkspaceProfile(account, viewer)) return null;
   const profile = await fetch(`${process.env.SUPABASE_URL}/rest/v1/profiles?select=${workspaceEnabled() ? 'id,name,profile_type,organization,purpose,contact,expertise,visibility' : 'id'}&owner_id=eq.${account.id}&status=eq.published&limit=1`, { headers: sbHeaders() });
   if (!profile.ok) throw new Error('Profile access lookup failed');
   const row = (await profile.json())[0];
@@ -129,6 +131,8 @@ export async function answerPersona({ owner, profile, message: q, workspaceId })
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
+  if (req.query?.channel === 'external') return externalPersonaHandler(req, res);
+  if (req.query?.channel === 'maintenance') return maintenanceHandler(req, res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'anon';
   if (limited(ip)) return res.status(429).json({ reply: 'Give me a moment, then ask again.', sources: [] });

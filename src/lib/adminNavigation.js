@@ -24,6 +24,9 @@ export const ADMIN_SECTIONS = [
     { id: 'visibility', label: 'Privacy', to: '/admin/settings?tab=privacy', icon: 'shield' },
     { id: 'payments', label: 'Payments', to: '/admin/settings?tab=payments', icon: 'box' },
     { id: 'integrations', label: 'Website connections', to: '/admin/integrations', icon: 'layers' },
+    { id: 'team', label: 'Team access', to: '/admin/team', icon: 'users' },
+    { id: 'webhooks', label: 'Webhooks', to: '/admin/webhooks', icon: 'layers' },
+    { id: 'export', label: 'Data export', to: '/admin/export', icon: 'folder' },
     { id: 'support', label: 'Support', to: '/admin/support', icon: 'chat' },
     { id: 'suggestions', label: 'Suggestions', to: '/admin/suggestions', icon: 'spark' },
   ] },
@@ -40,6 +43,20 @@ export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', descrip
   { id: 'account', label: 'Account settings', to: '/superadmin/settings?tab=account', icon: 'shield' },
 ] };
 
+export function adminSectionsFor(user) {
+  if (!user?.workspaceEnabled || ['owner', 'admin'].includes(user.workspaceRole)) return ADMIN_SECTIONS;
+  return ADMIN_SECTIONS.filter(section => ['overview', 'pipelines', 'settings'].includes(section.id)).map(section => ({
+    ...section,
+    pages: section.pages.filter(page => section.id === 'pipelines' ? user.workspaceRole === 'contributor' || ['files', 'knowledge'].includes(page.id) : section.id !== 'settings' || ['account', 'team', 'support', 'suggestions'].includes(page.id)),
+  }));
+}
+
+export function canOpenAdminPage(user, pathname, search = '') {
+  if (!user?.workspaceEnabled || ['owner', 'admin'].includes(user.workspaceRole)) return true;
+  const location = adminLocation(pathname, search);
+  return adminSectionsFor(user).some(section => section.id === location?.group && section.pages.some(page => page.id === location.page));
+}
+
 export function adminLocation(pathname, search = '') {
   const path = pathname.replace(/\/+$/, ''), tab = new URLSearchParams(search).get('tab');
   if (path === '/superadmin/settings' && tab === 'account') return { group: 'platform', page: 'account' };
@@ -53,7 +70,7 @@ export function adminLocation(pathname, search = '') {
     writing: ['pipelines', 'content'], templates: ['pipelines', 'content'], topics: ['pipelines', 'content'],
     files: ['pipelines', 'files'], add: ['pipelines', 'files'], knowledge: ['pipelines', 'knowledge'],
     store: ['store', 'catalogue'], activity: ['activity', 'records'], updates: ['activity', 'records'], purchases: ['payments', 'settings'].includes(tab) ? ['settings', 'payments'] : ['inbox', 'purchases'], enquiries: tab === 'form' ? ['settings', 'editor'] : ['inbox', 'enquiries'], questions: ['inbox', 'questions'],
-    settings: ['settings', settingsPage], integrations: ['settings', 'integrations'], support: ['settings', 'support'], superadmin: ['platform', tab === 'invites' ? 'invites' : 'customers'], invites: ['community', 'invites'], suggestions: ['settings', 'suggestions'], users: ['platform', 'customers'],
+    settings: ['settings', settingsPage], team: ['settings', 'team'], webhooks: ['settings', 'webhooks'], export: ['settings', 'export'], integrations: ['settings', 'integrations'], support: ['settings', 'support'], superadmin: ['platform', tab === 'invites' ? 'invites' : 'customers'], invites: ['community', 'invites'], suggestions: ['settings', 'suggestions'], users: ['platform', 'customers'],
   };
   if (!path.startsWith('/admin/') || !Object.hasOwn(routes, route)) return null;
   const [group, page] = routes[route];

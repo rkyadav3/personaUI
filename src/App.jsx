@@ -16,6 +16,9 @@ const Profile = lazy(() => import('./pages/Profile.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Integrations = lazy(() => import('./pages/Integrations.jsx'));
 const WorkspaceOperations = lazy(() => import('./pages/WorkspaceOperations.jsx'));
+const Team = lazy(() => import('./pages/Team.jsx'));
+const Webhooks = lazy(() => import('./pages/Webhooks.jsx'));
+const WorkspaceExport = lazy(() => import('./pages/WorkspaceExport.jsx'));
 const PublicProfile = lazy(() => import('./pages/PublicProfile.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
 const Invites = lazy(() => import('./pages/Invites.jsx'));
@@ -55,6 +58,9 @@ export default function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="settings" element={<Settings />} />
         <Route path="integrations" element={<Integrations />} />
+        <Route path="team" element={<Team />} />
+        <Route path="webhooks" element={<Webhooks />} />
+        <Route path="export" element={<WorkspaceExport />} />
         <Route path="files" element={<FileManager />} />
         <Route path="add" element={<AddFiles />} />
         <Route path="topics" element={<Topics />} />

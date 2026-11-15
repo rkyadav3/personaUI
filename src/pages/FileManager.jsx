@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import JSZip from 'jszip';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useOutletContext, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { breadcrumbs, fmtSize, idOrNull } from '../lib/format.js';
 import { useFolders, useOp, useTopics } from '../lib/hooks.js';
@@ -50,7 +50,7 @@ async function expandFiles(files, unzip, errors) {
   return items;
 }
 
-function FileEditorModal({ id, folders, topics, onClose, onChanged }) {
+function FileEditorModal({ id, folders, topics, onClose, onChanged, readOnly = false }) {
   const titleId = useId();
   const [file, setFile] = useState(null);
   const [name, setName] = useState(''), [topic, setTopic] = useState(null), [text, setText] = useState(''), [dest, setDest] = useState(null);
@@ -119,14 +119,14 @@ function FileEditorModal({ id, folders, topics, onClose, onChanged }) {
         <Crumbs parts={['All files', ...trail.map(c => c.name), file.name]} />
 
         <div className="cols c332" style={{ marginTop: 10 }}>
-          <Field label="File Name"><input type="text" value={name} onChange={e => setName(e.target.value)} /></Field>
-          <TopicSelect value={topic} onChange={setTopic} topics={topics} />
+          <Field label="File Name"><input type="text" value={name} readOnly={readOnly} onChange={e => setName(e.target.value)} /></Field>
+          <fieldset disabled={readOnly}><TopicSelect value={topic} onChange={setTopic} topics={topics} /></fieldset>
           <div><button className="btn block" style={{ marginTop: 22 }} onClick={download} disabled={downloadBusy}><Icon n="download" size={18} />{downloadBusy ? 'Preparing…' : 'Download'}</button></div>
         </div>
 
         {editable ? (
           <Field label="File Content">
-            <textarea rows={12} value={text} onChange={e => setText(e.target.value)} />
+            <textarea rows={12} value={text} readOnly={readOnly} onChange={e => setText(e.target.value)} />
           </Field>
         ) : (
           <p className="muted" style={{ fontSize: '.88rem', margin: '10px 0' }}>
@@ -135,31 +135,32 @@ function FileEditorModal({ id, folders, topics, onClose, onChanged }) {
         )}
 
         <div className="row" style={{ marginTop: 12 }}>
-          <button className="btn" onClick={() => save('draft')}>Save private draft</button>
-          <button className="btn primary" onClick={() => save('published')}>{busy ? 'Saving…' : 'Save & publish to AI'}</button>
+          {!readOnly && <button className="btn" onClick={() => save('draft')}>Save private draft</button>}
+          {!readOnly && <button className="btn primary" onClick={() => save('published')}>{busy ? 'Saving…' : 'Save & publish to AI'}</button>}
           <button className="btn" onClick={onClose}>Close</button>
         </div>
 
         {msgs.map((m, i) => <Notice key={i} kind={m.kind}>{m.t}</Notice>)}
 
-        <div className="row" style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--line)', alignItems: 'flex-end' }}>
+        {!readOnly && <div className="row" style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--line)', alignItems: 'flex-end' }}>
           <div className="grow"><FolderSelect label="Move to Folder" value={dest} onChange={setDest} folders={folders} /></div>
           <button className="btn" style={{ marginBottom: 12 }} onClick={() => changeFile('files.move', { id, folderId: dest })}>Move</button>
           <span style={{ marginBottom: 12 }}>
             <Confirm label="Delete File" warn="Are you sure? This removes the file and its searchable chunks from your AI persona." onConfirm={() => changeFile('files.delete', { id }, true)} />
           </span>
-        </div>
+        </div>}
       </fieldset>
     </AdminDialog>
   );
 }
 
 export default function FileManager({ defaultTab = 'browse' }) {
+  const readOnly = useOutletContext()?.workspace?.role === 'viewer';
   const [params, setParams] = useSearchParams();
   const folder = idOrNull(params.get('folder'));
   const openFile = idOrNull(params.get('file'));
   const requestedTab = params.get('tab') || defaultTab;
-  const currentTab = ['browse', 'upload', 'note'].includes(requestedTab) ? requestedTab : 'browse';
+  const currentTab = !readOnly && ['browse', 'upload', 'note'].includes(requestedTab) ? requestedTab : 'browse';
   const setTab = tab => setParams(p => { const n = Object.fromEntries(p); n.tab = tab; return n; });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -305,7 +306,7 @@ export default function FileManager({ defaultTab = 'browse' }) {
       </div>
 
       {/* Page Tab Bar */}
-      <AdminTabs label="File tools" value={currentTab} onChange={setTab} disabled={uploadBusy || noteBusy} items={[{ id: 'browse', label: 'Browse', icon: 'folder', count: files?.length }, { id: 'upload', label: 'Upload files', icon: 'upload' }, { id: 'note', label: 'Write a note', icon: 'pen' }]} />
+      {readOnly ? <Notice>Your viewer access lets you browse and download files.</Notice> : <AdminTabs label="File tools" value={currentTab} onChange={setTab} disabled={uploadBusy || noteBusy} items={[{ id: 'browse', label: 'Browse', icon: 'folder', count: files?.length }, { id: 'upload', label: 'Upload files', icon: 'upload' }, { id: 'note', label: 'Write a note', icon: 'pen' }]} />}
 
       {/* TAB 1: BROWSE FILES */}
       {['browse', 'upload', 'note'].includes(currentTab) && (
@@ -313,10 +314,10 @@ export default function FileManager({ defaultTab = 'browse' }) {
           <section className="card library-browser">
             <div className="library-toolbar">
               <Crumbs parts={[{ label: 'All files', onClick: () => chooseFolder(null) }, ...trail.map(c => ({ label: c.name, onClick: () => chooseFolder(c.id) }))]} />
-              <div className="row">
+              {!readOnly && <div className="row">
                 <button type="button" className="btn small" onClick={() => { setFolderMsg(null); setFolderOpen(true); }}><Icon n="plus" size={17} />New folder</button>
                 <button type="button" className="btn small primary" onClick={() => setTab('upload')}><Icon n="upload" size={17} />Upload</button>
-              </div>
+              </div>}
             </div>
             <div className="library-filters">
               <Field label="Search all files"><input type="search" placeholder="Name or contents…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} /></Field>
@@ -329,7 +330,7 @@ export default function FileManager({ defaultTab = 'browse' }) {
             {kids.length > 0 && <div className="library-folders">{kids.map(f => <button type="button" key={f.id} onClick={() => chooseFolder(f.id)}><Icon n="folder" size={22} /><span>{f.name}</span><Icon n="arrow" size={16} /></button>)}</div>}
             {!files ? <><Loading error={error} label="Loading your files…" compact />{error && <button type="button" className="btn" onClick={reloadFiles}>Retry</button>}</> : <>
               <div className="library-results"><span>{visibleFiles.length} of {files.length} files in {searchQuery.trim() ? 'this search' : 'this folder'} · {fmtSize(visibleFiles.reduce((total, file) => total + (file.size || 0), 0))}</span>{filtered && <button type="button" className="btn link" onClick={resetFilters}>Clear filters</button>}</div>
-              <LibraryFileList files={visibleFiles} topicNames={topicName} filtered={filtered} hasFolders={!!kids.length} onOpen={inspectFile} onUpload={() => setTab('upload')} onReset={resetFilters} />
+              <LibraryFileList files={visibleFiles} topicNames={topicName} filtered={filtered} hasFolders={!!kids.length} onOpen={inspectFile} onUpload={readOnly ? undefined : () => setTab('upload')} onReset={resetFilters} readOnly={readOnly} />
             </>}
             <p className="library-hint">Published means available for AI indexing. <Link to="/admin/knowledge">Check AI knowledge</Link> for indexing status.</p>
           </section>
@@ -345,6 +346,7 @@ export default function FileManager({ defaultTab = 'browse' }) {
           {/* File Inspector Modal */}
           {openFile && (
             <FileEditorModal
+              readOnly={readOnly}
               key={openFile}
               id={openFile}
               folders={folders}

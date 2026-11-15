@@ -13,7 +13,7 @@ test('integration secrets are random, hashed at rest and validated without trust
   assert.throws(()=>bearerCredential({headers:{'x-api-key':a.secret}}),e=>e.status===401);
 });
 test('external API authenticates first, assigns its source on the server and does not expose unexpected errors', async () => {
-  const { createPersonaHandler } = await import('../api/persona.js');
+  const { createPersonaHandler } = await import('../server/personaApi.js');
   let recorded;
   const handler=createPersonaHandler({
     service:{ authenticate:async()=>({workspaceId:'org',keyId:'key',integrationId:'site'}), chat:async(access,input)=>{recorded={access,input};return {reply:'Hello',sources:[],source:'external_api'};}},

@@ -29,11 +29,17 @@ import { createWorkspaceService, scopedWorkspace } from '../server/workspaces.js
 import { createKnowledgePolicyService, listKnowledgeSources } from '../server/knowledgePolicy.js';
 import { createIntegrationService } from '../server/integrations.js';
 import { createWorkspaceOperationsService } from '../server/workspaceOperations.js';
+import { authorizeWorkspaceOperation } from '../server/workspacePermissions.js';
+import { createTeamService } from '../server/workspaceTeam.js';
+import { createWebhookService } from '../server/webhooks.js';
+import { exportWorkspacePage } from '../server/workspaceData.js';
 
 const workspaces = createWorkspaceService();
 const knowledgePolicies = createKnowledgePolicyService();
 const integrations = createIntegrationService();
 const workspaceOperations = createWorkspaceOperationsService();
+const teamService = createTeamService();
+const webhooks = createWebhookService();
 export function createWorkspaceOperations(service = workspaces) {
   const ready = user => { if (!user?.workspaceEnabled) throw new HttpError(503, 'Workspace setup is not enabled yet. Install the workspace migrations and enable WORKSPACES_ENABLED.'); };
   return {
@@ -131,7 +137,7 @@ const OPS = {
 
   // public profile page (/p/<slug>): look + live preview data
   'page.save': ({ db }, a) => site.savePage(db, a),
-  'page.preview': ({ db, user }) => profile.previewProfile(db, user.slug),
+  'page.preview': ({ db, user, workspace }) => profile.previewProfile(db, workspace?.workspace?.slug || user.slug),
 
   // updates & schedule (shown on the public profile)
   'updates.list': ({ db }) => engage.listUpdates(db),
@@ -211,6 +217,14 @@ const OPS = {
   'platform.workspaces.health': ({ user }) => workspaceOperations.health(user),
   'platform.workspaces.check': ({ user }) => workspaceOperations.check(user),
   'platform.workspaces.audit': ({ user }, args) => workspaceOperations.audit(user, args),
+  'workspace.switch': ({ user }, args) => teamService.switch(user, args),
+  'team.accept': ({ user }, args) => teamService.accept(user, args),
+  'team.list': ({ workspace }) => teamService.list(workspace),
+  'team.change': ({ workspace }, args) => teamService.change(workspace, args),
+  'webhooks.list': ({ workspace }) => webhooks.list(workspace),
+  'webhooks.change': ({ workspace }, args) => webhooks.change(workspace, args),
+  'webhooks.run': ({ workspace }) => { authorizeWorkspaceOperation(workspace?.role, 'webhooks.run'); return webhooks.drain(workspace.workspace.id); },
+  'data.export': ({ workspace }, args) => exportWorkspacePage(workspace, args),
 };
 
 export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: tenantScope = scoped, operations = OPS, workspaceService = workspaces, workspaceScope = scopedWorkspace } = {}) {
@@ -224,10 +238,10 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
       const user = await sessionUser(req);
       if (!user) throw new HttpError(401, 'Not signed in.');
-      const platformOp = /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.|workspace\.)/.test(op);
+      const platformOp = op === 'team.accept' || /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.|workspace\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
       const access = !platformOp && user.workspaceEnabled ? await workspaceService.current(user) : null;
-      if (access && !['owner', 'admin'].includes(access.role)) throw new HttpError(403, 'Only a workspace administrator can use these tools.');
+      if (access) authorizeWorkspaceOperation(access.role, op);
       const db = platformOp ? null : access ? workspaceScope(access) : tenantScope(user.id);
       const result = await fn({ db, user, workspace: access }, args);
       if (op === 'account.change' && result.passwordChanged) auth.endSession(res);

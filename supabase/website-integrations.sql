@@ -111,6 +111,7 @@ begin
   stamp:=persona_knowledge_stamp(w.id);
   select * into existing from persona_requests where workspace_id=w.id and principal=principal_id and request_key=p_request;
   if existing.id is not null then
+    if existing.created_at<now()-interval '24 hours' then return jsonb_build_object('state','obsolete'); end if;
     if existing.message_hash<>p_hash or existing.session_id is distinct from p_session then raise exception 'Request ID was used for a different message.'; end if;
     if existing.knowledge_stamp is distinct from stamp then return jsonb_build_object('state','obsolete'); end if;
     if existing.state='pending' and existing.created_at<now()-interval '50 seconds' then

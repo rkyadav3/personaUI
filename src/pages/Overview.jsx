@@ -40,7 +40,9 @@ export function OverviewContent({ user, data, error, hour = new Date().getHours(
 
 export default function Overview() {
   const { user } = useAuth(), { data, error, reload } = useOp('overview');
-  const { activity } = useOutletContext() || {};
+  const { activity, workspace } = useOutletContext() || {};
   useEffect(() => { document.title = 'Studio overview'; }, []);
+  if (user?.workspaceEnabled && !workspace) return <Loading label="Opening workspace permissions…"/>;
+  if (workspace && !['owner','admin'].includes(workspace.role)) return <section className="card"><h1>{workspace.workspace.name}</h1><p>Your role is {workspace.role}. Browse workspace knowledge{workspace.role === 'contributor' ? ' and maintain files and articles' : ''}. The Admin Assistant is available to administrators.</p><div className="row"><Link className="btn" to="/admin/files">Files & notes</Link><Link className="btn" to="/admin/knowledge">AI knowledge</Link><Link className="btn" to="/admin/team">Team access</Link></div></section>;
   return <OverviewContent activity={activity} user={user} data={data} error={error} onApplied={() => { reload(); window.dispatchEvent(new Event('studio-changed')); window.dispatchEvent(new Event('enquiries-changed')); }} />;
 }

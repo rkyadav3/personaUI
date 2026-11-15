@@ -35,15 +35,15 @@ test('content and knowledge exposes one Content destination instead of separate 
   assert.doesNotMatch(html, /superadmin/);
 });
 
-test('page loading uses labelled skeletons and errors replace the loading state', () => {
+test('page loading uses the original labelled spinner and errors replace the loading state', () => {
   const { Loading } = require('../src/components/Ui.jsx');
   const html = render(Loading, { label: 'Loading your files' });
   assert.match(html, /role="status"/);
-  assert.match(html, /ui-skeleton/);
+  assert.match(html, /ui-loading-svg/);
   assert.match(html, /Loading your files/);
   const error = render(Loading, { error: 'Files unavailable' });
   assert.match(error, /role="alert"/);
-  assert.doesNotMatch(error, /ui-skeleton/);
+  assert.doesNotMatch(error, /ui-loading-svg/);
 });
 
 test('pending AI changes open a labelled approval dialog with a plain summary', () => {

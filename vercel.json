@@ -4,6 +4,7 @@
   "devCommand": "vite",
   "buildCommand": "npx vite build",
   "outputDirectory": "dist",
+  "crons": [{ "path": "/api/maintenance", "schedule": "0 0 * * *" }],
   "functions": {
     "api/site.js": { "maxDuration": 10 },
     "api/home.js": { "maxDuration": 15 },
@@ -12,12 +13,13 @@
     "api/rsvp.js": { "maxDuration": 15 },
     "api/payments.js": { "maxDuration": 30 },
     "api/razorpay-webhook.js": { "maxDuration": 30 },
-    "api/chat.js": { "maxDuration": 30 },
-    "api/persona.js": { "maxDuration": 30 },
+    "api/chat.js": { "maxDuration": 60 },
     "api/admin.js": { "maxDuration": 60 },
     "api/profile.js": { "maxDuration": 60 }
   },
   "rewrites": [
+    { "source": "/api/persona", "destination": "/api/chat?channel=external" },
+    { "source": "/api/maintenance", "destination": "/api/chat?channel=maintenance" },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

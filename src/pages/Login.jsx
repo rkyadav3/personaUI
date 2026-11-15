@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 import { Button } from 'open-glass-ui';
@@ -9,17 +9,19 @@ import { Field, Notice } from '../components/Ui.jsx';
 export default function Login() {
   const { setUser } = useAuth();
   const [params] = useSearchParams();
+  const { pathname } = useLocation();
+  const teamInvitation = pathname === '/admin/team' && params.get('invite')?.startsWith('wi_');
   const navigate = useNavigate();
 
   // If visitor arrives with ?invite=CODE or ?tab=register, forward to the invite activation page
   useEffect(() => {
     const invite = params.get('invite');
-    if (invite) {
+    if (invite && !teamInvitation) {
       navigate(`/invite/${encodeURIComponent(invite)}`, { replace: true });
     } else if (params.get('tab') === 'register') {
       navigate('/invite', { replace: true });
     }
-  }, [params, navigate]);
+  }, [params, navigate, teamInvitation]);
 
   const [f, setF] = useState({ email: '', password: '' });
   const [err, setErr] = useState(''), [busy, setBusy] = useState(false);
@@ -44,7 +46,7 @@ export default function Login() {
       <div className="box">
         <div className="login-orb" aria-hidden="true" />
         <h1>Studio</h1>
-        <p className="login-sub">Welcome back. Sign in to manage your persona and content.</p>
+        <p className="login-sub">{teamInvitation ? 'Sign in with your invited email to join the workspace. Then accept your invitation.' : 'Welcome back. Sign in to manage your persona and content.'}</p>
 
         <form onSubmit={submit}>
           <Glass material="regular" className="card">

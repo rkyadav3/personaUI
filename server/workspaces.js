@@ -31,11 +31,11 @@ export function createWorkspaceService({ database = raw } = {}) {
     if (!user?.id || user.isSuperAdmin) throw new HttpError(403, 'Sign in as a profile administrator to open a workspace.');
     return run(database().from('workspace_members').select(columns).eq('user_id', user.id).eq('status', 'active').order('created_at'));
   }
-  async function current(user, workspaceId = user?.activeWorkspaceId) {
+  async function current(user, workspaceId) {
     const rows = await memberships(user);
     const available = rows.filter(item => item.workspace?.status === 'active' && WORKSPACE_ROLES.includes(item.role));
     const row = workspaceId ? rows.find(item => item.workspace?.id === workspaceId) :
-      available.find(item => item.workspace?.owner_id === user.id) || available[0];
+      available.find(item => item.workspace?.id === user.activeWorkspaceId) || available.find(item => item.workspace?.owner_id === user.id) || available[0];
     return workspaceAccess(user, row);
   }
   return {

@@ -25,6 +25,6 @@ User-approved scope: one public Persona and one private Admin Assistant per indi
 ## Delivery state
 
 Base: ca725d69689392711e8a03ea671cf4fcc6fa899e. Branch: codex/organization-integrations.
-Stages 1–3 are verified and pushed. Stage 4 is verified (537 passing tests, build, service-role SQL and local browser controls) and ready to push. Stage 5 remains in progress. The standalone untracked UI prototype was removed from the original checkout at the user's request.
+Stages 1–4 are verified and pushed. Stage 5 has a testing checkpoint with teams, webhooks, export and retention, 544 passing tests, and a production build. The old loading spinner is restored. External Persona and maintenance routes share the existing chat function, keeping deployment at 12 functions for Hobby. Final browser verification and refinements to workspace recovery and review retention are in progress. The standalone untracked UI prototype was removed from the original checkout at the user's request.
 
 Hosted migrations are user-managed through the SQL Editor, as explicitly requested. Deliver executable SQL and its run order; keep hosted installation status separate from local verification.

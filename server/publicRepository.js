@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto';
 import { raw } from './supabase.js';
 import { HttpError } from './http.js';
 import { canViewProfile } from '../shared/governance.js';
-import { accountColumns } from './workspaceVisibility.js';
+import { accountColumns, canViewWorkspaceProfile } from './workspaceVisibility.js';
 
 export async function query(promise) {
   const { data, error } = await promise;
@@ -22,7 +22,7 @@ export function createPublicRepository(database = raw) {
   }
   async function owner(slug, viewer = null) {
     const user = await accountOwner(slug);
-    if (!canViewProfile(user, viewer)) return null;
+    if (!await canViewWorkspaceProfile(user, viewer, database)) return null;
     const profile = (await query(database().from('profiles').select('*').eq('owner_id', user.id).eq('status', 'published').limit(1)))[0];
     return profile ? { ...user, profile } : null;
   }

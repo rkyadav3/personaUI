@@ -16,7 +16,7 @@ New primary form text: 1rem. Explanations: at least .9375rem. Metadata may use .
 
 ## States
 
-Initial reads show layout skeletons with a useful loading label. Known byte/job counts drive real progress. Unknown processing uses indeterminate progress. Busy forms disable duplicate submission and preserve drafts after failure. Every failed read offers retry. Reduced-motion preferences suppress animation.
+App startup and page transitions use the original centered green loading spinner, as requested. Initial reads inside the new tools show layout skeletons with a useful loading label. Known byte/job counts drive real progress. Unknown processing uses indeterminate progress. Busy forms disable duplicate submission and preserve drafts after failure. Every failed read offers retry. Reduced-motion preferences suppress animation.
 
 ## Public organization pages
 
