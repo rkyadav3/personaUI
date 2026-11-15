@@ -51,3 +51,12 @@ test('cancelling while the response is being read preserves the abort', async ()
   const cancelled = new DOMException('Cancelled', 'AbortError');
   await assert.rejects(askPersona('ravi', 'My work', { fetcher: async () => ({ ok: true, json: async () => { throw cancelled; } }) }), error => error === cancelled);
 });
+
+test('chat can reuse an explicit request ID and distinguish a completed failure from a pending retry', async () => {
+  let submitted;
+  await assert.rejects(askPersona('ravi', 'Hello', { requestId: 'same-request', fetcher: async (_, options) => {
+    submitted = JSON.parse(options.body);
+    return { ok: false, status: 502, json: async () => ({ errors: { retry: 'new_request' } }) };
+  } }), error => error.retryWithNewId === true);
+  assert.equal(submitted.requestId, 'same-request');
+});

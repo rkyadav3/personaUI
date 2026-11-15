@@ -27,9 +27,11 @@ import { createPlatformService } from '../server/platform.js';
 import { createSupportService } from '../server/platformSupport.js';
 import { createWorkspaceService, scopedWorkspace } from '../server/workspaces.js';
 import { createKnowledgePolicyService, listKnowledgeSources } from '../server/knowledgePolicy.js';
+import { createIntegrationService } from '../server/integrations.js';
 
 const workspaces = createWorkspaceService();
 const knowledgePolicies = createKnowledgePolicyService();
+const integrations = createIntegrationService();
 export function createWorkspaceOperations(service = workspaces) {
   const ready = user => { if (!user?.workspaceEnabled) throw new HttpError(503, 'Workspace setup is not enabled yet. Install the workspace migrations and enable WORKSPACES_ENABLED.'); };
   return {
@@ -200,6 +202,8 @@ const OPS = {
   ...createWorkspaceOperations(),
   'knowledge.sources': ({ db }) => listKnowledgeSources(db),
   'knowledge.policy': ({ workspace }, args) => knowledgePolicies.save(workspace, args),
+  'integrations.list': ({ workspace }) => integrations.list(workspace),
+  'integrations.change': ({ workspace }, args) => integrations.change(workspace, args),
 };
 
 export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: tenantScope = scoped, operations = OPS, workspaceService = workspaces, workspaceScope = scopedWorkspace } = {}) {

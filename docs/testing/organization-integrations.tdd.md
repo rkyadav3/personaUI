@@ -22,3 +22,11 @@ Existing tests emit React server-rendering useLayoutEffect warnings; no new fail
 - Browser: organization selection, grounded draft review, confirmation, failed-save draft preservation and retry, source audience changes and 390px viewport fit pass using intercepted local requests.
 - Independent Standards/Spec review fixes: deny non-administrator mutations, verify private media membership and suspension, check enquiry workspace status, remove unsupported organization detail claims, merge additional detail fields, refresh source-policy cache.
 - Hosted SQL is user-managed. The user explicitly elected to use the SQL Editor themselves; no dashboard access is required.
+
+## Stage 3 — authenticated website connections
+
+- RED: three integration specifications initially failed for missing credential/API/migration implementation.
+- GREEN: 534 tests pass; production build passes. Actual migration runs twice in PostgreSQL/PGlite; admission/replay executes as service_role with BYPASSRLS.
+- Verified: random hashed scoped keys, expiry/revocation, server source assignment, shared monthly admission, idempotent pending/completed results, changed-message rejection, public-knowledge cache invalidation and counter-only update compatibility.
+- Browser: create connection, failed-save input preservation, one-time key dismissal, disable/enable and mobile fit. Installed widget recovers with a new ID after a confirmed terminal failure.
+- Review fixes: explicit terminal-retry metadata, retained provider token evidence after history failure, cache invalidation for changed source/profile access and date validity, helper execute permission under service_role.

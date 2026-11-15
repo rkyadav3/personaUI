@@ -14,6 +14,7 @@ export default function Chat({ m, ctx, data }) {
   const page = normalizePage(data.page), bg = normalizeBg(data.bg);
   const [input, setInput] = useState(''), [messages, setMessages] = useState([]), [busy, setBusy] = useState(false), [error, setError] = useState(''), [listening, setListening] = useState(false);
   const inputRef = useRef(null), controller = useRef(null), recognition = useRef(null), pending = useRef(false), conversationRef = useRef(null), panelRef = useRef(null), dockRef = useRef(null);
+  const retryRequest = useRef(null);
   const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
   const name = m.first || m.name || 'this creator';
   const popularProducts = page.customization.chatStore ? popularChatProducts(m.products) : [];
@@ -73,10 +74,13 @@ export default function Chat({ m, ctx, data }) {
     recognition.current?.stop();
     pending.current = true; setBusy(true);
     const request = new AbortController(); controller.current = request;
+    if (retryRequest.current?.question !== question || retryRequest.current?.slug !== ctx.slug) retryRequest.current = { slug: ctx.slug, question, id: crypto.randomUUID() };
     try {
-      const reply = await askPersona(ctx.slug, question, { signal: request.signal });
+      const reply = await askPersona(ctx.slug, question, { signal: request.signal, requestId: retryRequest.current.id });
+      retryRequest.current = null;
       setMessages(previous => [...previous, { role: 'assistant', text: reply.reply, sources: reply.sources }]);
     } catch (failure) {
+      if (failure.retryWithNewId) retryRequest.current = null;
       if (failure.name !== 'AbortError') { setError(failure.message); setInput(question); }
     } finally { pending.current = false; setBusy(false); }
   }

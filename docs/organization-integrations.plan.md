@@ -25,6 +25,6 @@ User-approved scope: one public Persona and one private Admin Assistant per indi
 ## Delivery state
 
 Base: ca725d69689392711e8a03ea671cf4fcc6fa899e. Branch: codex/organization-integrations.
-Stage 1 is verified and pushed. Stage 2 is verified (530 passing tests, build and local browser workflow) and ready to push. Stages 3–5 remain in progress. The standalone untracked UI prototype was removed from the original checkout at the user's request.
+Stages 1–2 are verified and pushed. Stage 3 is verified (534 passing tests, build, service-role SQL and local browser flows) and ready to push. Stages 4–5 remain in progress. The standalone untracked UI prototype was removed from the original checkout at the user's request.
 
 Hosted migrations are user-managed through the SQL Editor, as explicitly requested. Deliver executable SQL and its run order; keep hosted installation status separate from local verification.
