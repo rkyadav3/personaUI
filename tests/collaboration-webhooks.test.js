@@ -3,6 +3,23 @@ import assert from 'node:assert/strict';
 import { addonDatabase, ownerId, memberId } from './support/addonDatabase.js';
 import { scriptedDatabase, step, hasEq } from './support/database.js';
 
+test('retention removes expired assistant reviews as well as transcripts and keeps active reviews', async () => {
+  const db = await addonDatabase(['studio-assistant', 'studio-chat', 'workspaces', 'workspace-operations', 'collaboration-webhooks']);
+  try {
+    await db.exec('set role service_role');
+    await db.query('update workspace_api_settings set retention_days=7 where workspace_id=$1', [ownerId]);
+    const plan = { steps: [{ op: 'posts.save' }], answer: 'Private assistant response' };
+    for (const [status, future] of [['applied', false], ['pending', false], ['pending', true], ['running', true]]) {
+      const id = crypto.randomUUID();
+      await db.query("insert into studio_reviews(id,owner_id,command,plan,status,created_at,expires_at) values($1,$2,'Private question',$3,$4,now()-interval '10 days',case when $5 then now()+interval '1 hour' else now()-interval '9 days' end)", [id, ownerId, plan, status, future]);
+      if (status === 'applied') await db.query("insert into studio_chat(owner_id,question,answer,review_id,created_at) values($1,'Private question','Private answer',$2,now()-interval '10 days')", [ownerId, id]);
+    }
+    await db.query('select run_workspace_retention()');
+    assert.equal((await db.query('select count(*) n from studio_chat')).rows[0].n, 0);
+    assert.deepEqual((await db.query('select status from studio_reviews order by status')).rows.map(row => row.status), ['pending', 'running']);
+  } finally { await db.close(); }
+});
+
 test('invited administrators can read and apply through the production assistant adapter', async () => {
   const { createStudioOperations } = await import('../server/studioOperations.js');
   const access = { workspace: { id: ownerId }, ownerId, actorId: memberId, role: 'admin' };

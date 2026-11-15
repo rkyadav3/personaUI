@@ -170,6 +170,13 @@ begin
   execute format('delete from %I where id in(select t.id from %I t join workspace_api_settings s on s.workspace_id=t.workspace_id where t.created_at<now()-make_interval(days=>s.retention_days) limit 1000)',tab,tab);
   get diagnostics n=row_count; removed:=removed+n;
  end loop;
+ if to_regclass('public.studio_reviews') is not null then
+  delete from studio_reviews where id in (
+   select r.id from studio_reviews r join workspace_api_settings s on s.workspace_id=r.workspace_id
+   where r.created_at<now()-make_interval(days=>s.retention_days) and r.status<>'running'
+    and (r.status<>'pending' or r.expires_at<=now()) limit 1000
+  );
+ end if;
  update persona_requests r set response=null,message_hash='retained_usage_only' from workspace_api_settings s
   where r.workspace_id=s.workspace_id and r.created_at<now()-make_interval(days=>s.retention_days) and r.response is not null;
  delete from persona_requests r using workspace_api_settings s where r.workspace_id=s.workspace_id and r.created_at<date_trunc('month',now()) and r.created_at<now()-make_interval(days=>s.retention_days);

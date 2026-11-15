@@ -5,6 +5,22 @@ const load = () => import('../src/lib/studioSession.js');
 const id = '11111111-1111-4111-8111-111111111111';
 const draft = (status = 'pending') => ({ id, status, expiresAt: '2099-01-01T00:00:00Z', changes: [{ id: 'one', title: 'Rename project', fields: [{ path: 'title', before: 'Old', after: 'New' }] }] });
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
+
+test('assistant recovery remembers independent reviews for each workspace under the same login', async () => {
+  const { createStudioSession } = await load();
+  const stored = new Map([['studio-review:owner:workspace-a', 'review-a'], ['studio-review:owner:workspace-b', 'review-b']]);
+  const calls = [];
+  const session = createStudioSession({ userId: 'owner', workspaceId: 'workspace-b', storage: { getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value), removeItem: key => stored.delete(key) }, call: async (op, args) => {
+    calls.push({ op, args });
+    return op === 'studio.history' ? { rows: [], nextBefore: null } : { status: 'pending', review: { ...draft(), id: args.reviewId } };
+  } });
+  await session.recover();
+  assert.equal(session.snapshot().review?.id, 'review-b');
+  assert.equal(calls.at(-1).args.reviewId, 'review-b');
+  assert.equal(calls.every(call => call.args?.workspaceId === 'workspace-b'), true);
+  assert.equal(stored.get('studio-review:owner:workspace-a'), 'review-a');
+  session.dispose();
+});
 async function fixture(handler, saved = false) {
   const { createStudioSession } = await load(), calls = [], published = [], stored = new Map(saved ? [['studio-review:owner', id]] : []);
   let refreshed = 0;

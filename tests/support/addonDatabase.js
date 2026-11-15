@@ -4,7 +4,7 @@ export const ownerId='11111111-1111-4111-8111-111111111111', memberId='22222222-
 export async function addonDatabase(stages=[]) {
   const db=new PGlite();
   try {
-  await db.exec(`create role service_role bypassrls;
+  await db.exec(`create role service_role bypassrls; create role anon; create role authenticated;
     create table users(id uuid primary key,name text,slug text,email text,tags jsonb default '[]',profile_private boolean default false,locked_until timestamptz);
     create table profiles(id bigint primary key,owner_id uuid unique,name text,status text default 'published',views integer default 0);
     create table files(id bigint primary key,owner_id uuid,name text,status text default 'published');

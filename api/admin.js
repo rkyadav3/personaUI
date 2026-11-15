@@ -241,9 +241,12 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       const platformOp = op === 'team.accept' || /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.|workspace\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
       const access = !platformOp && user.workspaceEnabled ? await workspaceService.current(user) : null;
+      if (access && args.workspaceId && args.workspaceId !== access.workspace.id) throw new HttpError(409, 'Your selected workspace changed. Refresh this page before continuing.');
       if (access) authorizeWorkspaceOperation(access.role, op);
       const db = platformOp ? null : access ? workspaceScope(access) : tenantScope(user.id);
-      const result = await fn({ db, user, workspace: access }, args);
+      const operationArgs = access ? { ...args } : args;
+      if (access) delete operationArgs.workspaceId;
+      const result = await fn({ db, user, workspace: access }, operationArgs);
       if (op === 'account.change' && result.passwordChanged) auth.endSession(res);
       return res.status(200).json(result);
     } catch (e) {

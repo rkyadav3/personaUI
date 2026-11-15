@@ -25,6 +25,8 @@ User-approved scope: one public Persona and one private Admin Assistant per indi
 ## Delivery state
 
 Base: ca725d69689392711e8a03ea671cf4fcc6fa899e. Branch: codex/organization-integrations.
-Stages 1–4 are verified and pushed. Stage 5 has a testing checkpoint with teams, webhooks, export and retention, 544 passing tests, and a production build. The old loading spinner is restored. External Persona and maintenance routes share the existing chat function, keeping deployment at 12 functions for Hobby. Final browser verification and refinements to workspace recovery and review retention are in progress. The standalone untracked UI prototype was removed from the original checkout at the user's request.
+Stages 1–5 are implemented and verified locally. Stage 5 includes teams, signed durable webhooks, export/retention and workspace-bound requests, with 549 passing tests and a production build. The old loading spinner is restored. External Persona and maintenance routes share the existing chat function, keeping deployment at 12 functions for Hobby; Vercel confirmed the testing checkpoint deployment READY. Browser checks cover login/invitations, role restrictions, save retries, downloads and actual 390px mobile layout. The standalone untracked UI prototype was removed from the original checkout at the user's request.
 
 Hosted migrations are user-managed through the SQL Editor, as explicitly requested. Deliver executable SQL and its run order; keep hosted installation status separate from local verification.
+
+Production activation remains operator-managed: install the five migrations, configure WORKSPACES_ENABLED and webhook worker secrets, then verify hosted organization/individual flows and a connected website. Preview checks confirmed the add-on flag and maintenance authorization are not configured. See production-readiness.md.

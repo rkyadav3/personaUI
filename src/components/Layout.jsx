@@ -54,7 +54,7 @@ function Inner({ superadmin }) {
     if (!user?.workspaceEnabled || user.isSuperAdmin || superadmin) return undefined;
     let active = true;
     setWorkspace(null); setWorkspaceError('');
-    const load = () => api('workspace.current').then(result => { if (active) setWorkspace(result); }, error => { if (active) setWorkspaceError(error.message); });
+    const load = () => api('workspace.current').then(result => { if (active) { setWorkspace(result); setWorkspaceError(''); } }, error => { if (active) { setWorkspace(null); setWorkspaceError(error.message); } });
     load(); window.addEventListener('workspace-access-changed', load);
     return () => { active = false; window.removeEventListener('workspace-access-changed', load); };
   }, [user?.id, user?.workspaceEnabled, user?.isSuperAdmin, superadmin, workspaceAttempt]);
@@ -85,6 +85,8 @@ function Inner({ superadmin }) {
   if (!superadmin && user.isSuperAdmin) return <Navigate to="/superadmin" replace />;
   if (superadmin && !user.isSuperAdmin) return <Navigate to="/admin" replace />;
   if (!superadmin && pathname === '/admin/team' && new URLSearchParams(search).get('invite')?.startsWith('wi_')) return <main className="studio-main"><Outlet /></main>;
+  const recoveryPage = pathname === '/admin/settings' && new URLSearchParams(search).get('tab') === 'account' || pathname === '/admin/support' || pathname.startsWith('/admin/support/');
+  if (!superadmin && user.workspaceEnabled && !workspace && recoveryPage) return <main className="studio-main"><Outlet context={{ setNeeds, activity, workspace }} /></main>;
   if (!superadmin && user.workspaceEnabled && !workspace) return <><Loading error={workspaceError} label="Opening your workspace…" />{workspaceError && <button className="btn" onClick={() => setWorkspaceAttempt(value => value + 1)}>Retry workspace</button>}</>;
   if (!superadmin && needs === null) return <Loading label="Opening your workspace…" />;
   const supportPage = pathname === '/admin/support' || pathname.startsWith('/admin/support/');

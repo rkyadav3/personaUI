@@ -12,9 +12,10 @@ import KnowledgePolicies from '../components/KnowledgePolicies.jsx';
 export default function KnowledgeIndex() {
   const workspaceRole = useOutletContext()?.workspace?.role;
   const readOnly = workspaceRole === 'viewer';
+  const canAdminister = !workspaceRole || ['owner', 'admin'].includes(workspaceRole);
   const user = useAuth()?.user;
   const { data: c, reload: reloadCounts, error } = useOp('index.counts');
-  const { data: set } = useOp('index.settings');
+  const { data: set, error: settingsError, reload: reloadSettings } = useOp('index.settings');
 
   const [activeTab, setActiveTab] = useAdminTab({ values: ['sync', 'test'], defaultValue: 'sync' });
 
@@ -30,6 +31,7 @@ export default function KnowledgeIndex() {
   const [searchBusy, setSearchBusy] = useState(false);
 
   async function sync() {
+    if (readOnly || syncing) return;
     setSyncing(true); stop.current = false; setMsgs([]); setPct(0); setLabel('Analyzing source files…');
     try {
       const diff = await api('index.sync');
@@ -51,7 +53,7 @@ export default function KnowledgeIndex() {
 
   async function test(e) {
     e.preventDefault();
-    if (!q.trim() || searchBusy) return;
+    if (!q.trim() || searchBusy || readOnly) return;
     setSearchBusy(true); setSearchErr(''); setHits(null);
     try {
       setHits(await api('index.test', { q }));
@@ -59,7 +61,7 @@ export default function KnowledgeIndex() {
     setSearchBusy(false);
   }
 
-  if (!c) return <Loading error={error} />;
+  if (!c) return <><Loading error={error} />{error && <button className="btn" onClick={reloadCounts}>Retry knowledge status</button>}</>;
 
   const waiting = c.chunks - c.embedded;
   const readyPct = c.chunks > 0 ? Math.round((c.embedded / c.chunks) * 100) : 0;
@@ -130,7 +132,7 @@ export default function KnowledgeIndex() {
       {/* Page Tabs */}
       <AdminTabs label="AI knowledge tools" value={activeTab} onChange={setActiveTab} items={[{ id: 'sync', label: 'Readiness & sync', icon: 'book' }, { id: 'test', label: 'Test a question', icon: 'search' }]} />
       {user?.workspaceEnabled && <KnowledgePolicies readOnly={!!workspaceRole && !['owner', 'admin'].includes(workspaceRole)} />}
-      <p className="hint">Questions from your public chat are in <Link to="/admin/questions">Activity → Visitor Q&amp;A</Link>.</p>
+      {canAdminister && <p className="hint">Questions from your public chat are in <Link to="/admin/questions">Activity → Visitor Q&amp;A</Link>.</p>}
 
       {/* TAB 1: HOW IT WORKS & ADVANCED CONTROLS */}
       {activeTab === 'sync' && (
@@ -155,6 +157,7 @@ export default function KnowledgeIndex() {
 
           <details className="card" style={{ marginTop: 18 }}>
             <summary>Advanced search settings</summary>
+            {settingsError && <Notice kind="error">Search settings are unavailable. <button className="btn small" onClick={reloadSettings}>Retry search settings</button></Notice>}
             {set ? (
               <p style={{ fontSize: '.9rem', color: '#475569' }}>
                 Embedding Model: <b>{set.model}</b> (768 dimensions) ·
@@ -162,14 +165,14 @@ export default function KnowledgeIndex() {
                 Keyword Match: <b>{set.minKeywordRank}</b>
               </p>
             ) : null}
-            <div className="row" style={{ marginTop: 12 }}>
+            {canAdminister && <div className="row" style={{ marginTop: 12 }}>
               <Confirm
                 label="Rebuild Everything"
                 warn="This clears the vector index and re-extracts all published files from scratch. Only use this if you change your embedding model."
                 confirmLabel="Yes, rebuild index"
                 onConfirm={async () => { try { await api('index.rebuild'); reloadCounts(); } catch (e) { setMsgs([{ kind: 'error', t: e.message }]); } }}
               />
-            </div>
+            </div>}
           </details>
         </>
       )}
