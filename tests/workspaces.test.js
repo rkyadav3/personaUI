@@ -71,6 +71,18 @@ test('workspace type setup is an authorized transaction with a trusted actor and
   await assert.rejects(service.setup({ id: alice }, { type: 'superadmin' }), /Individual or Organization/);
 });
 
+test('default workspace selects an available membership while explicit suspended targets reject', async () => {
+  const { createWorkspaceService } = await import('../server/workspaces.js');
+  const rows = [
+    { ...membership, workspace: { ...workspace, status: 'suspended' } },
+    { ...membership, role: 'admin', workspace: { ...workspace, id: bob, owner_id: bob } },
+  ];
+  const db = scriptedDatabase({ table: 'workspace_members', data: rows }, { table: 'workspace_members', data: rows });
+  const service = createWorkspaceService({ database: () => db });
+  assert.equal((await service.current({ id: alice })).workspace.id, bob);
+  await assert.rejects(service.current({ id: alice }, alice), /not available/);
+});
+
 test('workspace migration preserves existing tenant IDs and enforces workspace/owner consistency', async () => {
   const sql = await readFile(new URL('../supabase/workspaces.sql', import.meta.url), 'utf8');
   const db = new PGlite();
