@@ -33,8 +33,9 @@ export function createWorkspaceService({ database = raw } = {}) {
   }
   async function current(user, workspaceId = user?.activeWorkspaceId) {
     const rows = await memberships(user);
+    const available = rows.filter(item => item.workspace?.status === 'active' && WORKSPACE_ROLES.includes(item.role));
     const row = workspaceId ? rows.find(item => item.workspace?.id === workspaceId) :
-      rows.find(item => item.workspace?.owner_id === user.id) || rows[0];
+      available.find(item => item.workspace?.owner_id === user.id) || available[0];
     return workspaceAccess(user, row);
   }
   return {
