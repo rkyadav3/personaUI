@@ -86,3 +86,40 @@ test('knowledge validity excludes expired and internal sources before AI context
   db.uid = 'alice'; db.workspaceId = 'alice';
   assert.deepEqual((await publishedPassages(db, candidates)).map(row => row.id), [1]);
 });
+
+test('knowledge policy changes are authorized, versioned and reject reversed validity dates', async () => {
+  const { createKnowledgePolicyService } = await import('../server/knowledgePolicy.js');
+  const db = scriptedDatabase({ table: 'rpc:set_source_policy', data: { id: 7, audience: 'internal' } });
+  const service = createKnowledgePolicyService({ database: () => db });
+  const access = { actorId: 'alice', workspace: { id: 'workspace-a' }, role: 'owner' };
+  const result = await service.save(access, { kind: 'file', id: 7, audience: 'internal', revision: 1 });
+  assert.equal(result.audience, 'internal');
+  assert.equal(step(db.calls[0], 'rpc')[0].p_user, 'alice');
+  assert.equal(step(db.calls[0], 'rpc')[0].p_workspace, 'workspace-a');
+  await assert.rejects(service.save({ ...access, role: 'viewer' }, { kind: 'file', id: 7, audience: 'public', revision: 1 }), /administrator/);
+  await assert.rejects(service.save(access, { kind: 'file', id: 7, audience: 'public', revision: 1, validFrom: '2027-01-01', validUntil: '2026-01-01' }), /after/);
+});
+
+test('workspace-enabled admin requests resolve membership before invoking content operations', async () => {
+  const { createAdminHandler } = await import('../api/admin.js');
+  let scoped = false;
+  const handler = createAdminHandler({
+    sessionUser: async () => ({ id: 'alice', workspaceEnabled: true }),
+    workspaceService: { current: async () => ({ role: 'owner', workspace: { id: 'workspace-a' }, actorId: 'alice', ownerId: 'alice' }) },
+    workspaceScope: () => { scoped = true; return { workspaceId: 'workspace-a' }; },
+    operations: { 'profile.get': ({ db }) => ({ scope: db.workspaceId }) },
+  });
+  const res = { setHeader() {}, status(code) { this.code = code; return this; }, json(value) { this.value = value; } };
+  await handler({ method: 'POST', body: { op: 'profile.get' } }, res);
+  assert.equal(res.code, 200); assert.equal(scoped, true); assert.equal(res.value.scope, 'workspace-a');
+});
+
+test('organization profile knowledge uses only visibility-filtered public facts', async () => {
+  const { organizationPassage } = await import('../server/organizationProfile.js');
+  const { buildPublic } = await import('../server/profile.js');
+  const publicView = buildPublic({ name: 'Acme', profile_type: 'organization', purpose: 'We provide support.',
+    contact: { email: 'private@example.test' }, organization: { type: 'company', mission: 'Private mission' }, visibility: { organization: false } }, []);
+  const passage = organizationPassage(publicView);
+  assert.match(passage.content, /We provide support/);
+  assert.doesNotMatch(passage.content, /private@example|Private mission/);
+});
