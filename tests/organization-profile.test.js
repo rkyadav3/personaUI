@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { scriptedDatabase, step } from './support/database.js';
+import { readFile } from 'node:fs/promises';
+import { PGlite } from '@electric-sql/pglite';
 
 test('organization normalization keeps organization facts and drops individual and unknown fields', async () => {
   const { normalizeOrganizationDraft, organizationMissing } = await import('../shared/organization.js');
@@ -14,6 +16,23 @@ test('organization normalization keeps organization facts and drops individual a
   assert.equal(draft.profile.organization.details.employeeSecrets, undefined);
   assert.equal(draft.profile.organization.details.industry, undefined);
   assert.deepEqual(organizationMissing(draft).required, []);
+});
+
+test('organization migration executes repeatably and synchronizes public suspension state', async () => {
+  const db = new PGlite(), owner = '11111111-1111-4111-8111-111111111111';
+  try {
+    await db.exec(`create role service_role; create table users(id uuid primary key,name text,slug text,email text);
+      create table profiles(id bigint primary key,owner_id uuid unique,name text);
+      create table files(id bigint primary key,owner_id uuid); create table posts(id bigint primary key,owner_id uuid);
+      insert into users values('${owner}','Alice','alice','alice@example.test');`);
+    await db.exec(await readFile(new URL('../supabase/workspaces.sql', import.meta.url), 'utf8'));
+    const sql = await readFile(new URL('../supabase/organization-profiles.sql', import.meta.url), 'utf8');
+    await db.exec(sql); await db.exec(sql);
+    await db.exec(`select setup_workspace_type('${owner}','${owner}','organization'); update workspaces set status='suspended' where id='${owner}'`);
+    const row = (await db.query('select workspace_type,workspace_status from users')).rows[0];
+    assert.equal(row.workspace_type, 'organization'); assert.equal(row.workspace_status, 'suspended');
+    await assert.rejects(db.exec(`insert into files(id,owner_id,audience) values(1,'${owner}','everyone')`), /check constraint/);
+  } finally { await db.close(); }
 });
 
 test('organization extraction grounds identity and leaves absent claims blank', async () => {
