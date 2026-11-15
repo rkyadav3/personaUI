@@ -8,6 +8,7 @@ import { raw, run } from './supabase.js';
 import { normalizePage } from '../shared/pageSettings.js';
 import { publicPortfolio } from '../shared/portfolio.js';
 import { canViewProfile } from '../shared/governance.js';
+import { accountColumns } from './workspaceVisibility.js';
 const MAX_MEMBERS = 200,
   MAX_OFFERS = 300;
 const cut = (s, n) => {
@@ -28,7 +29,7 @@ export async function homeFeed(db = raw()) {
   };
   if (!profiles.length) return base;
   const owners = ids(profiles);
-  const [users, cs, os, sites] = await Promise.all([run(db.from('users').select('id,email,slug,tags,profile_private,locked_until').in('id', owners)), run(db.from('contributions').select('*').in('owner_id', owners).order('id')), run(db.from('offerings').select('*').in('owner_id', owners).order('id')), run(db.from('site_settings').select('owner_id,bg_path,hero_path,page,portfolio').in('owner_id', owners))]);
+  const [users, cs, os, sites] = await Promise.all([run(db.from('users').select(accountColumns('id,email,slug,tags,profile_private,locked_until')).in('id', owners)), run(db.from('contributions').select('*').in('owner_id', owners).order('id')), run(db.from('offerings').select('*').in('owner_id', owners).order('id')), run(db.from('site_settings').select('owner_id,bg_path,hero_path,page,portfolio').in('owner_id', owners))]);
   return buildHomeFeed({
     profiles,
     users,

@@ -6,8 +6,11 @@ import { Link } from 'react-router-dom';
 import Icon from '../components/portfolio/Icon.jsx';
 import { useOp } from '../lib/hooks.js';
 import { Confirm, Loading, Notice, Pill, Progress } from '../components/Ui.jsx';
+import { useAuth } from '../lib/auth.jsx';
+import KnowledgePolicies from '../components/KnowledgePolicies.jsx';
 
 export default function KnowledgeIndex() {
+  const user = useAuth()?.user;
   const { data: c, reload: reloadCounts, error } = useOp('index.counts');
   const { data: set } = useOp('index.settings');
 
@@ -124,6 +127,7 @@ export default function KnowledgeIndex() {
 
       {/* Page Tabs */}
       <AdminTabs label="AI knowledge tools" value={activeTab} onChange={setActiveTab} items={[{ id: 'sync', label: 'Readiness & sync', icon: 'book' }, { id: 'test', label: 'Test a question', icon: 'search' }]} />
+      {user?.workspaceEnabled && <KnowledgePolicies />}
       <p className="hint">Questions from your public chat are in <Link to="/admin/questions">Activity → Visitor Q&amp;A</Link>.</p>
 
       {/* TAB 1: HOW IT WORKS & ADVANCED CONTROLS */}

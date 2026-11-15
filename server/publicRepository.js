@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto';
 import { raw } from './supabase.js';
 import { HttpError } from './http.js';
 import { canViewProfile } from '../shared/governance.js';
+import { accountColumns } from './workspaceVisibility.js';
 
 export async function query(promise) {
   const { data, error } = await promise;
@@ -16,7 +17,7 @@ export async function query(promise) {
 
 export function createPublicRepository(database = raw) {
   async function accountOwner(slug) {
-    const [user] = await query(database().from('users').select('id,email,slug,name,tags,profile_private,locked_until').eq('slug', slug).limit(1));
+    const [user] = await query(database().from('users').select(accountColumns('id,email,slug,name,tags,profile_private,locked_until')).eq('slug', slug).limit(1));
     return isSuperAdminEmail(user?.email) ? null : user || null;
   }
   async function owner(slug, viewer = null) {

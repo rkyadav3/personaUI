@@ -6,8 +6,10 @@ import { createAssetStorage } from '../server/assetStorage.js';
 import { HttpError, publicError } from '../server/http.js';
 import { raw, run } from '../server/supabase.js';
 import { assetIdValid } from '../shared/assets.js';
+import { canViewProfile } from '../shared/governance.js';
+import { createWorkspaceService } from '../server/workspaces.js';
 
-export function createMediaHandler({ viewerFor = sessionUser, repository = createPublicRepository, scope = scoped, storage = createAssetStorage, database = raw } = {}) {
+export function createMediaHandler({ viewerFor = sessionUser, repository = createPublicRepository, scope = scoped, storage = createAssetStorage, database = raw, workspaceService = createWorkspaceService() } = {}) {
 return async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
@@ -23,7 +25,8 @@ return async function handler(req, res) {
     if (!/^[a-z0-9-]{1,80}$/.test(slug)) throw new HttpError(404, 'Media not found.');
     const viewer = await viewerFor(req), repo = repository();
     const account = await repo.accountOwner(slug);
-    const user = account?.id === viewer?.id ? account : await repo.owner(slug, viewer);
+    if (account?.id === viewer?.id && viewer.workspaceEnabled) await workspaceService.current(viewer, account.id);
+    const user = account?.id === viewer?.id && canViewProfile(account, viewer) ? account : await repo.owner(slug, viewer);
     if (!user) throw new HttpError(404, 'Media not found.');
     let asset;
     if (legacyPath) {

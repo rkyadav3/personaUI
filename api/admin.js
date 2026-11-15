@@ -25,6 +25,19 @@ import { createTagService } from '../server/tags.js';
 import { createActivityService } from '../server/adminActivity.js';
 import { createPlatformService } from '../server/platform.js';
 import { createSupportService } from '../server/platformSupport.js';
+import { createWorkspaceService, scopedWorkspace } from '../server/workspaces.js';
+import { createKnowledgePolicyService, listKnowledgeSources } from '../server/knowledgePolicy.js';
+
+const workspaces = createWorkspaceService();
+const knowledgePolicies = createKnowledgePolicyService();
+export function createWorkspaceOperations(service = workspaces) {
+  const ready = user => { if (!user?.workspaceEnabled) throw new HttpError(503, 'Workspace setup is not enabled yet. Install the workspace migrations and enable WORKSPACES_ENABLED.'); };
+  return {
+    'workspace.current': async ({ user }) => { ready(user); return { ...(await service.current(user)), workspaces: await service.list(user) }; },
+    'workspace.setup': ({ user }, args) => { ready(user); return service.setup(user, args); },
+    'workspace.list': async ({ user }) => { ready(user); return { workspaces: await service.list(user) }; },
+  };
+}
 
 export function createPlatformOperations({ invitesService = invites, suggestionsService = createSuggestionService(), platformService = createPlatformService(), tagsService = createTagService(), supportService = createSupportService() } = {}) {
   return {
@@ -184,9 +197,12 @@ const OPS = {
   'index.settings': async () => ({ model: await model(), minSimilarity: env('MIN_SIMILARITY', 0.6), minKeywordRank: env('MIN_KEYWORD_RANK', 0.2) }),
 
   ...createPlatformOperations(),
+  ...createWorkspaceOperations(),
+  'knowledge.sources': ({ db }) => listKnowledgeSources(db),
+  'knowledge.policy': ({ workspace }, args) => knowledgePolicies.save(workspace, args),
 };
 
-export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: tenantScope = scoped, operations = OPS } = {}) {
+export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: tenantScope = scoped, operations = OPS, workspaceService = workspaces, workspaceScope = scopedWorkspace } = {}) {
   return async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
@@ -197,9 +213,12 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
       const user = await sessionUser(req);
       if (!user) throw new HttpError(401, 'Not signed in.');
-      const platformOp = /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.)/.test(op);
+      const platformOp = /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.|workspace\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
-      const result = await fn({ db: platformOp ? null : tenantScope(user.id), user }, args);
+      const access = !platformOp && user.workspaceEnabled ? await workspaceService.current(user) : null;
+      if (access && !['owner', 'admin'].includes(access.role)) throw new HttpError(403, 'Only a workspace administrator can use these tools.');
+      const db = platformOp ? null : access ? workspaceScope(access) : tenantScope(user.id);
+      const result = await fn({ db, user, workspace: access }, args);
       if (op === 'account.change' && result.passwordChanged) auth.endSession(res);
       return res.status(200).json(result);
     } catch (e) {

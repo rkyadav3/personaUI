@@ -1,0 +1,19 @@
+.ui-skeleton { display:grid;gap:1.25rem;padding:1.5rem 0;min-height:12rem; }
+.ui-skeleton-label { color:#486050;font-size:.9375rem;line-height:1.5; }
+.ui-skeleton-block { height:1rem;max-width:100%;background:#e8eee9;border-radius:6px;animation:skeleton-breathe 1.4s ease-in-out infinite alternate; }
+.ui-skeleton-title { height:2rem;width:42%; }
+.ui-skeleton-row { display:grid;gap:.75rem;padding:1.25rem;background:#f5f8f6;border-radius:12px; }
+.ui-skeleton-row .ui-skeleton-block:nth-child(2) { width:72%; }
+.ui-busy { display:grid;gap:.625rem;padding:1rem 0;color:#365641;font-size:.9375rem;line-height:1.5; }
+.ui-busy progress { width:100%;height:.5rem;accent-color:#128044; }
+@keyframes skeleton-breathe { from { opacity:.45; } to { opacity:1; } }
+@media(prefers-reduced-motion:reduce) { .ui-skeleton-block { animation:none; } }
+.workspace-setup { max-width:70ch; }
+.workspace-setup .muted { font-size:1rem;line-height:1.6; }
+.workspace-setup .btn { min-height:44px; }
+.studio-shell .organization-fields .f { font-size:.9375rem;line-height:1.5; }
+.studio-shell .organization-fields input,.studio-shell .organization-fields textarea,.studio-shell .organization-fields select { font-size:1rem;min-height:44px; }
+.pf-org-details { display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,3fr);gap:.75rem 1.5rem;font-size:1rem;line-height:1.6;margin:1.5rem 0; }
+.pf-org-details dt { font-weight:600; }
+.pf-org-details dd { margin:0;overflow-wrap:anywhere;white-space:pre-wrap; }
+@media(max-width:600px) { .pf-org-details { grid-template-columns:1fr;gap:.25rem; }.pf-org-details dd { margin-bottom:.75rem; } }

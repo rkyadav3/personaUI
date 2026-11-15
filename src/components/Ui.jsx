@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Badge, Button, Progress as GlassProgress, Stat } from 'open-glass-ui';
+import '../styles/loading.css';
+
+export function Skeleton({ label = 'Opening your workspace…', rows = 3 }) {
+  return <div className="ui-skeleton" role="status" aria-live="polite"><span className="ui-skeleton-label">{label}</span><div className="ui-skeleton-block ui-skeleton-title" aria-hidden="true" />{Array.from({ length: rows }, (_, i) => <div key={i} className="ui-skeleton-row" aria-hidden="true"><div className="ui-skeleton-block" /><div className="ui-skeleton-block" /></div>)}</div>;
+}
+export function Busy({ label = 'Working…', progress }) {
+  const value = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : undefined;
+  return <div className="ui-busy" role="status" aria-live="polite"><span>{label}{value !== undefined ? ` · ${Math.round(value)}%` : ''}</span><progress aria-label={label} max={100} value={value} /></div>;
+}
 
 const TONE = { published: 'positive', active: 'positive', draft: 'warning', expired: 'warning', revoked: 'warning', used: 'warning', 'used up': 'warning' };
 export const Pill = ({ status }) => <Badge tone={TONE[status] || 'neutral'}>{status}</Badge>;
@@ -57,7 +66,7 @@ export function Confirm({ label, warn, confirmLabel = 'Yes, delete', onConfirm, 
 
 export const Field = ({ label, children }) => <label className="f">{label}{children}</label>;
 
-export const Loading = ({ error, label = 'Loading…', compact = false }) => error ? <Notice kind="error">{error}</Notice> : <div className={`ui-loading${compact ? ' compact' : ''}`} role="status" aria-live="polite">
+export const Loading = ({ error, label = 'Loading…', compact = false }) => error ? <Notice kind="error">{error}</Notice> : !compact ? <Skeleton label={label} /> : <div className={`ui-loading${compact ? ' compact' : ''}`} role="status" aria-live="polite">
   <svg className="ui-loading-svg" width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true" focusable="false"><circle cx="24" cy="24" r="19" stroke="currentColor" strokeWidth="3" opacity=".15" /><path d="M24 5a19 19 0 0 1 19 19" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /><path d="m24 16 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z" fill="currentColor" /></svg>
   <span>{label}</span>
 </div>;

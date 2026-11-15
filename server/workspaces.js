@@ -23,7 +23,7 @@ export function workspaceAccess(user, membership) {
 /** Legacy owner_id remains a compatibility reference; callers authorize the workspace first. */
 export function scopedWorkspace(access, database = raw) {
   if (!access?.workspace?.id || !access.actorId || !access.ownerId) throw new HttpError(403, 'Workspace access is required.');
-  return scoped(access.ownerId, database, { workspaceId: access.workspace.id, actorId: access.actorId });
+  return Object.assign(scoped(access.ownerId, database, { workspaceId: access.workspace.id, actorId: access.actorId }), { workspaceType: access.workspace.type });
 }
 
 export function createWorkspaceService({ database = raw } = {}) {

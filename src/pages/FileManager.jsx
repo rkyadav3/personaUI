@@ -5,7 +5,7 @@ import { api } from '../lib/api.js';
 import { breadcrumbs, fmtSize, idOrNull } from '../lib/format.js';
 import { useFolders, useOp, useTopics } from '../lib/hooks.js';
 import { uploadToSigned } from '../lib/storage.js';
-import { Confirm, Crumbs, Field, Loading, Notice, Progress } from '../components/Ui.jsx';
+import { Busy, Confirm, Crumbs, Field, Loading, Notice, Progress } from '../components/Ui.jsx';
 import { FolderSelect, TopicSelect } from '../components/Selects.jsx';
 import AdminDialog from '../components/AdminDialog.jsx';
 import FormDialog from '../components/FormDialog.jsx';
@@ -188,6 +188,7 @@ export default function FileManager({ defaultTab = 'browse' }) {
   const [uploadStatus, setUploadStatus] = useState('published');
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
+  const [uploadStage, setUploadStage] = useState(''), [uploadMeasured, setUploadMeasured] = useState(false);
   const [uploadMsgs, setUploadMsgs] = useState([]);
   const [dragging, setDragging] = useState(false);
   const addUploadFiles = incoming => setUploadFiles(previous => {
@@ -216,18 +217,24 @@ export default function FileManager({ defaultTab = 'browse' }) {
 
   async function handleUpload() {
     if (uploadBusy || !uploadFiles.length) return;
-    setUploadBusy(true); setUploadPct(0); setUploadMsgs([]);
+    setUploadBusy(true); setUploadPct(0); setUploadMsgs([]); setUploadMeasured(false); setUploadStage('Preparing selected files…');
     const errors = [], newIds = [];
     try {
       const items = await expandFiles(uploadFiles, unzip, errors);
       for (let b = 0; b < items.length; b += 50) {
         const batch = items.slice(b, b + 50);
+        setUploadMeasured(false); setUploadStage('Preparing secure upload links…');
         const signed = await api('files.signUploads', { names: batch.map(i => i.rel.split('/').pop()) });
         for (let k = 0; k < batch.length; k++) {
           const { rel } = batch[k], parts = rel.split('/'), name = parts.pop();
           try {
             const blob = await batch[k].get();
-            await uploadToSigned(signed[k].path, signed[k].token, blob);
+            setUploadMeasured(false); setUploadStage(`Uploading ${name}…`);
+            await uploadToSigned(signed[k].path, signed[k].token, blob, 'files', fraction => {
+              setUploadMeasured(fraction < 1); setUploadPct((b + k + fraction) / Math.max(1, items.length));
+              if (fraction >= 1) setUploadStage(`Confirming ${name}…`);
+            });
+            setUploadMeasured(false); setUploadStage(`Reading ${name} and saving its content…`);
             const row = await api('files.register', { path: signed[k].path, name, folderId: uploadDest, folderParts: parts, topicId: uploadTopic, status: uploadStatus, size: blob.size });
             newIds.push(row.id);
           } catch (e) { errors.push(`${rel}: ${e.message}`); }
@@ -236,10 +243,10 @@ export default function FileManager({ defaultTab = 'browse' }) {
       }
       const out = errors.map(t => ({ kind: 'error', t }));
       if (newIds.length) out.push({ kind: 'success', t: `Uploaded ${newIds.length} file(s).` });
-      if (uploadStatus === 'published') out.push(...(await finishIndexing(newIds)));
+      if (uploadStatus === 'published') { setUploadMeasured(false); setUploadStage('Preparing your files for chatbot search…'); out.push(...(await finishIndexing(newIds))); }
       else if (newIds.length) out.push({ kind: 'info', t: 'Saved privately. Open a file and publish it when you want the AI to use it.' });
       setUploadMsgs(out);
-      setUploadFiles([]);
+      if (!errors.length) setUploadFiles([]);
       reload();
     } catch (e) { setUploadMsgs([{ kind: 'error', t: e.message }]); }
     setUploadBusy(false);
@@ -394,8 +401,8 @@ export default function FileManager({ defaultTab = 'browse' }) {
 
           {uploadBusy && (
             <div style={{ marginTop: 14 }}>
-              <Progress value={uploadPct} />
-              <span className="muted" style={{ fontSize: '.8rem' }}>Uploading and chunking for AI search…</span>
+              {uploadMeasured ? <Progress value={uploadPct} label={uploadStage} /> : <Busy label={uploadStage} />}
+              <span className="muted" style={{ fontSize: '.9375rem' }}>Your files stay selected if an upload fails.</span>
             </div>
           )}
 

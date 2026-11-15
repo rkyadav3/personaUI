@@ -9,6 +9,7 @@ import { CHECKOUT_CURRENCIES } from '../shared/commerce.js';
 import { env } from './config.js';
 import { raw, run } from './supabase.js';
 import { canViewProfile } from '../shared/governance.js';
+import { accountColumns } from './workspaceVisibility.js';
 import { HttpError } from './http.js';
 
 const EXT = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' };
@@ -127,7 +128,7 @@ export async function publicSettings(slug, viewer = null) {
   slug = String(slug || env('DEFAULT_SLUG', '')).toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return null;
   const db = raw();
-  const [u] = await run(db.from('users').select('id,email,tags,profile_private,locked_until').eq('slug', slug).limit(1));
+  const [u] = await run(db.from('users').select(accountColumns('id,email,tags,profile_private,locked_until')).eq('slug', slug).limit(1));
   if (isSuperAdminEmail(u?.email) || !canViewProfile(u, viewer)) return null;
   const [r] = await run(db.from('site_settings').select('bg_path,bg').eq('owner_id', u.id).limit(1));
   return hostedMediaTree(view(r));

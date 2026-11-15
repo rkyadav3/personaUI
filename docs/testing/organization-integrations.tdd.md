@@ -11,6 +11,14 @@ Source: ../organization-integrations.plan.md and the approved conversation.
 - Complete suite: 512 tests pass; no failures/skips. Production Vite build passes.
 - Workspace module coverage: 96.43% lines, 95% branches, 100% functions, measured with `node --test --experimental-test-coverage --test-coverage-include=server/workspaces.js tests/workspaces.test.js`.
 - Hosted database: migration has not yet been applied. Local execution is not a hosted deployment claim.
-- Independent review and stage push: pending.
+- Independent Standards and Spec reviews passed after fixing default workspace selection; Stage 1 pushed.
 
 Existing tests emit React server-rendering useLayoutEffect warnings; no new failing tests were introduced.
+
+## Stage 2 — organization experience
+
+- RED checkpoints: 5cc5c68, 6c4361d, f15de5a (organization UI, measured uploads, executable schema, source policies and runtime scope).
+- GREEN: 530 tests pass; production build passes. Actual workspaces and organization SQL migrations execute and rerun in local PostgreSQL/PGlite.
+- Browser: organization selection, grounded draft review, confirmation, failed-save draft preservation and retry, source audience changes and 390px viewport fit pass using intercepted local requests.
+- Independent Standards/Spec review fixes: deny non-administrator mutations, verify private media membership and suspension, check enquiry workspace status, remove unsupported organization detail claims, merge additional detail fields, refresh source-policy cache.
+- Hosted SQL is user-managed. The user explicitly elected to use the SQL Editor themselves; no dashboard access is required.

@@ -28,7 +28,11 @@ test('organization migration executes repeatably and synchronizes public suspens
     await db.exec(await readFile(new URL('../supabase/workspaces.sql', import.meta.url), 'utf8'));
     const sql = await readFile(new URL('../supabase/organization-profiles.sql', import.meta.url), 'utf8');
     await db.exec(sql); await db.exec(sql);
-    await db.exec(`select setup_workspace_type('${owner}','${owner}','organization'); update workspaces set status='suspended' where id='${owner}'`);
+    await db.exec(`select setup_workspace_type('${owner}','${owner}','organization'); insert into files(id,owner_id) values(2,'${owner}')`);
+    const policy = (await db.query(`select set_source_policy('${owner}','${owner}','file',2,'internal',null,null,1) as policy`)).rows[0].policy;
+    assert.equal(policy.audience, 'internal'); assert.equal(policy.revision, 2);
+    await assert.rejects(db.query(`select set_source_policy('${owner}','${owner}','file',2,'public',null,null,1)`), /source changed/);
+    await db.exec(`update workspaces set status='suspended' where id='${owner}'`);
     const row = (await db.query('select workspace_type,workspace_status from users')).rows[0];
     assert.equal(row.workspace_type, 'organization'); assert.equal(row.workspace_status, 'suspended');
     await assert.rejects(db.exec(`insert into files(id,owner_id,audience) values(1,'${owner}','everyone')`), /check constraint/);
@@ -122,4 +126,30 @@ test('organization profile knowledge uses only visibility-filtered public facts'
   const passage = organizationPassage(publicView);
   assert.match(passage.content, /We provide support/);
   assert.doesNotMatch(passage.content, /private@example|Private mission/);
+});
+
+test('workspace viewers cannot publish or delete owner content', async () => {
+  const { createAdminHandler } = await import('../api/admin.js');
+  let invoked = false;
+  const handler = createAdminHandler({
+    sessionUser: async () => ({ id: 'viewer', workspaceEnabled: true }),
+    workspaceService: { current: async () => ({ role: 'viewer', workspace: { id: 'org' }, actorId: 'viewer', ownerId: 'owner' }) },
+    workspaceScope: () => ({}), operations: { 'profile.status': () => { invoked = true; } },
+  });
+  const res = { setHeader() {}, status(n) { this.code = n; return this; }, json(v) { this.value = v; } };
+  await handler({ method: 'POST', body: { op: 'profile.status' } }, res);
+  assert.equal(res.code, 403); assert.equal(invoked, false);
+});
+test('additional extraction fills organization detail gaps without replacing reviewed facts', async () => {
+  const { mergeDraft } = await import('../src/lib/draft.js');
+  const { normalizeOrganizationDraft } = await import('../shared/organization.js');
+  const current = normalizeOrganizationDraft({ profile: { organization: { type: 'school', details: { board: 'CBSE' } } } });
+  const fresh = normalizeOrganizationDraft({ profile: { organization: { type: 'school', details: { board: 'Other', admissions: 'Apply in March' } } } });
+  assert.deepEqual(mergeDraft(current, fresh).profile.organization.details, { board: 'CBSE', admissions: 'Apply in March' });
+});
+test('organization extraction removes fabricated fees and accreditation claims', async () => {
+  const { groundOrganizationDraft } = await import('../server/organizationProfile.js');
+  const { normalizeOrganizationDraft } = await import('../shared/organization.js');
+  const draft = normalizeOrganizationDraft({ profile: { name: 'Acme', organization: { type: 'college', details: { affiliation: 'Invented accreditation' } } } });
+  assert.deepEqual(groundOrganizationDraft(draft, 'Acme is a college.').draft.profile.organization.details, {});
 });
