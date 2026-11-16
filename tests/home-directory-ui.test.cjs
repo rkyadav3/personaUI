@@ -7,7 +7,7 @@ Module._extensions['.jsx'] = (module, file) => module._compile(transformSync(fs.
 Module._extensions['.css'] = () => {};
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
-const { StaticRouter } = require('react-router-dom/server');
+const { StaticRouter } = require('react-router');
 const render = element => renderToStaticMarkup(React.createElement(StaticRouter, {}, element));
 
 test('sold-out directory products retain access to an existing saved receipt', () => {

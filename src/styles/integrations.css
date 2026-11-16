@@ -1,0 +1,19 @@
+.integration-page { max-width: 1080px; }
+.integration-page p { font-size: 1rem; line-height: 1.6; max-width: 72ch; }
+.integration-page h2 { font-size: 1.35rem; margin-bottom: .65rem; }
+.integration-page h3 { font-size: 1.1rem; }
+.integration-page fieldset { border: 0; padding: 0; min-width: 0; }
+.integration-page .card { margin-bottom: 1.5rem; }
+.integration-page input, .integration-page select { font-size: 1rem; }
+.integration-page pre { overflow: auto; padding: 1rem; background: #f1f7f3; color: #213b2b; border-radius: 12px; max-width: 100%; font-size: .9375rem; }
+.integration-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.2rem 0; border-top: 1px solid #e1eae4; }
+.integration-row .row { flex-wrap: wrap; }
+.webhook-events { display: grid; gap: .75rem; margin: 1rem 0; }
+.webhook-events label { display: flex; align-items: center; gap: .65rem; font-size: 1rem; }
+.webhook-events input { width: auto; }
+.workspace-switcher { padding: .8rem 0; color: #23432e; }
+.workspace-switcher select { width: 100%; font-size: .9375rem; }
+.workspace-switcher small { display: block; margin-top: .4rem; }
+.integration-page input[readonly] { font-family: monospace; }
+@media(max-width: 650px) { .integration-row { align-items: stretch; flex-direction: column; } .integration-page .cols { grid-template-columns: 1fr; } .integration-page .head { align-items: stretch; } }
+

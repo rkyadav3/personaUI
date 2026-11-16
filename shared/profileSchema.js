@@ -23,11 +23,13 @@ const COVER = t('cover_image', 'Cover image URL');
 export const OFFERING_FIELDS = Object.fromEntries(Object.entries(OFFERING_FIELDS_BASE).map(([k, v]) => [k, [...(v.some(f => f.key === 'cover_image') ? [] : [COVER]), ...v]]));
 
 export const VISIBILITY_DEFAULTS = {
+  organization: true,
   education: true, experience: true, designation: true, expertise: true, purpose: true, contributions: true,
   contact: { email: false, phone: false, location: false, other: false },   // private unless the user publishes it
 };
 
 export const VISIBILITY_LABELS = {
+  organization: 'Organization information',
   education: 'Education', experience: 'Working experience', designation: 'Designation', expertise: 'Expertise',
   purpose: 'Purpose to join', contributions: 'Contributions',
 };

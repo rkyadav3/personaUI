@@ -9,11 +9,11 @@ import { useOp } from '../lib/hooks.js';
 import { readSettingsTab } from '../lib/publicPageSettings.js';
 import AccountSettings from '../components/AccountSettings.jsx';
 
-export function PrivacyPreferences({ value, onChange, onSave, busy, message }) {
+export function PrivacyPreferences({ value, onChange, onSave, busy, message, organization = false }) {
   return <section className="card">
     <h3>Public profile visibility</h3>
     <p className="muted">Choose what visitors can see on your public pages and use when chatting with your persona. Contact fields stay private unless you enable them.</p>
-    <VisibilityEditor value={value} onChange={onChange} />
+    <fieldset className="admin-form-body" disabled={busy}><VisibilityEditor value={value} onChange={onChange} organization={organization} /></fieldset>
     <button type="button" className="btn primary" disabled={busy} onClick={onSave}>{busy ? 'Saving…' : 'Save visibility'}</button>
     <Notice kind={message?.kind}>{message?.text}</Notice>
   </section>;
@@ -34,7 +34,7 @@ function PrivacySettings() {
     } catch (failure) { setMessage({ kind: 'error', text: failure.message }); }
     finally { setBusy(false); }
   }
-  return <PrivacyPreferences value={visibility || data.profile.visibility} onChange={setVisibility} onSave={save} busy={busy} message={message} />;
+  return <PrivacyPreferences value={visibility || data.profile.visibility} onChange={setVisibility} onSave={save} busy={busy} message={message} organization={data.profile.profile_type === 'organization'} />;
 }
 
 export default function Settings() {

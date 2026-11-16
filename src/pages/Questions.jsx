@@ -34,5 +34,5 @@ export function ProfileQuestions() {
 
 export default function Questions() {
   useEffect(() => { document.title = 'Visitor Q&A'; }, []);
-  return <><div className="head"><div><h1>Visitor Q&amp;A</h1><p className="muted">Review visitors’ questions and the answers given by your public profile persona. Only you can access this history.</p></div></div><ProfileQuestions /></>;
+  return <><div className="head"><div><h1>Visitor Q&amp;A</h1><p className="muted">Review visitors’ questions and the answers given by your public profile persona. Only the profile owner and authorized administrators can view this history.</p></div></div><ProfileQuestions /></>;
 }

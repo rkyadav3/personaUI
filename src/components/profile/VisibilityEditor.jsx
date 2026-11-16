@@ -1,12 +1,12 @@
 import { VISIBILITY_LABELS } from '../../../shared/profileSchema.js';
 
 /** Section-level show/hide. Contact details are private until the person ticks them. */
-export default function VisibilityEditor({ value, onChange }) {
+export default function VisibilityEditor({ value, onChange, organization = false }) {
   const set = fn => { const n = structuredClone(value); fn(n); onChange(n); };
   return (
     <div>
       <label className="toggle"><input type="checkbox" checked disabled /> Name <span className="muted">(always shown)</span></label>
-      {Object.entries(VISIBILITY_LABELS).map(([k, l]) => (
+      {Object.entries(VISIBILITY_LABELS).filter(([key]) => organization ? !['education', 'experience', 'designation'].includes(key) : key !== 'organization').map(([k, l]) => (
         <label className="toggle" key={k}><input type="checkbox" checked={!!value[k]} onChange={e => set(n => { n[k] = e.target.checked; })} /> {l}</label>
       ))}
       <div className="toggle" style={{ display: 'block' }}>

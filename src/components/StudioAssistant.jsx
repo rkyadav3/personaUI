@@ -90,17 +90,18 @@ export function StudioConversation({ messages, historyBefore, historyBusy, histo
 }
 
 export default function StudioAssistant({ user, focusCommand, onApplied, call = api }) {
-  const [state, setState] = useState(() => initialStudioState(user?.id));
+  const workspaceId = user?.workspaceEnabled ? user.activeWorkspaceId : undefined;
+  const [state, setState] = useState(() => initialStudioState(user?.id, workspaceId));
   const inputRef = useRef(null), session = useRef(null), applied = useRef(onApplied);
   applied.current = onApplied;
-  const { input, messages, review, result, error, busy, historyBefore, historyBusy, historyError } = state.userId === user?.id ? state : initialStudioState(user?.id);
+  const { input, messages, review, result, error, busy, historyBefore, historyBusy, historyError } = state.userId === user?.id && state.workspaceId === workspaceId ? state : initialStudioState(user?.id, workspaceId);
   const setInput = value => session.current?.setInput(value);
   useEffect(() => { if (focusCommand) inputRef.current?.focus(); }, [focusCommand]);
   useEffect(() => {
-    const current = createStudioSession({ userId: user?.id, call, publish: setState, onApplied: () => applied.current?.() });
+    const current = createStudioSession({ userId: user?.id, workspaceId, call, publish: setState, onApplied: () => applied.current?.() });
     session.current = current; setState(current.snapshot()); current.recover();
     return () => { current.dispose(); if (session.current === current) session.current = null; };
-  }, [user?.id, call]);
+  }, [user?.id, workspaceId, call]);
   const submit = event => { event.preventDefault(); session.current?.submit(); };
   return <>
     <form className="studio-command" onSubmit={submit} aria-busy={busy === 'planning'}>

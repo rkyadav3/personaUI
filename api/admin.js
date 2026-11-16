@@ -25,6 +25,29 @@ import { createTagService } from '../server/tags.js';
 import { createActivityService } from '../server/adminActivity.js';
 import { createPlatformService } from '../server/platform.js';
 import { createSupportService } from '../server/platformSupport.js';
+import { createWorkspaceService, scopedWorkspace } from '../server/workspaces.js';
+import { createKnowledgePolicyService, listKnowledgeSources } from '../server/knowledgePolicy.js';
+import { createIntegrationService } from '../server/integrations.js';
+import { createWorkspaceOperationsService } from '../server/workspaceOperations.js';
+import { authorizeWorkspaceOperation } from '../server/workspacePermissions.js';
+import { createTeamService } from '../server/workspaceTeam.js';
+import { createWebhookService } from '../server/webhooks.js';
+import { exportWorkspacePage } from '../server/workspaceData.js';
+
+const workspaces = createWorkspaceService();
+const knowledgePolicies = createKnowledgePolicyService();
+const integrations = createIntegrationService();
+const workspaceOperations = createWorkspaceOperationsService();
+const teamService = createTeamService();
+const webhooks = createWebhookService();
+export function createWorkspaceOperations(service = workspaces) {
+  const ready = user => { if (!user?.workspaceEnabled) throw new HttpError(503, 'Workspace setup is not enabled yet. Install the workspace migrations and enable WORKSPACES_ENABLED.'); };
+  return {
+    'workspace.current': async ({ user }) => { ready(user); return { ...(await service.current(user)), workspaces: await service.list(user) }; },
+    'workspace.setup': ({ user }, args) => { ready(user); return service.setup(user, args); },
+    'workspace.list': async ({ user }) => { ready(user); return { workspaces: await service.list(user) }; },
+  };
+}
 
 export function createPlatformOperations({ invitesService = invites, suggestionsService = createSuggestionService(), platformService = createPlatformService(), tagsService = createTagService(), supportService = createSupportService() } = {}) {
   return {
@@ -114,7 +137,7 @@ const OPS = {
 
   // public profile page (/p/<slug>): look + live preview data
   'page.save': ({ db }, a) => site.savePage(db, a),
-  'page.preview': ({ db, user }) => profile.previewProfile(db, user.slug),
+  'page.preview': ({ db, user, workspace }) => profile.previewProfile(db, workspace?.workspace?.slug || user.slug),
 
   // updates & schedule (shown on the public profile)
   'updates.list': ({ db }) => engage.listUpdates(db),
@@ -184,9 +207,28 @@ const OPS = {
   'index.settings': async () => ({ model: await model(), minSimilarity: env('MIN_SIMILARITY', 0.6), minKeywordRank: env('MIN_KEYWORD_RANK', 0.2) }),
 
   ...createPlatformOperations(),
+  ...createWorkspaceOperations(),
+  'knowledge.sources': ({ db }) => listKnowledgeSources(db),
+  'knowledge.policy': ({ workspace }, args) => knowledgePolicies.save(workspace, args),
+  'integrations.list': ({ workspace }) => integrations.list(workspace),
+  'integrations.status': ({ workspace }, args) => integrations.status(workspace, args),
+  'integrations.change': ({ workspace }, args) => integrations.change(workspace, args),
+  'platform.workspaces.list': ({ user }, args) => workspaceOperations.list(user, args),
+  'platform.workspaces.change': ({ user }, args) => workspaceOperations.change(user, args),
+  'platform.workspaces.health': ({ user }) => workspaceOperations.health(user),
+  'platform.workspaces.check': ({ user }) => workspaceOperations.check(user),
+  'platform.workspaces.audit': ({ user }, args) => workspaceOperations.audit(user, args),
+  'workspace.switch': ({ user }, args) => teamService.switch(user, args),
+  'team.accept': ({ user }, args) => teamService.accept(user, args),
+  'team.list': ({ workspace }) => teamService.list(workspace),
+  'team.change': ({ workspace }, args) => teamService.change(workspace, args),
+  'webhooks.list': ({ workspace }) => webhooks.list(workspace),
+  'webhooks.change': ({ workspace }, args) => webhooks.change(workspace, args),
+  'webhooks.run': ({ workspace }) => { authorizeWorkspaceOperation(workspace?.role, 'webhooks.run'); return webhooks.drain(workspace.workspace.id); },
+  'data.export': ({ workspace }, args) => exportWorkspacePage(workspace, args),
 };
 
-export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: tenantScope = scoped, operations = OPS } = {}) {
+export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: tenantScope = scoped, operations = OPS, workspaceService = workspaces, workspaceScope = scopedWorkspace } = {}) {
   return async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
@@ -197,9 +239,18 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
       const user = await sessionUser(req);
       if (!user) throw new HttpError(401, 'Not signed in.');
-      const platformOp = /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.)/.test(op);
+      const platformOp = op === 'team.accept' || /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.|workspace\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
-      const result = await fn({ db: platformOp ? null : tenantScope(user.id), user }, args);
+      const workspaceOp = /^(workspace\.|integrations\.|team\.|webhooks\.|platform\.workspaces\.)/.test(op) || ['data.export', 'knowledge.sources', 'knowledge.policy'].includes(op);
+      if (workspaceOp && !user.workspaceEnabled) throw new HttpError(503, 'These account tools are not enabled on this deployment yet.');
+      if (op.startsWith('webhooks.') && !user.webhooksEnabled) throw new HttpError(503, 'Webhooks are currently disabled.');
+      const access = !platformOp && user.workspaceEnabled ? await workspaceService.current(user) : null;
+      if (access && args.workspaceId && args.workspaceId !== access.workspace.id) throw new HttpError(409, 'Your selected workspace changed. Refresh this page before continuing.');
+      if (access) authorizeWorkspaceOperation(access.role, op);
+      const db = platformOp ? null : access ? workspaceScope(access) : tenantScope(user.id);
+      const operationArgs = access ? { ...args } : args;
+      if (access) delete operationArgs.workspaceId;
+      const result = await fn({ db, user, workspace: access }, operationArgs);
       if (op === 'account.change' && result.passwordChanged) auth.endSession(res);
       return res.status(200).json(result);
     } catch (e) {

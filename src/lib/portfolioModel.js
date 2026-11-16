@@ -24,7 +24,8 @@ const SINGULAR = { Books: 'Book', 'Other Contributions': 'Other', 'Information &
 
 export function resolveSite(data, slug, heroOverride) {
   const p = normalizePortfolio(data.portfolio), page = normalizePage(data.page), cur = page.currency;
-  const name = data.name || '', me = firstWord(name), email = data.contact?.email || '';
+  const organization = data.profileType === 'organization';
+  const name = data.name || '', me = organization ? name : firstWord(name), email = data.contact?.email || '';
   const photo = (heroOverride !== undefined ? heroOverride : page.hero.imageUrl || data.hero) || '';
   const label = k => p.navLabels[k] || (k === 'store' ? p.navLabels.products : '') || PAGE_LABELS[k];
 
@@ -77,15 +78,16 @@ export function resolveSite(data, slug, heroOverride) {
   const homeAwards = page.customization.homeAwards.length ? resolveHomeAwards(p, page.customization.homeAwards) : p.awards;
 
   return {
+    organization: data.organization || null,
     slug, name, first: me, initials: initials(name), photo, photoStyle: p.photoStyle, heroPos: { x: page.hero.x, y: page.hero.y, zoom: page.hero.zoom },
     brand: p.brand || name || 'Portfolio',
     pages: pages.map(x => ({ ...x, label: label(x.key), path: x.key === 'chat' ? `/p/${slug}` : `/p/${slug}/${x.key}` })),
     navCta: { label: p.navCta.label || 'Let’s Connect', url: p.navCta.url || ctaUrl },
-    greeting: p.greeting || 'Hi I’m', heroName: p.heroName || me || name, titleLine: p.titleLine || page.tagline || data.designation || '',
+    greeting: p.greeting || (organization ? 'Welcome to' : 'Hi I’m'), heroName: p.heroName || me || name, titleLine: p.titleLine || page.tagline || data.designation || '',
     bio: p.bio || clip(about, 230), awards: homeAwards, homeProducts: homeProducts.slice(0, page.customization.homeLimit), availability: p.availability.show ? (p.availability.text || 'Available for new opportunities') : '',
     socials, domains, stats,
-    cta: { label: p.cta.label || 'Work with me', url: ctaUrl },
-    intro: p.intro.url ? { label: p.intro.label || 'Watch Introduction', url: p.intro.url, video: true } : { label: p.intro.label || 'Chat with my AI', url: chatUrl, video: false },
+    cta: { label: p.cta.label || (organization ? 'Contact our team' : 'Work with me'), url: ctaUrl },
+    intro: p.intro.url ? { label: p.intro.label || 'Watch Introduction', url: p.intro.url, video: true } : { label: p.intro.label || (organization ? 'Chat with our AI' : 'Chat with my AI'), url: chatUrl, video: false },
     projects, featured, others,
     projectsKicker: p.projectsKicker || 'Featured work', projectsTitle: p.projectsTitle || 'Selected Projects',
     products, productsKicker: p.productsKicker || 'Free & paid offerings', productsTitle: p.productsTitle || page.storeTitle || 'Shop', productsSubtitle: page.storeSubtitle,

@@ -1,11 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
-import { ADMIN_SECTIONS, SUPERADMIN_SECTION, adminLocation } from '../lib/adminNavigation.js';
+import { adminSectionsFor, SUPERADMIN_SECTION, adminLocation } from '../lib/adminNavigation.js';
 import Icon from './portfolio/Icon.jsx';
 
 export function AdminSectionTabs({ user, unread = 0 }) {
   const { pathname, search } = useLocation();
   const active = adminLocation(pathname, search);
-  const section = [...ADMIN_SECTIONS, SUPERADMIN_SECTION].find(item => item.id === active?.group);
+  const section = [...adminSectionsFor(user), SUPERADMIN_SECTION].find(item => item.id === active?.group);
   if (!section || section.pages.length === 1 || (section.adminOnly && !user?.isSuperAdmin)) return null;
   return <section className="admin-section-header">
     <div className="admin-section-context"><span>{section.label}</span><p>{section.description}</p></div>

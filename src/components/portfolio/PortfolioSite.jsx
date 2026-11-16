@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation } from 'react-router-dom';
+import { ORGANIZATION_FIELDS, ORGANIZATION_TYPES } from '../../../shared/organization.js';
 import { ACCENTS, FONT_STACK, normalizePage } from '../../../shared/pageSettings.js';
 import { customizePageStyle } from '../../../shared/customization.js';
 import { activityDisplayModel } from '../../lib/customizationDisplay.js';
@@ -369,6 +370,12 @@ function ContactPage({ m, ctx }) {
 
 function AboutPage({ m, embedded = false }) {
   const c = m.contact;
+  const org = m.organization;
+  const organizationDetails = org ? [
+    ['Organization type', ORGANIZATION_TYPES[org.type]], ['Founded', org.foundedYear], ['Mission and values', org.mission],
+    ['Locations', (org.locations || []).join(', ')],
+    ...(ORGANIZATION_FIELDS[org.type] || []).map(([key, label]) => [label, org.details?.[key]]),
+  ].filter(([, value]) => value) : [];
   return (
     <>
       {embedded ? <div className="pf-wrap pf-sec-head"><h2>{m.aboutTitle}</h2></div> : <PageTop kicker="About" title={m.aboutTitle} />}
@@ -376,6 +383,8 @@ function AboutPage({ m, embedded = false }) {
         {m.photo && <div className={`pf-photo about${m.photoStyle === 'bw' ? ' bw' : ''}`}><Pic src={m.photo} className="pf-photo-img" /></div>}
         <div>
           {paras(m.aboutBody).map((t, i) => <p className="pf-body" key={i}>{t}</p>)}
+          {org?.website && <p className="pf-body"><A href={org.website}>Visit our website</A></p>}
+          {organizationDetails.length > 0 && <dl className="pf-org-details">{organizationDetails.map(([label, value]) => <div key={label} style={{ display: 'contents' }}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
           {m.skills.length > 0 && <><h3 className="pf-h3">Skills &amp; expertise</h3><div className="pf-chips lg">{m.skills.map(s => <span key={s}>{s}</span>)}</div></>}
           {(c || m.socials.length > 0) && (
             <>

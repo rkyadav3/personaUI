@@ -1,4 +1,5 @@
 import { CATEGORIES } from '../../shared/profileSchema.js';
+import { organizationMissing } from '../../shared/organization.js';
 
 export const emptyDraft = () => ({
   profile: { name: null, education: [], contact: { email: null, phone: null, location: null, other: null },
@@ -11,6 +12,15 @@ const filled = v => (Array.isArray(v) ? v.length > 0 : v && typeof v === 'object
 /** When the AI is re-run with extra details: keep anything the person already has, fill only the gaps. */
 export function mergeDraft(cur, fresh) {
   const out = structuredClone(cur);
+  if (fresh.profile.organization) {
+    out.profile.organization ||= {};
+    for (const [key, value] of Object.entries(fresh.profile.organization)) {
+      if (key === 'details') {
+        out.profile.organization.details ||= {};
+        for (const [field, fact] of Object.entries(value || {})) if (!filled(out.profile.organization.details[field])) out.profile.organization.details[field] = fact;
+      } else if (!filled(out.profile.organization[key])) out.profile.organization[key] = value;
+    }
+  }
   for (const k of ['name', 'designation', 'education', 'expertise']) if (!filled(out.profile[k])) out.profile[k] = fresh.profile[k];
   for (const k of Object.keys(out.profile.contact)) if (!out.profile.contact[k]) out.profile.contact[k] = fresh.profile.contact[k];
   const x = out.profile.experience, f = fresh.profile.experience;
@@ -24,6 +34,7 @@ export function mergeDraft(cur, fresh) {
 }
 
 export function missing(d) {
+  if (d.profile.organization) return organizationMissing(d);
   const required = [], optional = [];
   if (!d.profile.name?.trim()) required.push('name');
   if (!d.purpose.description.trim() && !d.purpose.contributions.length) required.push('purpose');

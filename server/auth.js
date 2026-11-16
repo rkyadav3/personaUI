@@ -61,6 +61,9 @@ const slugFor = email =>
   `${(email.split('@')[0].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || 'user')}-${randomBytes(2).toString('hex')}`;
 
 export const publicUser = u => ({
+  workspaceEnabled: process.env.WORKSPACES_ENABLED === 'true',
+  webhooksEnabled: process.env.WORKSPACES_ENABLED === 'true' && process.env.WEBHOOKS_ENABLED === 'true',
+  activeWorkspaceId: u.active_workspace_id || null,
   id: String(u.id),
   email: u.email,
   name: u.name || null,
