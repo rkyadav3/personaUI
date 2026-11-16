@@ -47,7 +47,7 @@ test('an enabled individual owner can open website settings while a viewer remai
   );
   const service = createIntegrationService({ database: () => database });
   let role = 'owner';
-  const user = { id: 'individual-owner', workspaceEnabled: true, workspaceRole: role };
+  const user = { id: 'individual-owner', workspaceEnabled: true, workspaceRole: role, webhooksEnabled: true };
   const handler = createAdminHandler({
     sessionUser: async () => user,
     workspaceService: { current: async () => ({ role, actorId: user.id, ownerId: user.id, workspace: { id: user.id, type: 'individual' } }) },

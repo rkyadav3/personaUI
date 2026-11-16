@@ -39,9 +39,11 @@ export async function deliverWebhook(job,{resolve=lookup,request=https.request}=
  });
 }
 const admin=access=>{if(!access?.workspace?.id||!['owner','admin'].includes(access.role))throw new HttpError(403,'A workspace administrator is required.');};
-export function createWebhookService({database=raw,deliver=deliverWebhook}={}) {
+export function createWebhookService({database=raw,deliver=deliverWebhook,enabled=()=>process.env.WORKSPACES_ENABLED==='true'&&process.env.WEBHOOKS_ENABLED==='true'}={}) {
+ const ready=()=>{if(!enabled())throw new HttpError(503,'Webhooks are currently disabled.');};
  return {
   async list(access) {
+   ready();
    admin(access);
    const endpoints=await integrationQuery(database().from('workspace_webhooks').select('id,endpoint,events,enabled,created_at').eq('workspace_id',access.workspace.id).order('created_at',{ascending:false}));
    const ids=endpoints.map(row=>row.id);
@@ -49,6 +51,7 @@ export function createWebhookService({database=raw,deliver=deliverWebhook}={}) {
    return {endpoints,deliveries,encryptionConfigured:Buffer.from(process.env.WEBHOOK_ENCRYPTION_KEY||'','base64').length===32};
   },
   async change(access,input) {
+   ready();
    admin(access);let secret;const payload={};
    if(input?.action==='create'){
     payload.endpoint=webhookUrl(input.endpoint).href;
@@ -62,6 +65,7 @@ export function createWebhookService({database=raw,deliver=deliverWebhook}={}) {
    return {...result,...(secret?{secret}:{})};
   },
   async drain(workspaceId=null) {
+   if(!enabled())return {disabled:true,processed:0,results:[]};
    const jobs=await integrationQuery(database().rpc('claim_webhook_deliveries',{p_limit:5,p_workspace:workspaceId}));
    const results=await Promise.all(jobs.map(async job=>{
     let status=null,error=null;try{status=await deliver(job);if(status<200||status>=300)error='Endpoint returned HTTP '+status+'.';}catch{error='Endpoint DNS, TLS or delivery failed.';}

@@ -41,7 +41,7 @@ function Onboarding({ onDone, type = 'individual' }) {
           <div>
             <h1>{organization ? 'Create your organization profile' : 'Create Your AI Persona Profile'}</h1>
             <p className="muted" style={{ margin: 0 }}>
-              {organization ? 'Tell us what your organization does, who it serves and how its persona should help people.' : 'Introduce yourself in your own words, and our model will extract and organize your knowledge base.'}
+              {organization ? 'Tell us what your organization does, who it helps and what visitors should know.' : 'Tell us about yourself in your own words. We’ll organize your details into a profile you can review before sharing.'}
             </p>
           </div>
         </div>
@@ -54,13 +54,13 @@ function Onboarding({ onDone, type = 'individual' }) {
           </div>
           <div className="ux-step-card">
             <div className="ux-step-num">2</div>
-            <h5>AI Structured Extraction</h5>
+            <h5>Check your profile draft</h5>
             <p>{organization ? 'AI prepares a draft using only the information you provide.' : 'Our model organizes your background, education, and skills into clean categories.'}</p>
           </div>
           <div className="ux-step-card">
             <div className="ux-step-num">3</div>
             <h5>Review & Publish</h5>
-            <p>Fine-tune privacy settings and publish your unified public portfolio & chatbot.</p>
+            <p>Choose what visitors can see, check your details, then make your profile and chatbot available.</p>
           </div>
         </div>
 
@@ -83,7 +83,7 @@ function Onboarding({ onDone, type = 'individual' }) {
               disabled={busy || text.trim().length < 20}
               onClick={() => run(text, false)}
             >
-              <Icon n="spark" size={18} />{busy ? 'Extracting your details with AI…' : 'Build my profile'}
+              <Icon n="spark" size={18} />{busy ? 'Preparing your profile draft…' : 'Build my profile'}
             </button>
             <span className="muted" style={{ fontSize: '.85rem' }}>{text.length} / 6000 characters</span>
           </div>

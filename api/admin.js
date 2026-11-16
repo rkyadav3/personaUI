@@ -211,6 +211,7 @@ const OPS = {
   'knowledge.sources': ({ db }) => listKnowledgeSources(db),
   'knowledge.policy': ({ workspace }, args) => knowledgePolicies.save(workspace, args),
   'integrations.list': ({ workspace }) => integrations.list(workspace),
+  'integrations.status': ({ workspace }, args) => integrations.status(workspace, args),
   'integrations.change': ({ workspace }, args) => integrations.change(workspace, args),
   'platform.workspaces.list': ({ user }, args) => workspaceOperations.list(user, args),
   'platform.workspaces.change': ({ user }, args) => workspaceOperations.change(user, args),
@@ -242,6 +243,7 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
       const workspaceOp = /^(workspace\.|integrations\.|team\.|webhooks\.|platform\.workspaces\.)/.test(op) || ['data.export', 'knowledge.sources', 'knowledge.policy'].includes(op);
       if (workspaceOp && !user.workspaceEnabled) throw new HttpError(503, 'These account tools are not enabled on this deployment yet.');
+      if (op.startsWith('webhooks.') && !user.webhooksEnabled) throw new HttpError(503, 'Webhooks are currently disabled.');
       const access = !platformOp && user.workspaceEnabled ? await workspaceService.current(user) : null;
       if (access && args.workspaceId && args.workspaceId !== access.workspace.id) throw new HttpError(409, 'Your selected workspace changed. Refresh this page before continuing.');
       if (access) authorizeWorkspaceOperation(access.role, op);

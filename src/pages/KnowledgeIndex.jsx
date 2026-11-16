@@ -41,7 +41,7 @@ export default function KnowledgeIndex() {
       while (remaining > 0 && !stop.current) {
         const r = await api('index.embed', { seconds: 40 });
         embedded += r.done; remaining = r.remaining;
-        setPct(Math.min(1, embedded / total)); setLabel(`Embedded ${embedded} chunks…`);
+        setPct(Math.min(1, embedded / total)); setLabel(`Prepared ${embedded} passages…`);
         if (!r.done) break;
       }
       const out = [{ kind: 'success', t: `Synced successfully: added ${diff.added} source(s), removed ${diff.removed}, embedded ${embedded} chunk(s).` }];
@@ -94,7 +94,7 @@ export default function KnowledgeIndex() {
           <div>
             <strong style={{ fontSize: '1.1rem', color: '#0f172a' }}>AI Knowledge Readiness: {readyPct}%</strong>
             <p className="muted" style={{ margin: '2px 0 0', fontSize: '.86rem' }}>
-              {waiting > 0 ? `${waiting} knowledge chunks are waiting to be embedded.` : (c.chunks ? 'All indexed passages are ready to search.' : 'Publish a file or article to start building your AI knowledge.')}
+              {waiting > 0 ? `${waiting} passages are waiting to be prepared for answers.` : (c.chunks ? 'All prepared passages are ready for your chatbot to search.' : 'Publish a file or article to start building your AI knowledge.')}
             </p>
           </div>
           <button
@@ -102,7 +102,7 @@ export default function KnowledgeIndex() {
             disabled={syncing || readOnly}
             onClick={sync}
           >
-            <Icon n="refresh" size={18} />{syncing ? 'Syncing…' : 'Sync published material'}
+            <Icon n="refresh" size={18} />{syncing ? 'Preparing…' : 'Prepare chatbot knowledge'}
           </button>
         </div>
 
@@ -111,9 +111,9 @@ export default function KnowledgeIndex() {
         </div>
 
         <div className="metrics" style={{ marginTop: 14 }}>
-          <div className="metric"><b>{c.chunks}</b><span>Total Chunks</span></div>
-          <div className="metric"><b>{c.embedded}</b><span>Embedded &amp; Ready</span></div>
-          <div className="metric"><b>{waiting}</b><span>Waiting Sync</span></div>
+          <div className="metric"><b>{c.chunks}</b><span>Total passages</span></div>
+          <div className="metric"><b>{c.embedded}</b><span>Ready for answers</span></div>
+          <div className="metric"><b>{waiting}</b><span>Waiting to prepare</span></div>
         </div>
 
         {syncing && (
@@ -130,9 +130,9 @@ export default function KnowledgeIndex() {
       </section>
 
       {/* Page Tabs */}
-      <AdminTabs label="AI knowledge tools" value={activeTab} onChange={setActiveTab} items={[{ id: 'sync', label: 'Readiness & sync', icon: 'book' }, { id: 'test', label: 'Test a question', icon: 'search' }]} />
+      <AdminTabs label="AI knowledge tools" value={activeTab} onChange={setActiveTab} items={[{ id: 'sync', label: 'Knowledge readiness', icon: 'book' }, { id: 'test', label: 'Test a question', icon: 'search' }]} />
       {user?.workspaceEnabled && <KnowledgePolicies readOnly={!!workspaceRole && !['owner', 'admin'].includes(workspaceRole)} />}
-      {canAdminister && <p className="hint">Questions from your public chat are in <Link to="/admin/questions">Activity → Visitor Q&amp;A</Link>.</p>}
+      {canAdminister && <p className="hint">Questions from your public chat are in <Link to="/admin/questions">Inbox → Visitor Q&amp;A</Link>.</p>}
 
       {/* TAB 1: HOW IT WORKS & ADVANCED CONTROLS */}
       {activeTab === 'sync' && (
@@ -141,12 +141,12 @@ export default function KnowledgeIndex() {
             <div className="ux-step-card">
               <div className="ux-step-num">1</div>
               <h5>Upload Your Materials</h5>
-              <p>Add source documents in Library or write an article in Content.</p>
+              <p>Upload documents in Files & notes or write an article in Content.</p>
             </div>
             <div className="ux-step-card">
               <div className="ux-step-num">2</div>
-              <h5>Sync published material</h5>
-              <p>Choose “Sync published material” to make waiting passages searchable.</p>
+              <h5>Prepare chatbot knowledge</h5>
+              <p>Choose “Prepare chatbot knowledge” to make waiting passages searchable.</p>
             </div>
             <div className="ux-step-card">
               <div className="ux-step-num">3</div>
@@ -182,7 +182,7 @@ export default function KnowledgeIndex() {
         <section className="card">
           <h3>Test a question</h3>
           <p className="muted" style={{ fontSize: '.9rem', margin: '0 0 16px' }}>
-            Type any question below. This test shows which chunks of your research files will be returned to your Persona to answer that question.
+            Ask a question to see which passages your chatbot can find. This checks the available information; it does not generate a full chatbot answer.
           </p>
 
           <form onSubmit={test} className="row">
@@ -204,7 +204,7 @@ export default function KnowledgeIndex() {
 
           {hits && !hits.length && (
             <Notice kind="info">
-              No chunks passed the similarity threshold for this query. The persona would say it doesn't have enough notes on this topic.
+              No relevant passages were found. Add information about this topic, make it available to your chatbot, then prepare the knowledge again.
             </Notice>
           )}
 

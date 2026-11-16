@@ -13,7 +13,7 @@ function Tags({ value, onChange }) {
   return (
     <div>
       <div className="chips">{value.map(t => <span className="chip" key={t}>{t}<button type="button" aria-label={`Remove ${t}`} onClick={() => onChange(value.filter(x => x !== t))}>×</button></span>)}</div>
-      <input type="text" value={text} placeholder="Type a skill and press Enter" onChange={e => setText(e.target.value)}
+      <input type="text" aria-label="Add an area of expertise" value={text} placeholder="Type a skill and press Enter" onChange={e => setText(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(); } }} onBlur={add} />
     </div>
   );
@@ -35,7 +35,7 @@ export default function DraftEditor({ draft, onChange, withContributions = true 
         <h3>About you</h3>
         <div className="cols c2">
           <Field label="Full name *"><input type="text" value={val(p.name)} onChange={e => up(n => { n.profile.name = e.target.value; })} /></Field>
-          <Field label="Current designation"><input type="text" value={val(p.designation)} onChange={e => up(n => { n.profile.designation = e.target.value; })} /></Field>
+          <Field label="Current role or job title"><input type="text" value={val(p.designation)} onChange={e => up(n => { n.profile.designation = e.target.value; })} /></Field>
         </div>
         <Field label="Expertise"><Tags value={p.expertise} onChange={v => up(n => { n.profile.expertise = v; })} /></Field>
       </section>}

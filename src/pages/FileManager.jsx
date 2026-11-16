@@ -300,7 +300,7 @@ export default function FileManager({ defaultTab = 'browse' }) {
         <div className="ux-guide-content">
           <h4>From source material to answers</h4>
           <p>
-            Add files → organize them into folders and topics → publish to AI. Draft notes stay private; published material becomes searchable after indexing.
+            Add files → organize them into folders and topics → publish to AI. Draft notes stay private. After publishing, open AI knowledge to prepare the material for answers.
           </p>
         </div>
       </div>
@@ -332,7 +332,7 @@ export default function FileManager({ defaultTab = 'browse' }) {
               <div className="library-results"><span>{visibleFiles.length} of {files.length} files in {searchQuery.trim() ? 'this search' : 'this folder'} · {fmtSize(visibleFiles.reduce((total, file) => total + (file.size || 0), 0))}</span>{filtered && <button type="button" className="btn link" onClick={resetFilters}>Clear filters</button>}</div>
               <LibraryFileList files={visibleFiles} topicNames={topicName} filtered={filtered} hasFolders={!!kids.length} onOpen={inspectFile} onUpload={readOnly ? undefined : () => setTab('upload')} onReset={resetFilters} readOnly={readOnly} />
             </>}
-            <p className="library-hint">Published means available for AI indexing. <Link to="/admin/knowledge">Check AI knowledge</Link> for indexing status.</p>
+            <p className="library-hint">Published means the material can be prepared for chatbot answers. <Link to="/admin/knowledge">Check AI knowledge</Link> for indexing status.</p>
           </section>
           {folderOpen && <AdminDialog titleId={folderTitleId} onClose={() => setFolderOpen(false)} busy={folderBusy}>
             <form onSubmit={handleCreateFolder}>
@@ -384,7 +384,7 @@ export default function FileManager({ defaultTab = 'browse' }) {
           <fieldset className="admin-form-body" disabled={uploadBusy}><FolderSelect label="Destination Folder" value={uploadDest} onChange={setUploadDest} folders={folders} />
           <TopicSelect label="Assign to Research Topic (Optional)" value={uploadTopic} onChange={setUploadTopic} topics={topics} />
           <Field label="Availability"><select value={uploadStatus} onChange={e => setUploadStatus(e.target.value)}><option value="published">Publish to AI</option><option value="draft">Private draft</option></select></Field>
-          <p className="hint">Private drafts are stored in your library. Published files become available for AI answers once indexed.</p></fieldset>
+          <p className="hint">Private drafts are stored in your library. Published files become available for AI answers after you prepare them in AI knowledge.</p></fieldset>
 
           <p className="muted" style={{ fontSize: '.85rem' }}>
             {uploadFiles.length ? `${uploadFiles.length} file(s) selected.` : 'No files selected yet.'}

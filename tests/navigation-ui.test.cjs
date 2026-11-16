@@ -61,6 +61,16 @@ test('admin has clear primary groups including Invite and a separate Logout acti
   assert.match(html, /studio-logout[\s\S]*Logout[\s\S]*role="alert"[\s\S]*Please retry logout/);
 });
 
+test('the sidebar has no current organization or individual profile selector', () => {
+  const { StudioSidebar } = require('../src/components/Layout.jsx');
+  for (const type of ['organization', 'individual']) {
+    const workspace = { id: 'test-profile', name: 'Test profile', type };
+    const html = render(StudioSidebar, { user: { name: 'Owner', workspaceEnabled: true, workspaceRole: 'owner' }, workspace: { workspace, workspaces: [workspace], role: 'owner' }, onLogout() {} }, '/admin');
+    assert.doesNotMatch(html, /Current organization|Current profile|<select/);
+    assert.match(html, /Settings/);
+  }
+});
+
 test('every secondary admin link selects its own group and privileged tabs stay hidden', async () => {
   const { ADMIN_SECTIONS, adminLocation } = await import('../src/lib/adminNavigation.js');
   for (const section of ADMIN_SECTIONS) for (const page of section.pages) {

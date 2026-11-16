@@ -4,6 +4,7 @@
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+  if (!process.env.PERSONA_API_KEY || !process.env.PERSONA_API_URL || !process.env.SITE_ORIGIN) return res.status(503).json({ error: 'The website chatbot is not set up yet. Check its hosting settings.' });
   if (!process.env.SITE_ORIGIN || req.headers.origin !== process.env.SITE_ORIGIN || !String(req.headers['content-type'] || '').startsWith('application/json')) return res.status(403).json({ error: 'This browser request is not allowed.' });
   // For a private chatbot, enforce your site's authenticated visitor session here.
   // Origin is a browser CSRF guard; it does not prove that the caller is human.

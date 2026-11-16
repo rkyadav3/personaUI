@@ -48,25 +48,7 @@ Local tests execute the actual SQL in PostgreSQL/PGlite. Hosted SQL installation
 
 Settings → Team access creates email-bound invitation links that expire after seven days. An invited user signs in with that email and accepts the link. New users first need a platform invitation to create their login, then reopen the team link. The workspace owner cannot be removed or demoted here. Changing or removing a member revokes outstanding invitations for that email so an older link cannot undo the decision.
 
-Owners and administrators manage the workspace, its integrations, exports and shared private Admin Assistant. Contributors maintain files, articles and indexing. Viewers browse files and knowledge without editing. The workspace selector keeps the user's personal workspace available alongside team memberships. Public URLs refer to the selected workspace owner.
-
-## Signed webhooks and scheduling
-
-Set `WEBHOOK_ENCRYPTION_KEY` in Persona's server environment to a cryptographically random 32-byte value encoded as base64. Set `CRON_SECRET` to a separate random secret of at least 32 characters. Generate each locally with Node's `crypto.randomBytes`; keep these values in deployment environment secrets. Redeploy after adding them. Keep the encryption key stable: changing it makes existing encrypted webhook secrets unreadable, requiring endpoints to be recreated.
-
-Settings → Webhooks lets administrators add a public HTTPS endpoint on port 443, choose events, and save the one-time signing secret on their receiving server. Signing secrets are encrypted at rest. DNS is checked for public addresses and pinned for the delivery; private targets and redirects are rejected. Payloads contain event/workspace identifiers and change metadata, without chat messages or file contents.
-
-Events are queued durably in PostgreSQL. Each worker run claims up to five due deliveries, uses a lease to recover interrupted workers, and retries failures with increasing delays up to five attempts. Failed deliveries can be retried from the UI. Delivery is at least once: after signature verification, parse the signed JSON body and deduplicate its `id` in durable storage. If using `Webhook-Id`, require it to match that signed body ID; the header itself is not signed. Acknowledge only after safely storing or processing the event.
-
-The deployment includes a daily Vercel cron at 00:00 UTC, compatible with the Hobby plan. Vercel cron runs on production deployments; Preview deployments need manual processing or an external scheduler. For prompt delivery or more than five events per day, configure an external scheduler to call `GET` or `POST https://YOUR_PERSONA_HOST/api/maintenance` every minute with `Authorization: Bearer <CRON_SECRET>`. This endpoint uses the existing chat function and does not add a thirteenth function. Monitor the scheduler's failures and protect its authorization header. Administrators can also choose Process queued deliveries for their workspace.
-
-The receiver reads the original raw request bytes and validates:
-
-- `Webhook-Timestamp`: Unix seconds, within five minutes of the receiver's current time.
-- `Webhook-Signature`: `v1=` followed by hex HMAC-SHA256 of `timestamp + "." + rawBody`, keyed by the endpoint's signing secret.
-- A constant-time signature comparison before parsing JSON or trusting the event ID.
-
-Do not parse and reserialize JSON before verification: whitespace and byte differences change the signature. See `examples/verify-persona-webhook.js` for a reusable Node verifier. Use HTTPS, store the receiver secret in server environment variables, and reject invalid/stale signatures.
+Owners and administrators manage the workspace, its integrations, exports and shared private Admin Assistant. Contributors maintain files, articles and indexing. Viewers browse files and knowledge without editing. Team invitations open the shared profile. Personal profile data remains separate. Public URLs refer to the selected workspace owner.
 
 ## Export and retention
 

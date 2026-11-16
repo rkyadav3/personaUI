@@ -44,11 +44,12 @@ export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', descrip
 ] };
 
 export function adminSectionsFor(user) {
-  if (!user?.workspaceEnabled) return ADMIN_SECTIONS.map(section => ({
+  const sections = user?.webhooksEnabled ? ADMIN_SECTIONS : ADMIN_SECTIONS.map(section => ({ ...section, pages: section.pages.filter(page => page.id !== 'webhooks') }));
+  if (!user?.workspaceEnabled) return sections.map(section => ({
     ...section, pages: section.pages.filter(page => !workspacePages.has(page.id)),
   }));
-  if (['owner', 'admin'].includes(user.workspaceRole)) return ADMIN_SECTIONS;
-  return ADMIN_SECTIONS.filter(section => ['overview', 'pipelines', 'settings'].includes(section.id)).map(section => ({
+  if (['owner', 'admin'].includes(user.workspaceRole)) return sections;
+  return sections.filter(section => ['overview', 'pipelines', 'settings'].includes(section.id)).map(section => ({
     ...section,
     pages: section.pages.filter(page => section.id === 'pipelines' ? user.workspaceRole === 'contributor' || ['files', 'knowledge'].includes(page.id) : section.id !== 'settings' || ['account', 'team', 'support', 'suggestions'].includes(page.id)),
   }));
@@ -56,6 +57,7 @@ export function adminSectionsFor(user) {
 
 export function canOpenAdminPage(user, pathname, search = '') {
   const location = adminLocation(pathname, search);
+  if (location?.page === 'webhooks' && !user?.webhooksEnabled) return false;
   if (!user?.workspaceEnabled) return !workspacePages.has(location?.page);
   if (['owner', 'admin'].includes(user.workspaceRole)) return true;
   return adminSectionsFor(user).some(section => section.id === location?.group && section.pages.some(page => page.id === location.page));
@@ -64,7 +66,10 @@ export function canOpenAdminPage(user, pathname, search = '') {
 const workspacePages = new Set(['integrations', 'team', 'webhooks', 'export']);
 
 export function adminLocation(pathname, search = '') {
-  const path = pathname.replace(/\/+$/, ''), tab = new URLSearchParams(search).get('tab');
+  let path;
+  try { path = pathname.split('/').map(segment => decodeURIComponent(segment).replace(/\//g, '%2F')).join('/').replace(/\/+$/, '').toLowerCase(); }
+  catch { return null; }
+  const tab = new URLSearchParams(search).get('tab');
   if (path === '/superadmin/settings' && tab === 'account') return { group: 'platform', page: 'account' };
   if (path === '/superadmin' || path.startsWith('/superadmin/')) return { group: 'platform', page: SUPERADMIN_SECTION.pages.find(page => page.to === path || (page.id === 'support' && path.startsWith(`${page.to}/`)))?.id || 'dashboard' };
   if (path === '/admin') return { group: 'overview', page: 'overview' };

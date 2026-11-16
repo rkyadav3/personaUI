@@ -36,6 +36,7 @@ window.fetch=async(url,options={})=>{
   if(op==='knowledge.sources')return json({sources:[]});
   if(op==='enquiries.count')return json({new:0});
   if(op==='integrations.list')return json(data);
+  if(op==='integrations.status')return json({lastRequest:window.addonsFixture.lastRequest||null});
   if(op==='platform.workspaces.list')return json({workspaces:[{...workspace,owner:{email:user.email},settings:data.settings}],page:1,hasNext:false});
   if(op==='platform.workspaces.health')return json({checkedAt:new Date().toISOString(),api:{requests:12,failed:0,pending:0,stuck:0,p95Ms:650,platform:8,external:4},security:{activeKeys:1,expiringKeys:0,expiredKeys:0,revokedKeys:0,rejections:{}},probes:[{component:'generation',status:'unknown',detail:'No recent check.'},{component:'embedding',status:'unknown',detail:'No recent check.'}]});
   if(op==='platform.workspaces.audit')return json({rows:[]});
@@ -47,7 +48,7 @@ window.fetch=async(url,options={})=>{
     const site=data.integrations.find(row=>row.id===args.id);
     if(args.action==='toggle')site.enabled=args.enabled;
     if(args.action==='revoke')site.keys.forEach(k=>k.revoked_at=new Date().toISOString());
-    return json({...(args.action==='create'||args.action==='rotate'?{secret:'ps_local_fixture_not_a_real_secret'}:{})});
+    return json({...(args.action==='create'||args.action==='rotate'?{integrationId:args.id||'22222222-2222-4222-8222-222222222222',secret:'ps_local_fixture_not_a_real_secret'}:{})});
   }
   if(op.startsWith('activity.'))return json({counts:{},baseline:null,away:false});
   if(op.endsWith('.list') || op.endsWith('.all'))return json([]);

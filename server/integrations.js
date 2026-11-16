@@ -71,6 +71,14 @@ export function createIntegrationService({ database = raw, publicRepository = cr
     chat: (access, input) => perform(access, input, 'external_api'),
     platformChat: (access, input) => perform(access, input, 'own_platform'),
     session: access => integrationQuery(database().rpc('create_persona_session', { p_key: access.keyId })),
+    async status(access, input) {
+      adminAccess(access);
+      if (!uuidValid(input?.id)) throw new HttpError(400, 'Choose a website connection.');
+      const sites = await integrationQuery(database().from('website_integrations').select('id').eq('workspace_id', access.workspace.id).eq('id', input.id).limit(1));
+      if (!sites.length) throw new HttpError(404, 'This website connection is not available.');
+      const requests = await integrationQuery(database().from('persona_requests').select('completed_at').eq('workspace_id', access.workspace.id).eq('integration_id', input.id).eq('source', 'external_api').eq('state', 'complete').order('completed_at', { ascending: false }).limit(1));
+      return { lastRequest: requests[0]?.completed_at || null };
+    },
     async list(access) {
       adminAccess(access);
       const sites = await integrationQuery(database().from('website_integrations').select('id,name,site_origin,enabled,created_at,keys:persona_api_keys(id,prefix,scope,expires_at,revoked_at,created_at)').eq('workspace_id', access.workspace.id).order('created_at', { ascending: false }));

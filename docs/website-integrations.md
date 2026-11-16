@@ -1,5 +1,7 @@
 # Connect your Persona to a website
 
+The Settings page now guides users through four steps inside the app: add the website, save its hosting settings, download the server file and add the chatbot script, then check for a successful request. Vercel JavaScript and Next.js App Router server files are available directly from the page. Account settings include copyable profile/API/script addresses and account identifiers. No customer database name or password is required. The connection check reports the latest authenticated successful request timestamp; it does not certify the identity of the originating site or visitor.
+
 1. In Persona, open Settings → Website connections. Create a connection using your website URL.
 2. Save the one-time key in your website backend environment as `PERSONA_API_KEY`. Set `PERSONA_API_URL` to `https://YOUR_PERSONA_HOST/api/persona` and `SITE_ORIGIN` to your website's exact HTTPS origin.
 3. Copy `examples/persona-proxy.js` from this repository into your website's `api/persona-proxy.js`. It runs as a Vercel Node serverless function. A Next.js/Express application can use the same upstream request inside its server route.
@@ -48,9 +50,11 @@ Local tests execute the actual SQL in PostgreSQL/PGlite. Hosted SQL installation
 
 Settings → Team access creates email-bound invitation links that expire after seven days. An invited user signs in with that email and accepts the link. New users first need a platform invitation to create their login, then reopen the team link. The workspace owner cannot be removed or demoted here. Changing or removing a member revokes outstanding invitations for that email so an older link cannot undo the decision.
 
-Owners and administrators manage the workspace, its integrations, exports and shared private Admin Assistant. Contributors maintain files, articles and indexing. Viewers browse files and knowledge without editing. The workspace selector keeps the user's personal workspace available alongside team memberships. Public URLs refer to the selected workspace owner.
+Owners and administrators manage the workspace, its integrations, exports and shared private Admin Assistant. Contributors maintain files, articles and indexing. Viewers browse files and knowledge without editing. Team invitations open the shared profile. Personal profile data remains separate. Public URLs refer to the selected workspace owner.
 
-## Signed webhooks and scheduling
+## Retained webhook implementation (disabled)
+
+The user requested that webhooks be hidden and disabled for now. WEBHOOKS_ENABLED defaults to false. The current release omits Webhooks from navigation, redirects its route, rejects management operations and skips background deliveries. The following describes retained implementation for a future explicitly enabled release; it is not an available product feature.
 
 Set `WEBHOOK_ENCRYPTION_KEY` in Persona's server environment to a cryptographically random 32-byte value encoded as base64. Set `CRON_SECRET` to a separate random secret of at least 32 characters. Generate each locally with Node's `crypto.randomBytes`; keep these values in deployment environment secrets. Redeploy after adding them. Keep the encryption key stable: changing it makes existing encrypted webhook secrets unreadable, requiring endpoints to be recreated.
 

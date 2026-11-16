@@ -62,6 +62,7 @@ const slugFor = email =>
 
 export const publicUser = u => ({
   workspaceEnabled: process.env.WORKSPACES_ENABLED === 'true',
+  webhooksEnabled: process.env.WORKSPACES_ENABLED === 'true' && process.env.WEBHOOKS_ENABLED === 'true',
   activeWorkspaceId: u.active_workspace_id || null,
   id: String(u.id),
   email: u.email,

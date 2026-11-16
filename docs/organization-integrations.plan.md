@@ -2,6 +2,10 @@
 
 User-approved scope: one public Persona and one private Admin Assistant per individual or organization. Keep the existing green-and-white application and its core knowledge workflow. External websites authenticate through their backend with a secret API key.
 
+Latest user change: hide Webhooks from the interface and disable the backend feature while retaining its implementation. WEBHOOKS_ENABLED defaults to false; no webhook management or delivery runs in the current release. The temporary test receiver was removed and its synthetic endpoint disabled. Team access and exports remain in scope.
+
+Latest interface change: remove the Current organization / Current profile selector from the sidebar. Membership, authorization and backend switching remain intact; the selector component is retained without mounting it in the interface.
+
 ## Stages
 
 1. Workspace foundation: backfill existing accounts without changing URLs or legacy ownership, enforce workspace references, verify membership and status.
