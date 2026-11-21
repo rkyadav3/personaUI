@@ -1,6 +1,6 @@
 import { studioCommand } from '../../shared/studioAssistant.js';
 
-export const initialStudioState = userId => ({ userId, input: '', messages: [], review: null, result: null, error: '', busy: '', historyBefore: null, historyBusy: false, historyError: '' });
+export const initialStudioState = (userId, workspaceId) => ({ userId, workspaceId, input: '', messages: [], review: null, result: null, error: '', busy: '', historyBefore: null, historyBusy: false, historyError: '' });
 const browserTimeZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return 'UTC'; } };
 const turnMessages = turn => [
   { id: `${turn.id}:q`, role: 'user', text: turn.question, createdAt: turn.createdAt },
@@ -22,10 +22,11 @@ export function studioMessageGroups(messages) {
 }
 
 /** One session belongs to one mounted owner. Late responses cannot change a newer session. */
-export function createStudioSession({ userId, call, publish, onApplied, storage, timeZone = browserTimeZone(), now = Date.now }) {
-  let state = initialStudioState(userId), active = true, revision = 0, persistence = storage;
+export function createStudioSession({ userId, workspaceId, call: request, publish, onApplied, storage, timeZone = browserTimeZone(), now = Date.now }) {
+  const call = (op, args = {}) => request(op, workspaceId ? { ...args, workspaceId } : args);
+  let state = initialStudioState(userId, workspaceId), active = true, revision = 0, persistence = storage;
   if (persistence === undefined) { try { persistence = globalThis.sessionStorage; } catch { /* Reviews also remain on the server. */ } }
-  const key = `studio-review:${userId}`, live = version => active && revision === version;
+  const key = `studio-review:${userId}${workspaceId ? ':' + workspaceId : ''}`, live = version => active && revision === version;
   const update = patch => { if (active) { state = { ...state, ...patch }; publish?.(state); } };
   const remember = id => { try { if (id) persistence?.setItem(key, id); else persistence?.removeItem(key); } catch { /* Browser recovery is optional. */ } };
   const review = value => { update({ review: value }); remember(value?.id); };

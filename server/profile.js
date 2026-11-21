@@ -11,6 +11,9 @@ import { publicUrl, hostedMediaTree } from './site.js';
 import { raw, run } from './supabase.js';
 import { canViewProfile } from '../shared/governance.js';
 import { normalizeQuantity } from '../shared/commerce.js';
+import { normalizeOrganizationDraft, organizationMissing, publicOrganization } from '../shared/organization.js';
+import { extractOrganizationProfile } from './organizationProfile.js';
+import { accountColumns, canViewWorkspaceProfile } from './workspaceVisibility.js';
 
 const MAX_TEXT = 6000, MAX_PER_HOUR = 12;
 const str = (v, n = 300) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
@@ -119,6 +122,7 @@ JSON shape:
 {"profile":{"name":null,"education":[{"qualification":"","specialization":"","institution":""}],"contact":{"email":null,"phone":null,"location":null,"other":null},"experience":{"total_years":null,"description":"","employers":[{"company":"","role":"","duration":""}]},"designation":null,"expertise":[]},"purpose":{"description":"","contributions":[{"category":"","subtype":"","description":"","intent":"unspecified"}]},"clarifications":[]}`;
 
 export async function extract(db, text, ai = generateJSON) {
+  if (db.workspaceType === 'organization') return extractOrganizationProfile(db, text, ai);
   text = String(text || '').trim();
   if (text.length < 20) throw new Error('Write a little more about yourself so there is something to work with.');
   if (text.length > MAX_TEXT) throw new Error(`Please keep it under ${MAX_TEXT} characters.`);
@@ -178,7 +182,8 @@ async function upsertContributions(db, items) {
 /** Step 7: only here does a profile come into existence, and only with an explicit confirmation. */
 export async function confirmProfile(db, { submissionId, draft, visibility, confirmed }) {
   if (confirmed !== true) throw new Error('Please confirm that you have reviewed your profile.');
-  const d = normalizeDraft(draft), m = missingFields(d);
+  const org = db.workspaceType === 'organization';
+  const d = org ? normalizeOrganizationDraft(draft) : normalizeDraft(draft), m = org ? organizationMissing(d) : missingFields(d);
   if (m.required.length) throw new Error(`Still needed: ${m.required.join(' and ')}.`);
   let sub = null;
   if (submissionId) sub = (await run(db.from('profile_submissions').select('*').eq('id', submissionId).limit(1)))[0] || null;
@@ -188,6 +193,7 @@ export async function confirmProfile(db, { submissionId, draft, visibility, conf
     designation: d.profile.designation, expertise: d.profile.expertise, purpose: d.purpose.description,
     visibility: normalizeVisibility(visibility), status: 'published', confirmed_at: new Date().toISOString(),
     original_text: sub?.input_text || null, ai_extracted: ai ? ai.profile : null, field_sources: fieldSources(d.profile, ai?.profile), updated_at: new Date().toISOString(),
+    ...(org ? { profile_type: 'organization', organization: d.profile.organization } : {}),
   };
   const cur = await profileRow(db);
   if (cur) await run(db.from('profiles').update(row).eq('id', cur.id)); else await run(db.from('profiles').insert(row));
@@ -200,25 +206,34 @@ export async function confirmProfile(db, { submissionId, draft, visibility, conf
 export async function saveProfile(db, { draft, purpose }) {
   const cur = await profileRow(db);
   if (!cur) throw new Error('Create your profile first.');
-  const d = normalizeDraft({ profile: draft, purpose: { description: purpose } });
+  const org = db.workspaceType === 'organization';
+  const d = org ? normalizeOrganizationDraft({ profile: draft, purpose: { description: purpose } }) : normalizeDraft({ profile: draft, purpose: { description: purpose } });
   if (!d.profile.name) throw new Error('A name is required.');
+  if (org && organizationMissing(d).required.length) throw new Error('Complete the organization type, introduction, audience and persona purpose.');
   await run(db.from('profiles').update({
     name: d.profile.name, education: d.profile.education, contact: d.profile.contact, experience: d.profile.experience, designation: d.profile.designation,
     expertise: d.profile.expertise, purpose: d.purpose.description, field_sources: fieldSources(d.profile, cur.ai_extracted), updated_at: new Date().toISOString(),
+    ...(org ? { profile_type: 'organization', organization: d.profile.organization } : {}),
   }).eq('id', cur.id));
   return getProfile(db);
 }
 
 /** Only the server's reviewed command executor calls this combined profile write. */
 export async function saveAssistantProfile(db, values) {
-  const d = normalizeDraft({ profile: values, purpose: { description: values.purpose } });
+  const existing = db.workspaceType === 'organization' ? await profileRow(db) : null;
+  const input = { profile: { ...values, ...(db.workspaceType === 'organization' ? { organization: values.organization || existing?.organization } : {}) }, purpose: { description: values.purpose } };
+  const d = db.workspaceType === 'organization' ? normalizeOrganizationDraft(input) : normalizeDraft(input);
   if (!d.profile.name) throw new Error('A name is required.');
   if (!['draft', 'published'].includes(values.status || 'draft')) throw new Error('Choose draft or published status.');
   if (!values.id && !d.purpose.description) throw new Error('Your purpose is required.');
-  const cur = await profileRow(db);
+  const cur = db.workspaceType === 'organization' ? existing : await profileRow(db);
   if (values.id ? !cur || String(cur.id) !== String(values.id) : cur) throw new Error('The profile changed after review. Prepare a new review.');
   const stamp = new Date().toISOString(), status = values.status || 'draft';
   const patch = { ...d.profile, purpose: d.purpose.description, visibility: normalizeVisibility(values.visibility), status, field_sources: fieldSources(d.profile, cur?.ai_extracted), updated_at: stamp, ...(status === 'published' && !cur?.confirmed_at ? { confirmed_at: stamp } : {}) };
+  if (db.workspaceType === 'organization') {
+    if (organizationMissing(d).required.length) throw new Error('Complete organization setup before using the assistant to publish this profile.');
+    patch.profile_type = 'organization';
+  }
   const saved = await run(cur ? db.from('profiles').update(patch).eq('id', cur.id).select('id') : db.from('profiles').insert(patch).select('id'));
   if (!saved[0]) throw new Error('The profile change could not be confirmed. Check the profile editor.');
   return saved[0];
@@ -300,6 +315,7 @@ export function buildPublic(profile, contributions) {
   for (const k of ['email', 'phone', 'location', 'other']) if (v.contact[k] && c[k]) contact[k] = c[k];
   return {
     name: profile.name,
+    ...(profile.profile_type === 'organization' ? { profileType: 'organization', organization: publicOrganization(profile, v) } : {}),
     views: profile.views || 0,
     designation: v.designation ? profile.designation : null,
     education: v.education ? profile.education : [],
@@ -341,8 +357,8 @@ function decorate(pub, slug, site, engage = { updates: [], schedule: [] }) {
 export async function publicProfile(slug, viewer = null, db = raw()) {
   slug = String(slug || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return null;
-  const [u] = await run(db.from('users').select('id,email,tags,profile_private,locked_until').eq('slug', slug).limit(1));
-  if (isSuperAdminEmail(u?.email) || !canViewProfile(u, viewer)) return null;
+  const [u] = await run(db.from('users').select(accountColumns('id,email,tags,profile_private,locked_until')).eq('slug', slug).limit(1));
+  if (isSuperAdminEmail(u?.email) || !await canViewWorkspaceProfile(u, viewer, () => db)) return null;
   const [p] = await run(db.from('profiles').select('*').eq('owner_id', u.id).eq('status', 'published').limit(1));
   if (!p) return null;
   const [cs, os, site, engage, tagDefinitions] = await Promise.all([
@@ -369,8 +385,8 @@ export async function publicOffers(slug, viewer = null) {
   slug = String(slug || process.env.DEFAULT_SLUG || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return null;
   const db = raw();
-  const [u] = await run(db.from('users').select('id,email,slug,tags,profile_private,locked_until').eq('slug', slug).limit(1));
-  if (isSuperAdminEmail(u?.email) || !canViewProfile(u, viewer)) return null;
+  const [u] = await run(db.from('users').select(accountColumns('id,email,slug,tags,profile_private,locked_until')).eq('slug', slug).limit(1));
+  if (isSuperAdminEmail(u?.email) || !await canViewWorkspaceProfile(u, viewer, () => db)) return null;
   const [p] = await run(db.from('profiles').select('*').eq('owner_id', u.id).eq('status', 'published').limit(1));
   if (!p) return { handle: u.slug, name: null, hasProfile: false, contact: null, offers: [] };
   const [cs, os] = await Promise.all([run(db.from('contributions').select('*').eq('owner_id', u.id).order('id')), run(db.from('offerings').select('*').eq('owner_id', u.id).order('id'))]);

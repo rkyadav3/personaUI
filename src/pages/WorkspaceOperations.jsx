@@ -1,0 +1,41 @@
+import { useState } from 'react';
+import { useOp } from '../lib/hooks.js';
+import { api } from '../lib/api.js';
+import { useAuth } from '../lib/auth.jsx';
+import { Busy, Field, Notice, Skeleton } from '../components/Ui.jsx';
+import '../styles/integrations.css';
+const auditText = detail => {
+  const labels = { status: 'Workspace status', enabled: 'All chat', external_enabled: 'External API', monthly_limit: 'Monthly requests', minute_limit: 'Requests per minute', retention_days: 'Retention days' };
+  const display = value => typeof value === 'boolean' ? value ? 'Enabled' : 'Disabled' : String(value ?? 'Unknown');
+  return Object.entries(detail?.changes || detail || {}).map(([key, value]) => (labels[key] || key) + ': ' + (detail?.before && key in detail.before ? display(detail.before[key]) + ' → ' : '') + display(value)).join(' · ');
+};
+
+export default function WorkspaceOperations() {
+  const { user } = useAuth();
+  if (!user?.isSuperAdmin) return <Notice kind="error">Only Super Admin can manage workspaces.</Notice>;
+  return <Operations />;
+}
+function Operations() {
+  const [type,setType]=useState(''), [query,setQuery]=useState(''), [page,setPage]=useState(1);
+  const directory=useOp('platform.workspaces.list',{type,query,page}), health=useOp('platform.workspaces.health'), audit=useOp('platform.workspaces.audit');
+  const [editing,setEditing]=useState(null), [limits,setLimits]=useState({}), [busy,setBusy]=useState(false), [notice,setNotice]=useState(null);
+  async function change(input) {
+    if(busy)return;setBusy(true);setNotice(null);
+    try{await api('platform.workspaces.change',input);await Promise.all([directory.reload(),health.reload(),audit.reload()]);setNotice({kind:'success',text:'Workspace settings saved.'});setEditing(null);}
+    catch(error){setNotice({kind:'error',text:error.message});}finally{setBusy(false);}
+  }
+  return <div className="integration-page"><div className="head"><div><h1>Workspace operations</h1><p className="muted">Track individual and organization workspaces, access and API health.</p></div><button className="btn" disabled={busy} onClick={()=>Promise.all([directory.reload(),health.reload(),audit.reload()])}>Refresh</button></div>
+    <section className="card"><h2>API health</h2>{health.loading&&!health.data&&<Skeleton label="Checking API measurements…" />}{health.error&&<><Notice kind="error">{health.error}</Notice><button className="btn" onClick={health.reload}>Retry health</button></>}{health.data&&<><p>Last 24 hours · Measured {new Date(health.data.checkedAt).toLocaleString()}</p><p>{health.data.api.requests} admitted requests · {health.data.api.failed} failed · {health.data.api.pending} pending · {health.data.api.stuck} overdue</p><p className="muted">95th percentile response time: {health.data.api.p95Ms==null?'Unknown':health.data.api.p95Ms+' ms'}. API status: {health.data.api.requests===0?'Unknown — no requests in this window':health.data.api.failed>0?'Failures observed':'No failures observed'}.</p><p className="muted">{health.data.api.platform} platform requests · {health.data.api.external} external requests</p></>}</section>
+    <section className="card"><h2>Security health</h2>{health.data?<><p>{health.data.security.activeKeys} active keys · {health.data.security.expiringKeys} expiring within 7 days · {health.data.security.expiredKeys} expired · {health.data.security.revokedKeys} revoked</p><p className="muted">Rejected external requests since {health.data.security.rejectionWindowStart?new Date(health.data.security.rejectionWindowStart).toLocaleString():'the recorded bucket window'}: {Object.entries(health.data.security.rejections||{}).map(([key,n])=>key.replaceAll('_',' ')+' '+n).join(' · ')||'None recorded'}</p><p className="muted">Keys are scoped to public chat and stored as digests. Counts report recorded events and key state; they are not a security certification.</p></>:<p className="muted">Unknown until measurements load.</p>}</section>
+    <section className="card"><div className="head"><h2>Provider checks</h2><button className="btn" disabled={busy} onClick={async()=>{setBusy(true);setNotice(null);try{await api('platform.workspaces.check');await health.reload();}catch(e){setNotice({kind:'error',text:e.message});}finally{setBusy(false);}}}>Run provider checks</button></div>{health.data?.probes.map(probe=><p key={probe.component}><strong>{probe.component==='generation'?'Answer model':'Embedding model'}: {probe.status}</strong><br/><span className="muted">{probe.detail}{probe.checked_at?' · '+new Date(probe.checked_at).toLocaleString():''}</span></p>)||<p>Unknown — no recent check.</p>}</section>
+    <section className="card"><h2>Workspace directory</h2><div className="cols c2"><Field label="Search workspace names"><input type="search" value={query} onChange={e=>{setQuery(e.target.value);setPage(1);}}/></Field><Field label="Workspace type"><select value={type} onChange={e=>{setType(e.target.value);setPage(1);}}><option value="">All types</option><option value="individual">Individual</option><option value="organization">Organization</option></select></Field></div>
+      {directory.loading&&<Skeleton label="Loading workspace directory…" rows={2}/>}<Notice kind="error">{directory.error}</Notice>{directory.error&&<button className="btn" onClick={directory.reload}>Retry directory</button>}
+      {directory.data?.workspaces.map(w=><article className="integration-row" key={w.id}><div><h3>{w.name||'Unnamed workspace'}</h3><p>{w.type||'Awaiting setup'} · {w.status}</p><p className="muted">{w.owner?.email} · /p/{w.slug}</p></div><div className="row"><button className="btn" disabled={busy} onClick={()=>{setEditing(w);setLimits({monthly_limit:w.settings?.monthly_limit||1000,minute_limit:w.settings?.minute_limit||30,retention_days:w.settings?.retention_days||30});}}>Limits & retention</button><button className="btn" disabled={busy} onClick={()=>change({workspaceId:w.id,status:w.status==='active'?'suspended':'active'})}>{w.status==='active'?'Suspend':'Restore'}</button><button className="btn danger" disabled={busy} onClick={()=>change({workspaceId:w.id,external_enabled:!(w.settings?.external_enabled??true)})}>{w.settings?.external_enabled===false?'Restore external API':'Stop external API'}</button><button className="btn" disabled={busy} onClick={()=>change({workspaceId:w.id,enabled:!(w.settings?.enabled??true)})}>{w.settings?.enabled===false?'Restore all chat':'Stop all chat'}</button></div></article>)}
+      {directory.data&&!directory.data.workspaces.length&&<p>No workspaces match.</p>}<div className="row"><button className="btn" disabled={page===1||directory.loading} onClick={()=>setPage(page-1)}>Previous</button><span>Page {page}</span><button className="btn" disabled={!directory.data?.hasNext||directory.loading} onClick={()=>setPage(page+1)}>Next</button></div>
+    </section>
+    {editing&&<section className="card"><h2>Limits for {editing.name}</h2><form onSubmit={e=>{e.preventDefault();change({workspaceId:editing.id,...limits});}}><fieldset disabled={busy}>{[['monthly_limit','Monthly requests',1,10000000],['minute_limit','Requests per minute',1,10000],['retention_days','Conversation retention days',7,365]].map(([key,label,min,max])=><Field key={key} label={label}><input type="number" required min={min} max={max} value={limits[key]} onChange={e=>setLimits({...limits,[key]:Number(e.target.value)})}/></Field>)}<div className="row"><button className="btn primary">Save limits</button><button type="button" className="btn" onClick={()=>setEditing(null)}>Cancel</button></div></fieldset></form></section>}
+    <section className="card"><h2>Recent audit history</h2>{audit.loading&&!audit.data&&<Skeleton label="Opening audit history…" rows={2}/>}<Notice kind="error">{audit.error}</Notice>{audit.error&&<button className="btn" onClick={audit.reload}>Retry audit</button>}{audit.data?.rows.map(row=><p key={row.id}><strong>{row.action}</strong> · {new Date(row.created_at).toLocaleString()}<br/>{auditText(row.detail)}<br/><span className="muted">Workspace {row.workspace_id} · Actor {row.actor_id||'Deleted account'}</span></p>)}{audit.data&&!audit.data.rows.length&&<p>No audit events recorded.</p>}</section>
+    {busy&&<Busy label="Applying workspace controls…" />}<Notice kind={notice?.kind}>{notice?.text}</Notice>
+  </div>;
+}
+

@@ -40,3 +40,16 @@ test('restricted Studio navigation hides unavailable features and retains accoun
   const owner = render(StudioSidebar, {user:{name:'Owner',isSuperAdmin:true},onLogout(){}}, '/superadmin/master');
   assert.match(owner, /href="\/superadmin\/master"/);
 });
+
+test('workspace navigation requires both tag grants and membership roles', () => {
+  const { adminSectionsFor, canOpenAdminPage } = require('../src/lib/adminNavigation.js');
+  const user = { id:'member', workspaceEnabled:true, workspaceRole:'admin', webhooksEnabled:true, permissions:['content'] };
+  const pages = adminSectionsFor(user).flatMap(section => section.pages).map(page => page.id);
+  assert.ok(pages.includes('content'));
+  assert.ok(pages.includes('account'));
+  assert.ok(pages.includes('support'));
+  for (const page of ['integrations', 'team', 'webhooks', 'export']) assert.ok(!pages.includes(page), page);
+  assert.equal(canOpenAdminPage(user, '/admin/writing'), true);
+  assert.equal(canOpenAdminPage({ ...user, workspaceRole:'viewer' }, '/admin/writing'), false);
+  assert.equal(canOpenAdminPage(user, '/admin/store'), false);
+});

@@ -7,6 +7,7 @@ import { normalizeEnquiry, normalizeEventForm, normalizeUpdate, shapeEngage, upd
 import { normalizePortfolio } from '../shared/portfolio.js';
 import { raw, run } from './supabase.js';
 import { canViewProfile } from '../shared/governance.js';
+import { accountColumns } from './workspaceVisibility.js';
 
 const MAX_UPDATES = 300, MAX_PER_HOUR = 5;
 const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
@@ -88,7 +89,7 @@ export async function submitEnquiry(body, { ip }, db = raw()) {
   const slug = String(body?.slug || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return { ok: false, status: 400, error: 'Something went wrong. Please reload the page.' };
   try {
-    const [u] = await run(db.from('users').select('id,tags,profile_private,locked_until').eq('slug', slug).limit(1));
+    const [u] = await run(db.from('users').select(accountColumns('id,tags,profile_private,locked_until')).eq('slug', slug).limit(1));
     if (!canViewProfile(u)) return { ok: false, status: 404, error: 'This profile is not available.' };
     const [p] = u ? await run(db.from('profiles').select('id').eq('owner_id', u.id).eq('status', 'published').limit(1)) : [];
     if (!u || !p) return { ok: false, status: 404, error: 'This profile is not available.' };

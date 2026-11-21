@@ -50,10 +50,10 @@ export function SharedPaymentSettings() {
   return <section className="card">
     <h3>Shared Razorpay account</h3>
     <p className="muted">Paid purchases use the app’s Razorpay account. Every purchase is recorded under the profile that sold the item.</p>
-    <Notice kind={data.configured ? 'success' : 'info'}>{data.configured ? `Payments are configured${data.testMode ? ' in test mode' : ''}.` : 'The platform administrator needs to configure Razorpay credentials and the payment encryption key.'}</Notice>
-    {!data.webhookConfigured && <Notice kind="info">Set the shared Razorpay webhook secret to receive payment and refund updates.</Notice>}
+    <Notice kind={data.configured ? 'success' : 'info'}>{data.configured ? `Payments are configured${data.testMode ? ' in test mode' : ''}.` : 'Paid checkout is not ready on this deployment. Contact Support to ask the platform team to enable payments.'}</Notice>
+    {!data.webhookConfigured && <Notice kind="info">Automatic payment and refund updates are not ready. The platform team needs to complete payment setup.</Notice>}
     <label className="toggle"><input type="checkbox" checked={enabled ?? data.enabled} onChange={e => setEnabled(e.target.checked)} disabled={busy} />Enable paid checkout on my profile</label>
-    <p className="hint">Free claims work without Razorpay. Upload delivery files or configure services in Store → Items.</p>
+    <p className="hint">Visitors can still claim free items. Add download files or describe your services in Store → Items.</p>
     <button className="btn primary" disabled={busy || enabled === null} onClick={save}>{busy ? 'Saving…' : 'Save payment preference'}</button>
     <Notice kind={msg?.kind}>{msg?.t}</Notice>
   </section>;

@@ -3,6 +3,7 @@ import { CATEGORIES, INTENTS } from '../../../shared/profileSchema.js';
 import { nextCategory } from '../../lib/draft.js';
 import { Field } from '../Ui.jsx';
 import FormDialog from '../FormDialog.jsx';
+import OrganizationFields from './OrganizationFields.jsx';
 
 const recordFields = { education: [['qualification', 'Qualification'], ['specialization', 'Field of study'], ['institution', 'Institution']], employer: [['company', 'Company'], ['role', 'Role'], ['duration', 'Duration']] };
 
@@ -12,7 +13,7 @@ function Tags({ value, onChange }) {
   return (
     <div>
       <div className="chips">{value.map(t => <span className="chip" key={t}>{t}<button type="button" aria-label={`Remove ${t}`} onClick={() => onChange(value.filter(x => x !== t))}>×</button></span>)}</div>
-      <input type="text" value={text} placeholder="Type a skill and press Enter" onChange={e => setText(e.target.value)}
+      <input type="text" aria-label="Add an area of expertise" value={text} placeholder="Type a skill and press Enter" onChange={e => setText(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(); } }} onBlur={add} />
     </div>
   );
@@ -23,22 +24,23 @@ export default function DraftEditor({ draft, onChange, withContributions = true 
   const [adding, setAdding] = useState(null);
   const up = fn => { const n = structuredClone(draft); fn(n); onChange(n); };
   const p = draft.profile, x = p.experience, ks = draft.purpose.contributions;
+  const organization = !!p.organization;
   const val = v => v ?? '';
   const start = kind => setAdding({ kind, record: kind === 'contribution' ? { category: nextCategory(ks), subtype: '', description: '', intent: 'unspecified' } : Object.fromEntries(recordFields[kind].map(([key]) => [key, ''])) });
   const patchRecord = patch => setAdding(current => ({ ...current, record: { ...current.record, ...patch } }));
 
   return (
     <>
-      <section className="card">
+      {organization ? <OrganizationFields draft={draft} onChange={onChange} /> : <section className="card">
         <h3>About you</h3>
         <div className="cols c2">
           <Field label="Full name *"><input type="text" value={val(p.name)} onChange={e => up(n => { n.profile.name = e.target.value; })} /></Field>
-          <Field label="Current designation"><input type="text" value={val(p.designation)} onChange={e => up(n => { n.profile.designation = e.target.value; })} /></Field>
+          <Field label="Current role or job title"><input type="text" value={val(p.designation)} onChange={e => up(n => { n.profile.designation = e.target.value; })} /></Field>
         </div>
         <Field label="Expertise"><Tags value={p.expertise} onChange={v => up(n => { n.profile.expertise = v; })} /></Field>
-      </section>
+      </section>}
 
-      <section className="card">
+      {!organization && <><section className="card">
         <h3>Education</h3>
         {p.education.map((e, i) => (
           <div className="row sub" key={i}>
@@ -66,7 +68,7 @@ export default function DraftEditor({ draft, onChange, withContributions = true 
           </div>
         ))}
         <button type="button" className="btn" onClick={() => start('employer')}>Add employer</button>
-      </section>
+      </section></>}
 
       <section className="card">
         <h3>Contact details <span className="muted" style={{ fontSize: '.85rem', fontWeight: 400 }}>private unless you publish them</span></h3>
@@ -78,11 +80,11 @@ export default function DraftEditor({ draft, onChange, withContributions = true 
       </section>
 
       <section className="card">
-        <h3>Purpose to join</h3>
-        <Field label="Why do you want to join?"><textarea rows={3} value={draft.purpose.description} onChange={e => up(n => { n.purpose.description = e.target.value; })} /></Field>
+        <h3>{organization ? 'About our organization' : 'Purpose to join'}</h3>
+        <Field label={organization ? 'What does your organization do? *' : 'Why do you want to join?'}><textarea rows={3} value={draft.purpose.description} onChange={e => up(n => { n.purpose.description = e.target.value; })} /></Field>
         {withContributions && (
           <>
-            <h3 style={{ marginTop: 14 }}>What you want to contribute</h3>
+            <h3 style={{ marginTop: 14 }}>{organization ? 'Services, programs and resources' : 'What you want to contribute'}</h3>
             <p className="muted">Pick every category that applies. Say whether each is free or paid; nothing is assumed to be paid.</p>
             {ks.map((k, i) => (
               <div className="row sub" key={i}>

@@ -20,6 +20,7 @@ export function normalizeTags(tags = [], definitions = []) {
 }
 
 export function canViewProfile(account, viewer = null) {
+  if (account?.workspace_status && account.workspace_status !== 'active') return false;
   if (!account || (account.locked_until && new Date(account.locked_until) > new Date())) return false;
   // Unknown or malformed tag data fails closed.
   if (account.tags != null && (!Array.isArray(account.tags) || account.tags.some(tag => !Object.hasOwn(PROFILE_TAGS, tag) && !customTagKey(tag)))) return false;

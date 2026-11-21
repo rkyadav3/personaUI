@@ -8,21 +8,24 @@ export const TENANT_RPCS = new Set(['hybrid_search', 'set_embeddings', 'chunk_so
 TENANT_TABLES.add('assets');
 TENANT_RPCS.add('save_store_currency');
 
-export function scoped(uid, database = raw) {
+export function scoped(uid, database = raw, workspace) {
   if (!uid) throw new Error('Not signed in.');
   const r = database();
-  const stamp = rows => Array.isArray(rows) ? rows.map(x => ({ ...x, owner_id: uid })) : { ...rows, owner_id: uid };
-  const noOwner = v => { const { owner_id, ...rest } = v; return rest; };   // ownership can never be changed
+  const stampRow = row => ({ ...row, owner_id: uid, ...(workspace ? { workspace_id: workspace.workspaceId, created_by: workspace.actorId, updated_by: workspace.actorId } : {}) });
+  const stamp = rows => Array.isArray(rows) ? rows.map(stampRow) : stampRow(rows);
+  const noOwner = v => { const { owner_id, workspace_id, created_by, updated_by, ...rest } = v; return { ...rest, ...(workspace ? { updated_by: workspace.actorId } : {}) }; };
+  const filter = query => workspace ? query.eq('owner_id', uid).eq('workspace_id', workspace.workspaceId) : query.eq('owner_id', uid);
   return {
     uid,
+    ...(workspace ? { workspaceId: workspace.workspaceId, actorId: workspace.actorId } : {}),
     from(name) {
       if (!TENANT_TABLES.has(name)) throw new Error('Table is not available in this account.');
       const t = r.from(name);
       return {
-        select: (cols, opts) => t.select(cols, opts).eq('owner_id', uid),
+        select: (cols, opts) => filter(t.select(cols, opts)),
         insert: (rows, opts) => t.insert(stamp(rows), opts),
-        update: values => t.update(noOwner(values)).eq('owner_id', uid),
-        delete: () => t.delete().eq('owner_id', uid),
+        update: values => filter(t.update(noOwner(values))),
+        delete: () => filter(t.delete()),
       };
     },
     rpc: (fn, params = {}) => {

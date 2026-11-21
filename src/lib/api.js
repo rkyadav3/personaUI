@@ -2,6 +2,7 @@
 // Identical calls that are still in flight share ONE request, so a double or triple click can never run the same
 // action (create, delete, save, sign-in…) more than once. A new call is allowed as soon as the first one finishes.
 const inflight = new Map();
+let workspaceId = null;
 
 async function send(op, args) {
   const r = await fetch('/api/admin', {
@@ -11,10 +12,13 @@ async function send(op, args) {
   let data = null;
   try { data = await r.json(); } catch { /* non-JSON error page */ }
   if (!r.ok) { const e = new Error(data?.error || `Request failed (${r.status})`); e.status = r.status; throw e; }
+  if (op === 'workspace.current') workspaceId = data?.workspace?.id || null;
+  if (['auth.login', 'auth.register', 'auth.logout'].includes(op)) workspaceId = null;
   return data;
 }
 
 export function api(op, args = {}) {
+  if (workspaceId) args = { ...args, workspaceId: args.workspaceId ?? workspaceId };
   const key = `${op}\u0000${JSON.stringify(args)}`;
   let p = inflight.get(key);
   if (!p) {

@@ -32,15 +32,16 @@ export function hasPermission(user, permission) {
 }
 
 export function operationPermissions(op) {
+  if (op === 'workspace.setup') return ['profile'];
   if (/^(profile\.|site\.|page\.)/.test(op)) return ['profile'];
   if (/^(content\.|files\.|folders\.|topics\.|posts\.|templates\.|updates\.|events\.)/.test(op)) return ['content'];
-  if (/^(index\.|chat\.)/.test(op)) return ['knowledge'];
+  if (/^(index\.|chat\.|knowledge\.|integrations\.)/.test(op)) return ['knowledge'];
   if (/^(items\.|contributions\.|offerings\.|purchases\.|payments\.)/.test(op)) return ['commerce'];
   if (/^enquiries\./.test(op)) return ['enquiries'];
-  if (/^(invites\.|suggestions\.)/.test(op)) return ['community'];
+  if (/^(invites\.|suggestions\.|team\.)/.test(op)) return ['community'];
   // These tools aggregate several areas. Requiring all permissions prevents
   // the assistant and shared asset tools from bypassing a disabled feature.
-  if (/^(studio\.|activity\.)/.test(op) || op === 'overview') return ALL_PERMISSIONS;
+  if (/^(studio\.|activity\.|webhooks\.)/.test(op) || ['overview', 'data.export'].includes(op)) return ALL_PERMISSIONS;
   return [];
 }
 
@@ -54,7 +55,8 @@ export function routePermissions(pathname, search = '') {
     store: ['commerce'], purchases: ['commerce'],
     writing: ['content'], templates: ['content'], topics: ['content'], files: ['content'], add: ['content'], activity: ['content'], updates: ['content'],
     knowledge: ['knowledge'], questions: ['knowledge'], enquiries: ['enquiries'],
-    invites: ['community'], suggestions: ['community'],
+    invites: ['community'], suggestions: ['community'], team: ['community'],
+    integrations: ['knowledge'], webhooks: ALL_PERMISSIONS, export: ALL_PERMISSIONS,
   };
   return permissions[route] || [];
 }

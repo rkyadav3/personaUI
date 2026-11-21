@@ -8,10 +8,11 @@ import { paged } from './supabase.js';
 import { HttpError } from './http.js';
 import { STUDIO_ENTITIES } from '../shared/studioAssistant.js';
 import { createActivityService } from './adminActivity.js';
+import { workspaceIdentity } from './workspacePermissions.js';
 
 const lazy = path => new Proxy({}, { get: (_, key) => async (...args) => (await import(path))[key](...args) });
 const fields = (row, keys) => Object.fromEntries(keys.split(' ').filter(key => Object.hasOwn(row || {}, key)).map(key => [key, row[key]]));
-const identity = ctx => { if (!ctx?.user?.id || ctx.db?.uid !== ctx.user.id) throw new HttpError(401, 'Your signed-in identity and tenant scope must agree.'); };
+const identity = workspaceIdentity;
 const dependencies = { customization: ['offerings'], products: ['assets'], files: ['folders', 'topics'], folders: ['files'], topics: ['files', 'posts'], posts: ['topics', 'templates'], templates: ['topics'], offerings: ['contributions', 'assets', 'settings'], contributions: ['offerings'], updates: ['responses'], responses: ['updates'] };
 
 /** The assistant can only call this fixed set of existing, owner-scoped admin services. */

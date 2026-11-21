@@ -2,14 +2,20 @@ import AdminTabs from '../components/AdminTabs.jsx';
 import { useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { useAdminTab } from '../lib/adminTabs.js';
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import Icon from '../components/portfolio/Icon.jsx';
 import { useOp } from '../lib/hooks.js';
 import { Confirm, Loading, Notice, Pill, Progress } from '../components/Ui.jsx';
+import { useAuth } from '../lib/auth.jsx';
+import KnowledgePolicies from '../components/KnowledgePolicies.jsx';
 
 export default function KnowledgeIndex() {
+  const workspaceRole = useOutletContext()?.workspace?.role;
+  const readOnly = workspaceRole === 'viewer';
+  const canAdminister = !workspaceRole || ['owner', 'admin'].includes(workspaceRole);
+  const user = useAuth()?.user;
   const { data: c, reload: reloadCounts, error } = useOp('index.counts');
-  const { data: set } = useOp('index.settings');
+  const { data: set, error: settingsError, reload: reloadSettings } = useOp('index.settings');
 
   const [activeTab, setActiveTab] = useAdminTab({ values: ['sync', 'test'], defaultValue: 'sync' });
 
@@ -25,6 +31,7 @@ export default function KnowledgeIndex() {
   const [searchBusy, setSearchBusy] = useState(false);
 
   async function sync() {
+    if (readOnly || syncing) return;
     setSyncing(true); stop.current = false; setMsgs([]); setPct(0); setLabel('Analyzing source files…');
     try {
       const diff = await api('index.sync');
@@ -34,7 +41,7 @@ export default function KnowledgeIndex() {
       while (remaining > 0 && !stop.current) {
         const r = await api('index.embed', { seconds: 40 });
         embedded += r.done; remaining = r.remaining;
-        setPct(Math.min(1, embedded / total)); setLabel(`Embedded ${embedded} chunks…`);
+        setPct(Math.min(1, embedded / total)); setLabel(`Prepared ${embedded} passages…`);
         if (!r.done) break;
       }
       const out = [{ kind: 'success', t: `Synced successfully: added ${diff.added} source(s), removed ${diff.removed}, embedded ${embedded} chunk(s).` }];
@@ -46,7 +53,7 @@ export default function KnowledgeIndex() {
 
   async function test(e) {
     e.preventDefault();
-    if (!q.trim() || searchBusy) return;
+    if (!q.trim() || searchBusy || readOnly) return;
     setSearchBusy(true); setSearchErr(''); setHits(null);
     try {
       setHits(await api('index.test', { q }));
@@ -54,7 +61,7 @@ export default function KnowledgeIndex() {
     setSearchBusy(false);
   }
 
-  if (!c) return <Loading error={error} />;
+  if (!c) return <><Loading error={error} />{error && <button className="btn" onClick={reloadCounts}>Retry knowledge status</button>}</>;
 
   const waiting = c.chunks - c.embedded;
   const readyPct = c.chunks > 0 ? Math.round((c.embedded / c.chunks) * 100) : 0;
@@ -87,15 +94,15 @@ export default function KnowledgeIndex() {
           <div>
             <strong style={{ fontSize: '1.1rem', color: '#0f172a' }}>AI Knowledge Readiness: {readyPct}%</strong>
             <p className="muted" style={{ margin: '2px 0 0', fontSize: '.86rem' }}>
-              {waiting > 0 ? `${waiting} knowledge chunks are waiting to be embedded.` : (c.chunks ? 'All indexed passages are ready to search.' : 'Publish a file or article to start building your AI knowledge.')}
+              {waiting > 0 ? `${waiting} passages are waiting to be prepared for answers.` : (c.chunks ? 'All prepared passages are ready for your chatbot to search.' : 'Publish a file or article to start building your AI knowledge.')}
             </p>
           </div>
           <button
             className="btn primary"
-            disabled={syncing}
+            disabled={syncing || readOnly}
             onClick={sync}
           >
-            <Icon n="refresh" size={18} />{syncing ? 'Syncing…' : 'Sync published material'}
+            <Icon n="refresh" size={18} />{syncing ? 'Preparing…' : 'Prepare chatbot knowledge'}
           </button>
         </div>
 
@@ -104,9 +111,9 @@ export default function KnowledgeIndex() {
         </div>
 
         <div className="metrics" style={{ marginTop: 14 }}>
-          <div className="metric"><b>{c.chunks}</b><span>Total Chunks</span></div>
-          <div className="metric"><b>{c.embedded}</b><span>Embedded &amp; Ready</span></div>
-          <div className="metric"><b>{waiting}</b><span>Waiting Sync</span></div>
+          <div className="metric"><b>{c.chunks}</b><span>Total passages</span></div>
+          <div className="metric"><b>{c.embedded}</b><span>Ready for answers</span></div>
+          <div className="metric"><b>{waiting}</b><span>Waiting to prepare</span></div>
         </div>
 
         {syncing && (
@@ -123,8 +130,9 @@ export default function KnowledgeIndex() {
       </section>
 
       {/* Page Tabs */}
-      <AdminTabs label="AI knowledge tools" value={activeTab} onChange={setActiveTab} items={[{ id: 'sync', label: 'Readiness & sync', icon: 'book' }, { id: 'test', label: 'Test a question', icon: 'search' }]} />
-      <p className="hint">Questions from your public chat are in <Link to="/admin/questions">Activity → Visitor Q&amp;A</Link>.</p>
+      <AdminTabs label="AI knowledge tools" value={activeTab} onChange={setActiveTab} items={[{ id: 'sync', label: 'Knowledge readiness', icon: 'book' }, { id: 'test', label: 'Test a question', icon: 'search' }]} />
+      {user?.workspaceEnabled && <KnowledgePolicies readOnly={!!workspaceRole && !['owner', 'admin'].includes(workspaceRole)} />}
+      {canAdminister && <p className="hint">Questions from your public chat are in <Link to="/admin/questions">Inbox → Visitor Q&amp;A</Link>.</p>}
 
       {/* TAB 1: HOW IT WORKS & ADVANCED CONTROLS */}
       {activeTab === 'sync' && (
@@ -133,12 +141,12 @@ export default function KnowledgeIndex() {
             <div className="ux-step-card">
               <div className="ux-step-num">1</div>
               <h5>Upload Your Materials</h5>
-              <p>Add source documents in Library or write an article in Content.</p>
+              <p>Upload documents in Files & notes or write an article in Content.</p>
             </div>
             <div className="ux-step-card">
               <div className="ux-step-num">2</div>
-              <h5>Sync published material</h5>
-              <p>Choose “Sync published material” to make waiting passages searchable.</p>
+              <h5>Prepare chatbot knowledge</h5>
+              <p>Choose “Prepare chatbot knowledge” to make waiting passages searchable.</p>
             </div>
             <div className="ux-step-card">
               <div className="ux-step-num">3</div>
@@ -149,6 +157,7 @@ export default function KnowledgeIndex() {
 
           <details className="card" style={{ marginTop: 18 }}>
             <summary>Advanced search settings</summary>
+            {settingsError && <Notice kind="error">Search settings are unavailable. <button className="btn small" onClick={reloadSettings}>Retry search settings</button></Notice>}
             {set ? (
               <p style={{ fontSize: '.9rem', color: '#475569' }}>
                 Embedding Model: <b>{set.model}</b> (768 dimensions) ·
@@ -156,14 +165,14 @@ export default function KnowledgeIndex() {
                 Keyword Match: <b>{set.minKeywordRank}</b>
               </p>
             ) : null}
-            <div className="row" style={{ marginTop: 12 }}>
+            {canAdminister && <div className="row" style={{ marginTop: 12 }}>
               <Confirm
                 label="Rebuild Everything"
                 warn="This clears the vector index and re-extracts all published files from scratch. Only use this if you change your embedding model."
                 confirmLabel="Yes, rebuild index"
                 onConfirm={async () => { try { await api('index.rebuild'); reloadCounts(); } catch (e) { setMsgs([{ kind: 'error', t: e.message }]); } }}
               />
-            </div>
+            </div>}
           </details>
         </>
       )}
@@ -173,7 +182,7 @@ export default function KnowledgeIndex() {
         <section className="card">
           <h3>Test a question</h3>
           <p className="muted" style={{ fontSize: '.9rem', margin: '0 0 16px' }}>
-            Type any question below. This test shows which chunks of your research files will be returned to your Persona to answer that question.
+            Ask a question to see which passages your chatbot can find. This checks the available information; it does not generate a full chatbot answer.
           </p>
 
           <form onSubmit={test} className="row">
@@ -186,7 +195,7 @@ export default function KnowledgeIndex() {
               onChange={e => setQ(e.target.value)}
               autoFocus
             />
-            <button className="btn primary" disabled={searchBusy || !q.trim()}>
+            <button className="btn primary" disabled={searchBusy || !q.trim() || readOnly}>
               {searchBusy ? 'Searching…' : 'Search Notes'}
             </button>
           </form>
@@ -195,7 +204,7 @@ export default function KnowledgeIndex() {
 
           {hits && !hits.length && (
             <Notice kind="info">
-              No chunks passed the similarity threshold for this query. The persona would say it doesn't have enough notes on this topic.
+              No relevant passages were found. Add information about this topic, make it available to your chatbot, then prepare the knowledge again.
             </Notice>
           )}
 

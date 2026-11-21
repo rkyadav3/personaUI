@@ -1,17 +1,20 @@
-export async function askPersona(slug, input, { signal, fetcher = fetch } = {}) {
+export async function askPersona(slug, input, { signal, fetcher = fetch, requestId } = {}) {
   const message = typeof input === 'string' ? input.trim().slice(0, 500) : '';
   if (!message) throw new Error('Write a question first.');
   let response;
   try {
     response = await fetcher('/api/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug, message }), signal,
+      body: JSON.stringify({ slug, message, ...(requestId ? { requestId } : {}) }), signal,
     });
   } catch (error) {
     if (error?.name === 'AbortError') throw error;
     throw new Error('The persona could not answer right now. Please try again.');
   }
-  if (!response.ok) throw new Error(response.status === 429 ? 'Please wait a moment before asking another question.' : 'The persona could not answer right now. Please try again.');
+  if (!response.ok) {
+    let failure; try { failure = await response.json(); } catch { /* Non-JSON error page. */ }
+    throw Object.assign(new Error(response.status === 429 ? 'Please wait a moment before asking another question.' : 'The persona could not answer right now. Please try again.'), { retryWithNewId: failure?.errors?.retry === 'new_request' });
+  }
   let data;
   try { data = await response.json(); }
   catch (error) {

@@ -3,8 +3,9 @@ import { STUDIO_ENTITIES, STUDIO_REVIEW_MS, studioCatalog, studioCommand } from 
 import { makeStudioPlan, studioFingerprint, studioModelContext } from './studioPlan.js';
 import { HttpError } from './http.js';
 import { analyticsPanels } from '../shared/adminActivity.js';
+import { workspaceIdentity } from './workspacePermissions.js';
 
-const actor = ctx => { if (!ctx?.user?.id || ctx.db?.uid !== ctx.user.id) throw new HttpError(401, 'Your signed-in identity and tenant scope must agree.'); };
+const actor = workspaceIdentity;
 const validateId = value => { if (typeof value !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(value)) throw new HttpError(400, 'Choose a valid review.'); return value; };
 const reviewView = row => ({ id: row.id, status: row.status, expiresAt: row.expiresAt, changes: row.plan.changes });
 const report = row => ({ reviewId: row.id, status: row.status, results: row.results || [], ...(row.error ? { warning: row.error } : {}) });
@@ -46,7 +47,7 @@ export function createStudioAssistant({ reviews, history, readState, generate, e
   }
   const get = async (ctx, id) => {
     const row = await reviews.get(ctx, validateId(id));
-    if (!row || row.ownerId !== ctx.user.id) throw new HttpError(404, 'Review not found.');
+    if (!row || row.ownerId !== ctx.db.uid) throw new HttpError(404, 'Review not found.');
     return row;
   };
   return {

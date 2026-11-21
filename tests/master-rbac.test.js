@@ -72,6 +72,25 @@ test('direct feature APIs and the assistant reject disabled permissions before t
   }
 });
 
+test('workspace features enforce tag permissions before loading workspace access', async () => {
+  const restricted = { ...member, workspaceEnabled: true, webhooksEnabled: true, permissions: [] };
+  for (const op of ['workspace.setup', 'knowledge.sources', 'knowledge.policy', 'integrations.list', 'integrations.change', 'team.list', 'team.change', 'webhooks.list', 'webhooks.change', 'data.export']) {
+    const res = response();
+    await createAdminHandler({ sessionUser: async () => restricted, workspaceService: { current() { throw new Error('Must not load workspace access'); } }, operations: { [op]() { throw new Error('Must not execute'); } } })({ method: 'POST', body: { op } }, res);
+    assert.equal(res.code, 403, op);
+  }
+});
+
+test('workspace membership and tag grants must both allow a feature', async () => {
+  for (const [permissions, role, expected] of [[['content'], 'contributor', 200], [['content'], 'viewer', 403], [[], 'admin', 403]]) {
+    let calls = 0;
+    const res = response();
+    await createAdminHandler({ sessionUser: async () => ({ ...member, workspaceEnabled: true, permissions }), workspaceService: { current: async () => ({ role, workspace: { id: 'workspace-a' } }) }, workspaceScope: () => ({}), operations: { 'posts.create': () => { calls++; return { ok: true }; } } })({ method: 'POST', body: { op: 'posts.create' } }, res);
+    assert.equal(res.code, expected);
+    assert.equal(calls, expected === 200 ? 1 : 0);
+  }
+});
+
 test('session checks load changed role permissions for the same cookie', async () => {
   const previous = process.env.SESSION_SECRET;
   process.env.SESSION_SECRET = 'master-rbac-test-secret-123456';

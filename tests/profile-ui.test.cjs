@@ -7,7 +7,7 @@ Module._extensions['.jsx'] = (module, file) => module._compile(transformSync(fs.
 Module._extensions['.css'] = () => {};
 const React = require('react');
 const { renderToStaticMarkup: renderMarkup } = require('react-dom/server');
-const { StaticRouter } = require('react-router-dom/server');
+const { StaticRouter } = require('react-router');
 const renderToStaticMarkup = element => renderMarkup(React.createElement(StaticRouter, {}, element));
 const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
 const { ShopCard } = require('../src/components/commerce/Shop.jsx');

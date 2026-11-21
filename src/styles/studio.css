@@ -50,3 +50,11 @@
 .content-section-tabs{margin-bottom:24px}.content-section-tabs a[aria-current="page"]{font-weight:650}.content-section-tabs a:focus-visible{outline:2px solid #127541;outline-offset:3px}
 @media(max-width:1050px){.studio-shell .content-templates{grid-template-columns:1fr}}
 .admin-dialog>h2{padding-right:40px;margin-bottom:24px;line-height:1.3}.admin-dialog .item-form-dialog{margin:0}.admin-dialog .support-new-request{border:0;padding:0;margin:0}.admin-create-form{display:grid;gap:16px}.admin-dialog[open]{animation:admin-form-appear .18s cubic-bezier(.22,1,.36,1)}.admin-dialog[open]::backdrop{animation:admin-form-backdrop .18s ease-out}@keyframes admin-form-appear{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}@keyframes admin-form-backdrop{from{opacity:0}to{opacity:1}}@media(prefers-reduced-motion:reduce){.admin-dialog[open],.admin-dialog[open]::backdrop{animation:none}}
+
+/* Readable controls across profile, settings and management forms. */
+.studio-main :is(label,.f,input,textarea,select,.btn){font-size:1rem;line-height:1.5}
+.studio-main .btn{min-height:40px}
+.studio-main .hint{font-size:.9375rem;line-height:1.6}
+.studio-main :is(input,textarea)::placeholder{color:#53635a;opacity:1}
+.studio-main .admin-section-context p{font-size:.9375rem}
+.studio-main :is(input,textarea,select){caret-color:#166534}

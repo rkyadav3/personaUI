@@ -1,0 +1,16 @@
+.connection-value { margin: 1.25rem 0; min-width: 0; }
+.connection-value-label { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .5rem; }
+.connection-value-label strong { font-size: 1rem; overflow-wrap: anywhere; }
+.connection-value input { width: 100%; min-width: 0; font-size: 1rem; }
+.connection-value pre { overflow: auto; padding: 1rem; background: #f1f7f3; color: #213b2b; border-radius: 12px; max-width: 100%; font-size: .9375rem; line-height: 1.6; }
+.connection-value > .btn { margin-top: .5rem; }
+.connection-value p { margin: .5rem 0; }
+.connection-value :focus-visible { outline: 2px solid #166534; outline-offset: 3px; }
+.connection-value ::selection { background: #d3efde; color: #163d27; }
+.connection-instructions { padding-left: 1.5rem; font-size: 1rem; line-height: 1.6; max-width: 72ch; }
+.connection-instructions li { margin: .75rem 0; }
+.connection-instructions code { overflow-wrap: anywhere; }
+.connection-details, .account-connection-details { margin: 1.5rem 0; padding: 1.25rem 0; border-top: 1px solid #d8e1dc; }
+.connection-code { margin: 1rem 0; }
+.connection-details summary, .connection-code summary, .account-connection-details summary { cursor: pointer; font-size: 1rem; font-weight: 600; line-height: 1.5; }
+@media (max-width: 600px) { .connection-value-label { gap: .5rem; align-items: flex-start; } .connection-value-label .btn { flex-shrink: 0; } }

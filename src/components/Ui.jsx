@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Badge, Button, Progress as GlassProgress, Stat } from 'open-glass-ui';
+import '../styles/loading.css';
+
+export function Skeleton({ label = 'Opening your workspace…', rows = 3 }) {
+  return <div className="ui-skeleton" role="status" aria-live="polite"><span className="ui-skeleton-label">{label}</span><div className="ui-skeleton-block ui-skeleton-title" aria-hidden="true" />{Array.from({ length: rows }, (_, i) => <div key={i} className="ui-skeleton-row" aria-hidden="true"><div className="ui-skeleton-block" /><div className="ui-skeleton-block" /></div>)}</div>;
+}
+export function Busy({ label = 'Working…', progress }) {
+  const value = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : undefined;
+  return <div className="ui-busy" role="status" aria-live="polite"><span>{label}{value !== undefined ? ` · ${Math.round(value)}%` : ''}</span><progress aria-label={label} max={100} value={value} /></div>;
+}
 
 const TONE = { published: 'positive', active: 'positive', draft: 'warning', expired: 'warning', revoked: 'warning', used: 'warning', 'used up': 'warning' };
 export const Pill = ({ status }) => <Badge tone={TONE[status] || 'neutral'}>{status}</Badge>;

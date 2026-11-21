@@ -1,11 +1,9 @@
 import { HttpError } from './http.js';
+import { workspaceIdentity } from './workspacePermissions.js';
 
 const columns = 'id,question,answer,review_id,insights,created_at';
 const view = row => ({ id: String(row.id), question: row.question, answer: row.answer, reviewId: row.review_id || null, createdAt: row.created_at, ...(row.insights ? { insights: row.insights } : {}) });
-const identity = ctx => {
-  if (!ctx?.user?.id || ctx.db?.uid !== ctx.user.id) throw new HttpError(401, 'Not signed in.');
-  return ctx.user.id;
-};
+const identity = workspaceIdentity;
 async function result(query) {
   const { data, error } = await query;
   if (error) {

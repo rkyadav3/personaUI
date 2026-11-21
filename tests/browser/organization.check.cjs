@@ -1,0 +1,33 @@
+async page => {
+  const check = (condition, message) => { if (!condition) throw new Error(message); };
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('http://127.0.0.1:5181/tests/browser/organization.html');
+  await page.getByRole('heading', { name: 'Who are you setting up Persona for?' }).waitFor();
+  await page.getByRole('button', { name: 'Organization', exact: true }).click();
+  await page.getByRole('textbox', { name: 'About your organization', exact: true }).fill('Acme School provides education for families. Its persona helps parents understand admissions.');
+  await page.getByRole('button', { name: 'Build my profile', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Organization name *', exact: true }).waitFor();
+  check(await page.getByText('Working experience', { exact: true }).count() === 0, 'Individual working experience is shown for an organization');
+  await page.getByRole('checkbox', { name: /reviewed this/ }).check();
+  await page.getByRole('button', { name: 'Confirm and publish my profile', exact: true }).click();
+  await page.getByRole('button', { name: 'Save Profile Changes', exact: true }).waitFor();
+  await page.evaluate(() => { window.organizationFixture.failSave = true; });
+  const audience = page.getByRole('textbox', { name: 'Who should your persona help? *', exact: true });
+  await audience.fill('Parents, applicants and community partners');
+  await page.getByRole('button', { name: 'Save Profile Changes', exact: true }).click();
+  await page.getByRole('alert').getByText('Profile save unavailable. Try again.').waitFor();
+  check(await audience.inputValue() === 'Parents, applicants and community partners', 'Failed save lost the organization draft');
+  await page.evaluate(() => { window.organizationFixture.failSave = false; });
+  await page.getByRole('button', { name: 'Save Profile Changes', exact: true }).click();
+  await page.getByText('Profile details saved successfully.').waitFor();
+  check(await page.evaluate(() => window.organizationFixture.profile.organization.audience) === 'Parents, applicants and community partners', 'Successful retry did not save the draft');
+  await page.getByRole('link', { name: 'Content & knowledge', exact: true }).click();
+  await page.getByRole('link', { name: 'AI knowledge', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Choose a source', exact: true }).selectOption('file:1');
+  await page.getByRole('combobox', { name: 'Who can use this information?', exact: true }).selectOption('internal');
+  await page.getByRole('button', { name: 'Save source access', exact: true }).click();
+  await page.getByText('Source access saved. New persona requests use these rules immediately.').waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Mobile knowledge settings overflow');
+  return ['Organization choice, grounded draft review and publication', 'Draft-preserving save failure and retry', 'Source audience controls', 'Mobile viewport fit'];
+}

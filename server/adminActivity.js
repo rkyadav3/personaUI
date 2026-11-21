@@ -1,6 +1,7 @@
 import { HttpError } from './http.js';
 import { activitySummary } from '../shared/adminActivity.js';
-const identity = ctx => { if (!ctx.user?.id || ctx.user.isSuperAdmin || ctx.db?.uid !== ctx.user.id) throw new HttpError(401, 'Your signed-in admin identity and scope must agree.'); };
+import { workspaceIdentity } from './workspacePermissions.js';
+const identity = ctx => { if (ctx.user?.isSuperAdmin) throw new HttpError(401, 'Your signed-in admin identity and scope must agree.'); return workspaceIdentity(ctx); };
 async function rpc(ctx, fn) {
   identity(ctx);
   const { data, error } = await ctx.db.rpc(fn);
