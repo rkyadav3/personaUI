@@ -16,6 +16,7 @@ const Profile = lazy(() => import('./pages/Profile.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const PublicProfile = lazy(() => import('./pages/PublicProfile.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
+const Master = lazy(() => import('./pages/Master.jsx'));
 const Invites = lazy(() => import('./pages/Invites.jsx'));
 const Suggestions = lazy(() => import('./pages/Suggestions.jsx'));
 const Support = lazy(() => import('./pages/Support.jsx'));
@@ -78,6 +79,7 @@ export default function App() {
       <Route path="/superadmin" element={<Layout superadmin />}>
         <Route index element={<SuperAdmin />} />
         <Route path="customers" element={<SuperAdmin />} />
+        <Route path="master" element={<Master />} />
         <Route path="invites" element={<Invites />} />
         <Route path="suggestions" element={<Suggestions />} />
         <Route path="support" element={<Support />} />

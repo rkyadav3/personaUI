@@ -34,9 +34,11 @@ window.fetch = async (url, options) => {
       sessionStorage.setItem('fixture:account', JSON.stringify(user)); return Response.json({ user });
     }
     case 'site.get': return Response.json(state.site);
+    case 'content.get': return Response.json(state.site);
     case 'profile.get': return Response.json({ profile: state.profile, contributions: [] });
     case 'enquiries.count': return Response.json({ new: 0 });
     case 'page.preview': return Response.json({ ...state.profile, page: state.site.page, portfolio: state.site.portfolio, contributions: [] });
+    case 'content.save':
     case 'page.save':
       if (args.page) state.site.page = normalizePage(args.page);
       if (args.portfolioPatch) state.site.portfolio = normalizePortfolio({ ...state.site.portfolio, ...args.portfolioPatch });

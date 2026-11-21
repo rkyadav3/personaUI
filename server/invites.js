@@ -67,7 +67,7 @@ export async function validateInvite(code) {
 export async function listUsersDetailed() {
   const db = raw();
   const [users, codes, profiles] = await Promise.all([
-    paged(db, 'users', 'id,email,name,slug,tags,profile_private,created_at,invite_code_id,failed_attempts,locked_until', q => q.order('created_at', { ascending: false }).order('id', { ascending: false })),
+    paged(db, 'users', 'id,email,name,slug,tags,profile_private,profile_type,created_at,invite_code_id,failed_attempts,locked_until', q => q.order('created_at', { ascending: false }).order('id', { ascending: false })),
     run(db.from('invite_codes').select('id,code,label')),
     run(db.from('profiles').select('owner_id,status,name,designation')).catch(() => []),
   ]);
@@ -95,7 +95,7 @@ export async function listUsersDetailed() {
       designation: p?.designation || null,
       isAdmin: !isSuperAdminEmail(u.email),
       isSuperAdmin: isSuperAdminEmail(u.email),
-      tags: u.tags || [], profile_private: u.profile_private
+      tags: u.tags || [], profile_private: u.profile_private, profileType: u.profile_type || null
     };
   });
 }

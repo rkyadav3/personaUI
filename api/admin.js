@@ -25,6 +25,8 @@ import { createTagService } from '../server/tags.js';
 import { createActivityService } from '../server/adminActivity.js';
 import { createPlatformService } from '../server/platform.js';
 import { createSupportService } from '../server/platformSupport.js';
+import { loadPermissions, requireOperationPermissions } from '../server/rbac.js';
+import { chooseProfileType } from '../server/profileType.js';
 
 export function createPlatformOperations({ invitesService = invites, suggestionsService = createSuggestionService(), platformService = createPlatformService(), tagsService = createTagService(), supportService = createSupportService() } = {}) {
   return {
@@ -45,6 +47,8 @@ export function createPlatformOperations({ invitesService = invites, suggestions
     'support.reply': ({ user }, args) => supportService.reply(user, args),
     'platform.tags.list': async () => ({ tags: await tagsService.list() }),
     'platform.tags.create': async ({ user }, args) => ({ tag: await tagsService.create(user, args) }),
+    'platform.master.get': async ({ user }) => ({ tags: await tagsService.master(user) }),
+    'platform.tags.update': async ({ user }, args) => ({ tag: await tagsService.update(user, args) }),
     'platform.sales': ({ user }) => platformService.sales(user),
     'platform.payments.setEnabled': ({ user }, args) => platformService.setCheckout(user, args),
     'platform.home.get': async ctx => { needSuperAdmin(ctx); return { settings: await platformService.home() }; },
@@ -59,12 +63,12 @@ const PUBLIC = {
   'auth.logout': async (_, __, { res }) => { auth.endSession(res); return { ok: true }; },
   'auth.register': async (args, _, { res }) => {
     const r = await auth.register(args);
-    if (r.user) await auth.startSession(res, r.user);
+    if (r.user) { r.user = await loadPermissions(r.user); await auth.startSession(res, r.user); }
     return r;
   },
   'auth.login': async (args, _, { res }) => {
     const r = await auth.login(args);
-    if (r.user) await auth.startSession(res, r.user);
+    if (r.user) { r.user = await loadPermissions(r.user); await auth.startSession(res, r.user); }
     return r;
   },
   'invites.validate': async ({ code }) => invites.validateInvite(code),
@@ -74,13 +78,14 @@ const PUBLIC = {
 const activityService = createActivityService();
 const OPS = {
   'account.change': ({ user }, args) => changeAccount(user, args),
+  'account.profileType': ({ user }, args) => chooseProfileType(user, args),
   'items.list': ({ db }) => catalogue.listItems(db),
   'items.save': ({ db }, a) => catalogue.saveItem(db, a),
   'items.currency': ({ db }, a) => catalogue.saveStoreCurrency(db, a),
   'items.delete': async ({ db }, a) => { await catalogue.deleteItem(db, a); return { ok: true }; },
-  'assets.sign': ({ db }, a) => assets.signAsset(db, a),
-  'assets.register': ({ db }, a) => assets.registerAsset(db, a),
-  'assets.open': ({ db }, a) => assets.downloadAsset(db, a.id),
+  'assets.sign': ({ db, user }, a) => assets.signAsset(db, a, undefined, user),
+  'assets.register': ({ db, user }, a) => assets.registerAsset(db, a, undefined, user),
+  'assets.open': ({ db, user }, a) => assets.downloadAsset(db, a.id, undefined, undefined, user),
   'activity.resume': ctx => activityService.resume(ctx),
   'activity.touch': ctx => activityService.touch(ctx),
   'activity.report': ctx => activityService.report(ctx),
@@ -113,7 +118,9 @@ const OPS = {
   'site.save': ({ db }, a) => site.saveSettings(db, a),
 
   // public profile page (/p/<slug>): look + live preview data
-  'page.save': ({ db }, a) => site.savePage(db, a),
+  'page.save': ({ db, user }, a) => site.savePage(db, a, undefined, user),
+  'content.get': ({ db }) => site.getContent(db),
+  'content.save': ({ db }, a) => site.saveContent(db, a),
   'page.preview': ({ db, user }) => profile.previewProfile(db, user.slug),
 
   // updates & schedule (shown on the public profile)
@@ -199,7 +206,9 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (!user) throw new HttpError(401, 'Not signed in.');
       const platformOp = /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
+      requireOperationPermissions(user, op);
       const result = await fn({ db: platformOp ? null : tenantScope(user.id), user }, args);
+      if (op === 'account.change' && result.user) result.user.permissions = user.permissions;
       if (op === 'account.change' && result.passwordChanged) auth.endSession(res);
       return res.status(200).json(result);
     } catch (e) {

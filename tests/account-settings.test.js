@@ -43,7 +43,7 @@ test('password changes invalidate existing cookies and new logins use the new se
     let cookie;
     await startSession({ setHeader: (_, value) => { cookie = value.split(';')[0]; } }, publicUser({ ...account, session_version: 2 }));
     const req = { headers: { cookie } };
-    assert.ok(await sessionUser(req, scriptedDatabase({ table: 'users', data: [{ ...account, session_version: 2 }] })));
+    assert.ok(await sessionUser(req, scriptedDatabase({ table: 'users', data: [{ ...account, session_version: 2 }] }, { table: 'profile_tags', data: [{ key: 'standard', permissions: [] }] })));
     assert.equal(await sessionUser(req, scriptedDatabase({ table: 'users', data: [{ ...account, session_version: 3 }] })), null);
   } finally { if (previous === undefined) delete process.env.SESSION_SECRET; else process.env.SESSION_SECRET = previous; }
 });

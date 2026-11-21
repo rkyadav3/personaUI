@@ -6,7 +6,6 @@ import { useOp } from '../lib/hooks.js';
 import { fmtDate } from '../lib/format.js';
 import { Confirm, Field, Loading, Notice, Stats } from '../components/Ui.jsx';
 import AdminDialog from '../components/AdminDialog.jsx';
-import FormDialog from '../components/FormDialog.jsx';
 import { PROFILE_TAGS, tagLabel, isPrivateProfile } from '../../shared/governance.js';
 import '../styles/governance.css';
 import { RevenueTotals } from './PlatformPayments.jsx';
@@ -53,8 +52,7 @@ export function CustomerManager({ user, users, definitions = Object.entries(PROF
   return <>
     <div className="head"><div><span className="governance-eyebrow">PLATFORM OWNER</span><h1>{dashboard ? 'SuperAdmin dashboard' : 'Customers'}</h1><p className="muted">Manage customer accounts, profile tags and platform access.</p></div><button className="btn" onClick={reload} disabled={busy}>Refresh</button></div>
     <Stats items={[{ n: users.length, label: 'Customers', sub: `${users.length - locked} active accounts` }, { n: users.filter(isPrivateProfile).length, label: 'Private profiles', sub: 'Owner and SuperAdmin access' }, { n: users.filter(person => person.tags?.includes('hero')).length, label: 'Hero profiles', sub: 'Public profiles' }, { n: locked, label: 'Suspended accounts', sub: 'Access restricted' }]} />
-    <CustomTags definitions={definitions} reload={reload} />
-    {dashboard && <><PlatformFinancialSummary /><div className="governance-shortcuts"><Link to="/superadmin/customers"><strong>Customer support</strong><span>Edit accounts, restore access and assign tags →</span></Link><Link to="/superadmin/sales"><strong>Sales & payments</strong><span>Review admin earnings and manage checkout →</span></Link><Link to="/superadmin/settings"><strong>Main site settings</strong><span>Edit the public directory homepage →</span></Link><Link to="/superadmin/invites"><strong>Invite history</strong><span>See link creators and invited members →</span></Link><Link to="/superadmin/suggestions"><strong>Platform suggestions</strong><span>Review ideas and share your response →</span></Link></div></>}
+    {dashboard && <><PlatformFinancialSummary /><div className="governance-shortcuts"><Link to="/superadmin/customers"><strong>Customer support</strong><span>Edit accounts, restore access and assign tags →</span></Link><Link to="/superadmin/master"><strong>Master</strong><span>Create profile tags and manage feature permissions →</span></Link><Link to="/superadmin/sales"><strong>Sales & payments</strong><span>Review admin earnings and manage checkout →</span></Link><Link to="/superadmin/settings"><strong>Main site settings</strong><span>Edit the public directory homepage →</span></Link><Link to="/superadmin/invites"><strong>Invite history</strong><span>See link creators and invited members →</span></Link><Link to="/superadmin/suggestions"><strong>Platform suggestions</strong><span>Review ideas and share your response →</span></Link></div></>}
     {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
     <section className="card governance-card"><h2>{dashboard ? 'Recent customers' : 'Customer directory'}</h2>
       {!dashboard && <div className="row"><Field label="Search customers"><input type="search" placeholder="Name, email or profile slug" value={query} onChange={event => setQuery(event.target.value)} /></Field><Field label="Filter accounts"><select value={filter} onChange={event => setFilter(event.target.value)}><option value="all">All customers</option><option value="active">Active</option><option value="locked">Suspended</option>{definitions.map(({ key, label }) => <option key={key} value={key}>{label}</option>)}</select></Field></div>}
@@ -70,15 +68,4 @@ export function CustomerManager({ user, users, definitions = Object.entries(PROF
       <Notice kind="error">{dialogError}</Notice><div className="row end"><button type="button" className="btn" disabled={busy} onClick={() => { setEditing(null); setPasswordUser(null); }}>Cancel</button><button className="btn primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button></div>
     </form></AdminDialog>}
   </>;
-}
-
-function CustomTags({ definitions, reload }) {
-  const [open, setOpen] = useState(false), [label, setLabel] = useState(''), [visibility, setVisibility] = useState('public'), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  async function create(event) {
-    event.preventDefault(); setBusy(true); setError('');
-    try { await api('platform.tags.create', { label, visibility }); await reload(); setLabel(''); setOpen(false); }
-    catch (failure) { setError(failure.message); }
-    finally { setBusy(false); }
-  }
-  return <section className="card"><div className="head"><div><h2>Profile tags</h2><p className="muted">Create public badges or private groups. Any private tag restricts the profile and knowledge.</p></div><button type="button" className="btn" onClick={() => setOpen(true)}>Add new tag</button></div><div className="governance-tags">{definitions.map(tag => <span className={`governance-tag ${tag.visibility === 'private' ? 'private' : tag.key}`} key={tag.key}>{tag.label} · {tag.visibility}</span>)}</div>{open && <FormDialog title="Add new tag" busy={busy} onClose={() => setOpen(false)}><form onSubmit={create}><div className="row"><Field label="New tag name"><input type="text" value={label} required maxLength={40} onChange={event => setLabel(event.target.value)} /></Field><Field label="Tag visibility"><select value={visibility} onChange={event => setVisibility(event.target.value)}><option value="public">Public profile</option><option value="private">Private profile & knowledge</option></select></Field></div><Notice kind="error">{error}</Notice><div className="row"><button className="btn primary" disabled={busy}>{busy ? 'Creating…' : 'Create tag'}</button><button type="button" className="btn" onClick={() => setOpen(false)}>Cancel</button></div></form></FormDialog>}</section>;
 }

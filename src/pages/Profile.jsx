@@ -8,14 +8,28 @@ import { Loading, Notice, Pill } from '../components/Ui.jsx';
 import DraftEditor from '../components/profile/DraftEditor.jsx';
 import VisibilityEditor from '../components/profile/VisibilityEditor.jsx';
 import Icon from '../components/portfolio/Icon.jsx';
+import { useAuth } from '../lib/auth.jsx';
+import { PROFILE_TYPES } from '../../shared/rbac.js';
 
 const PLACEHOLDER = 'Tell us about yourself, your education, professional experience, expertise, and what you would like to contribute to our platform.';
 
 // ------------------------------------------------------------------ registration: write -> review -> publish
+export function ProfileTypeChoice({ busy, error, onChoose }) {
+  return <section className="card profile-type-choice"><h1>Choose your profile type</h1><p className="muted">Are you creating a profile for yourself or for an organisation?</p><div className="profile-type-options">{Object.entries(PROFILE_TYPES).map(([type, label]) => <button type="button" className="btn" key={type} disabled={busy} onClick={() => onChoose(type)}><Icon n={type === 'individual' ? 'users' : 'globe'} size={24} /><strong>{label}</strong><span>{type === 'individual' ? 'Your personal background, work and contributions.' : 'Your organisation, its work and expertise.'}</span></button>)}</div><Notice kind="error">{error}</Notice>{busy && <p role="status">Saving your profile type…</p>}</section>;
+}
+
 function Onboarding({ onDone }) {
+  const { user, setUser } = useAuth();
   const [text, setText] = useState(''), [busy, setBusy] = useState(false), [err, setErr] = useState('');
   const [res, setRes] = useState(null), [draft, setDraft] = useState(emptyDraft()), [extra, setExtra] = useState('');
   const [vis, setVis] = useState(structuredClone(VISIBILITY_DEFAULTS)), [ok, setOk] = useState(false);
+  const organisation = user?.profileType === 'organisation';
+  async function choose(type) {
+    setBusy(true); setErr('');
+    try { const result = await api('account.profileType', { type }); setUser(current => current?.id === user.id ? { ...current, profileType: result.profileType } : current); }
+    catch (error) { setErr(error.message); }
+    finally { setBusy(false); }
+  }
 
   async function run(source, merge) {
     setBusy(true); setErr('');
@@ -31,14 +45,15 @@ function Onboarding({ onDone }) {
     setBusy(false);
   }
 
+  if (!user?.profileType) return <ProfileTypeChoice busy={busy} error={err} onChoose={choose} />;
   if (!res) {
     return (
       <>
         <div className="head" style={{ marginBottom: 6 }}>
           <div>
-            <h1>Create Your AI Persona Profile</h1>
+            <h1>{organisation ? 'Create Your Organisation Profile' : 'Create Your AI Persona Profile'}</h1>
             <p className="muted" style={{ margin: 0 }}>
-              Introduce yourself in your own words, and our model will extract and organize your knowledge base.
+              {organisation ? 'Introduce your organisation, its work and expertise, and our model will organise its profile.' : 'Introduce yourself in your own words, and our model will extract and organize your knowledge base.'}
             </p>
           </div>
         </div>
@@ -63,12 +78,12 @@ function Onboarding({ onDone }) {
 
         <section className="card">
           <label className="f">
-            <strong>About You & Background</strong>
+            <strong>{organisation ? 'About Your Organisation' : 'About You & Background'}</strong>
             <textarea
               rows={10}
               style={{ fontFamily: 'inherit', fontSize: '1rem', marginTop: 4 }}
-              aria-label="About you"
-              placeholder={PLACEHOLDER}
+              aria-label={organisation ? 'About your organisation' : 'About you'}
+              placeholder={organisation ? 'Tell us your organisation’s name, purpose, areas of expertise, work, history and contact details.' : PLACEHOLDER}
               value={text}
               onChange={e => setText(e.target.value)}
               maxLength={6000}

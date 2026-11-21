@@ -7,7 +7,8 @@ import Icon from '../components/portfolio/Icon.jsx';
 import { ActivityGlimpse } from '../components/AdminActivity.jsx';
 import { AdminQuickActions } from '../components/AdminNavigation.jsx';
 import StudioAssistant from '../components/StudioAssistant.jsx';
-import { Loading } from '../components/Ui.jsx';
+import { Loading, Notice } from '../components/Ui.jsx';
+import { ALL_PERMISSIONS, hasPermission } from '../../shared/rbac.js';
 import '../styles/studio.css';
 
 export function OverviewContent({ user, data, error, hour = new Date().getHours(), onApplied, activity }) {
@@ -39,6 +40,12 @@ export function OverviewContent({ user, data, error, hour = new Date().getHours(
 }
 
 export default function Overview() {
+  const { user } = useAuth();
+  const fullAccess = ALL_PERMISSIONS.every(key => hasPermission(user, key));
+  return fullAccess ? <FullOverview /> : <><h1>Your workspace</h1><Notice kind="info">Your profile tags control which features you can use. Open an available feature from the navigation, or <Link to="/admin/support">contact platform support</Link> to request access. The Studio assistant and combined analytics require all six feature permissions.</Notice></>;
+}
+
+function FullOverview() {
   const { user } = useAuth(), { data, error, reload } = useOp('overview');
   const { activity } = useOutletContext() || {};
   useEffect(() => { document.title = 'Studio overview'; }, []);

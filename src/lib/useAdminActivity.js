@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import { ALL_PERMISSIONS, hasPermission } from '../../shared/rbac.js';
 const IDLE_MS = 5 * 60 * 1000;
 export function useAdminActivity(user, call = api) {
   const [state, setState] = useState({ summary: null, error: '', version: 0 });
   useEffect(() => {
-    if (!user?.id || user.isSuperAdmin) return;
+    if (!user?.id || user.isSuperAdmin || !ALL_PERMISSIONS.every(key => hasPermission(user, key))) return;
     let active = true, pending = false, resumeQueued = false, away = false, lastInput = Date.now();
     function settled() {
       pending = false;
@@ -34,6 +35,6 @@ export function useAdminActivity(user, call = api) {
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pointerdown', input); window.addEventListener('keydown', input);
     return () => { active = false; clearInterval(timer); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pointerdown', input); window.removeEventListener('keydown', input); };
-  }, [user?.id, user?.isSuperAdmin, call]);
+  }, [user?.id, user?.isSuperAdmin, JSON.stringify(user?.permissions), call]);
   return state;
 }

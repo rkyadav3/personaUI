@@ -4,7 +4,8 @@ import { getAsset } from './assets.js';
 import { randomUUID } from 'node:crypto';
 import { BG_BUCKET, normalizeBg } from '../shared/siteSettings.js';
 import { normalizePage } from '../shared/pageSettings.js';
-import { normalizePortfolio } from '../shared/portfolio.js';
+import { normalizePortfolio, ACTIVITY_SECTIONS } from '../shared/portfolio.js';
+import { requireFeaturePermission } from './rbac.js';
 import { CHECKOUT_CURRENCIES } from '../shared/commerce.js';
 import { env } from './config.js';
 import { raw, run } from './supabase.js';
@@ -44,11 +45,13 @@ export function saveSettings(db, { bg, path }, storageOverride) {
 }
 
 /** Save the look of the public profile page (/p/<slug>), and optionally switch its hero photo (the old file is deleted). */
-export async function savePage(db, { page, portfolio, portfolioPatch, heroPath, bg, path, expectedVersion, applyItemCurrency = false }, storageOverride) {
+export async function savePage(db, { page, portfolio, portfolioPatch, heroPath, bg, path, expectedVersion, applyItemCurrency = false }, storageOverride, user) {
+  const updatingProducts = portfolioPatch !== undefined ? Object.hasOwn(portfolioPatch || {}, 'products') : portfolio !== undefined;
   const cur = await row(db);
   const conflict = () => { throw new HttpError(409, 'Your settings changed in another editor or assistant review. Reload the latest settings and review your changes again.'); };
   if (expectedVersion !== undefined && expectedVersion !== (cur?.updated_at || null)) conflict();
   if (applyItemCurrency === true) {
+    requireFeaturePermission(user, 'commerce');
     const currency = String(page?.currency || '').trim().toUpperCase();
     if (!CHECKOUT_CURRENCIES.includes(currency)) throw new HttpError(400, 'Choose a supported Store currency.');
     if (expectedVersion === undefined || portfolio !== undefined || portfolioPatch !== undefined || heroPath !== undefined || bg !== undefined || path !== undefined || Object.keys(page || {}).some(key => key !== 'currency')) throw new HttpError(400, 'Apply Store currency separately from other page changes.');
@@ -68,10 +71,19 @@ export async function savePage(db, { page, portfolio, portfolioPatch, heroPath, 
     if (imagePath !== undefined && imagePath !== null && (typeof imagePath !== 'string' || !imagePath.startsWith(`${db.uid}/`) || imagePath.slice(db.uid.length + 1).includes('/') || imagePath.includes('..'))) throw new Error('Bad image path.');
   }
   const storage = () => storageOverride || raw().storage.from(BG_BUCKET);
-  if (page !== undefined) patch.page = normalizePage(page);                       // each editor sends only what it owns
+  if (page !== undefined) {
+    patch.page = normalizePage(page);
+    if (patch.page.currency !== normalizePage(cur?.page).currency) requireFeaturePermission(user, 'commerce');
+  }
   if (portfolio !== undefined) {
     patch.portfolio = normalizePortfolio(portfolio);
-    for (const product of patch.portfolio.products) {
+    if (updatingProducts) requireFeaturePermission(user, 'commerce');
+    // Partial activity/appearance writes must preserve Store records verbatim,
+    // including legacy IDs still referenced by existing orders and checkout.
+    if (!updatingProducts) patch.portfolio.products = cur?.portfolio?.products || [];
+    const previous = normalizePortfolio(cur?.portfolio);
+    if (Object.keys(ACTIVITY_SECTIONS).some(key => key !== 'events' && JSON.stringify(patch.portfolio[key]) !== JSON.stringify(previous[key]))) requireFeaturePermission(user, 'content');
+    for (const product of updatingProducts ? patch.portfolio.products : []) {
       const previous = normalizePortfolio(cur?.portfolio).products.find(item => item.id === product.id);
       if (product.deliveryUrl && product.deliveryUrl !== previous?.deliveryUrl) throw new Error('Upload a delivery file instead of using an external access link.');
       if (product.assetId && product.assetId !== previous?.assetId) await getAsset(db, product.assetId, 'delivery');
@@ -79,7 +91,7 @@ export async function savePage(db, { page, portfolio, portfolioPatch, heroPath, 
     }
     const ids = new Set();
     const remapped = new Map();
-    patch.portfolio.products = patch.portfolio.products.map(product => {
+    if (updatingProducts) patch.portfolio.products = patch.portfolio.products.map(product => {
       const id = product.id.startsWith('legacy-') || ids.has(product.id) ? randomUUID() : product.id;
       if (id !== product.id && !remapped.has(product.id)) remapped.set(product.id, id);
       ids.add(id); return { ...product, id };
@@ -120,6 +132,19 @@ export async function savePage(db, { page, portfolio, portfolioPatch, heroPath, 
   }
   const settings = await getSettings(db);
   return warning ? { ...settings, warning } : settings;
+}
+
+const contentKeys = Object.keys(ACTIVITY_SECTIONS).filter(key => key !== 'events');
+export async function getContent(db) {
+  const settings = await getSettings(db);
+  return { version: settings.version, portfolio: normalizePortfolio(Object.fromEntries(contentKeys.map(key => [key, settings.portfolio[key]]))) };
+}
+
+export async function saveContent(db, input = {}) {
+  if (!input.portfolioPatch || typeof input.portfolioPatch !== 'object' || Array.isArray(input.portfolioPatch) || Object.keys(input.portfolioPatch).some(key => !contentKeys.includes(key))) throw new HttpError(400, 'Choose valid activity collections.');
+  if (input.expectedVersion === undefined) throw new HttpError(400, 'Reload saved activity before making changes.');
+  await savePage(db, { portfolioPatch: input.portfolioPatch, expectedVersion: input.expectedVersion });
+  return getContent(db);
 }
 
 /** Background-only public API retained for existing integrations. Portfolio reads its settings through /api/profile. */
