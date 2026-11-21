@@ -24,7 +24,7 @@ function ContentEditor({ uploading }) {
   const busy = saving || uploading;
   useEffect(() => {
     let active = true;
-    api('site.get').then(value => {
+    api('content.get').then(value => {
       if (!active) return;
       const cached = readEditorDraft(draftKey), draft = cached ? rebaseEditorDraft(cached, value) : null;
       setSaved(draft?.saved || value); setPf(draft?.pf || value.portfolio);
@@ -47,14 +47,14 @@ function ContentEditor({ uploading }) {
     setBusy(true); setMessage(null);
     try {
       const portfolioPatch = Object.fromEntries(changed.map(key => [key, normalized[key]]));
-      const next = await api('page.save', { portfolioPatch, expectedVersion: saved.version });
+      const next = await api('content.save', { portfolioPatch, expectedVersion: saved.version });
       clearEditorDraft(draftKey); setSaved(next); setPf(next.portfolio); setMessage({ kind: 'success', text: 'Content saved. Your public pages use these same records.' });
     } catch (error) { setMessage({ kind: 'error', text: error.message }); }
     finally { setBusy(false); }
   }
   async function reload() {
     setBusy(true);
-    try { const next = await api('site.get'); setSaved(next); setPf(next.portfolio); setMessage({ kind: 'info', text: 'Latest saved content loaded. Your local draft was discarded.' }); }
+    try { const next = await api('content.get'); setSaved(next); setPf(next.portfolio); setMessage({ kind: 'info', text: 'Latest saved content loaded. Your local draft was discarded.' }); }
     catch (error) { setMessage({ kind: 'error', text: error.message }); }
     finally { setBusy(false); }
   }

@@ -42,6 +42,8 @@ async function operation(op, args) {
     case 'auth.logout': return {};
     case 'profile.get': return { profile, contributions: [] };
     case 'site.get': return { ...page, heroUrl: null };
+    case 'content.get': return { ...page, version: 'fixture-version' };
+    case 'content.save': page.portfolio = { ...page.portfolio, ...args.portfolioPatch }; return { ...page, version: 'fixture-version' };
     case 'page.preview': if (window.fixturePreviewError) throw new Error('Fixture preview unavailable'); return page;
     case 'overview': return { counts: counts(), recent: files };
     case 'enquiries.count': return { new: 2 };

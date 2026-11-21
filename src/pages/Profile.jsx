@@ -10,15 +10,29 @@ import { normalizeOrganizationDraft, ORGANIZATION_QUESTIONS } from '../../shared
 import DraftEditor from '../components/profile/DraftEditor.jsx';
 import VisibilityEditor from '../components/profile/VisibilityEditor.jsx';
 import Icon from '../components/portfolio/Icon.jsx';
+import { useAuth } from '../lib/auth.jsx';
+import { PROFILE_TYPES } from '../../shared/rbac.js';
 
 const PLACEHOLDER = 'Tell us about yourself, your education, professional experience, expertise, and what you would like to contribute to our platform.';
 
 // ------------------------------------------------------------------ registration: write -> review -> publish
+export function ProfileTypeChoice({ busy, error, onChoose }) {
+  return <section className="card profile-type-choice"><h1>Choose your profile type</h1><p className="muted">Are you creating a profile for yourself or for an organisation?</p><div className="profile-type-options">{Object.entries(PROFILE_TYPES).map(([type, label]) => <button type="button" className="btn" key={type} disabled={busy} onClick={() => onChoose(type)}><Icon n={type === 'individual' ? 'users' : 'globe'} size={24} /><strong>{label}</strong><span>{type === 'individual' ? 'Your personal background, work and contributions.' : 'Your organisation, its work and expertise.'}</span></button>)}</div><Notice kind="error">{error}</Notice>{busy && <p role="status">Saving your profile type…</p>}</section>;
+}
+
 function Onboarding({ onDone, type = 'individual' }) {
+  const { user, setUser } = useAuth();
   const organization = type === 'organization';
   const [text, setText] = useState(''), [busy, setBusy] = useState(false), [err, setErr] = useState('');
   const [res, setRes] = useState(null), [draft, setDraft] = useState(() => organization ? normalizeOrganizationDraft() : emptyDraft()), [extra, setExtra] = useState('');
   const [vis, setVis] = useState(structuredClone(VISIBILITY_DEFAULTS)), [ok, setOk] = useState(false);
+  const organisation = organization || (!user?.workspaceEnabled && user?.profileType === 'organisation');
+  async function choose(type) {
+    setBusy(true); setErr('');
+    try { const result = await api('account.profileType', { type }); setUser(current => current?.id === user.id ? { ...current, profileType: result.profileType } : current); }
+    catch (error) { setErr(error.message); }
+    finally { setBusy(false); }
+  }
 
   async function run(source, merge) {
     setBusy(true); setErr('');
@@ -34,14 +48,15 @@ function Onboarding({ onDone, type = 'individual' }) {
     setBusy(false);
   }
 
+  if (!user?.workspaceEnabled && !user?.profileType) return <ProfileTypeChoice busy={busy} error={err} onChoose={choose} />;
   if (!res) {
     return (
       <>
         <div className="head" style={{ marginBottom: 6 }}>
           <div>
-            <h1>{organization ? 'Create your organization profile' : 'Create Your AI Persona Profile'}</h1>
+            <h1>{organisation ? 'Create Your Organisation Profile' : 'Create Your AI Persona Profile'}</h1>
             <p className="muted" style={{ margin: 0 }}>
-              {organization ? 'Tell us what your organization does, who it helps and what visitors should know.' : 'Tell us about yourself in your own words. We’ll organize your details into a profile you can review before sharing.'}
+              {organisation ? 'Tell us what your organisation does, who it helps and what visitors should know.' : 'Tell us about yourself in your own words. We’ll organize your details into a profile you can review before sharing.'}
             </p>
           </div>
         </div>
@@ -66,12 +81,12 @@ function Onboarding({ onDone, type = 'individual' }) {
 
         <section className="card">
           <label className="f">
-            <strong>{organization ? 'About your organization' : 'About You & Background'}</strong>
+            <strong>{organisation ? 'About Your Organisation' : 'About You & Background'}</strong>
             <textarea
               rows={10}
               style={{ fontFamily: 'inherit', fontSize: '1rem', marginTop: 4 }}
-              aria-label={organization ? 'About your organization' : 'About you'}
-              placeholder={organization ? 'Include your organization name, type, what you do, who you serve, and what your persona should help people understand.' : PLACEHOLDER}
+              aria-label={organization ? 'About your organization' : organisation ? 'About your organisation' : 'About you'}
+              placeholder={organisation ? 'Tell us your organisation’s name, purpose, areas of expertise, work, history and contact details.' : PLACEHOLDER}
               value={text}
               onChange={e => setText(e.target.value)}
               maxLength={6000}

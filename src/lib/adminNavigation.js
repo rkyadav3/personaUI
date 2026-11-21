@@ -1,4 +1,5 @@
 import { readSettingsTab } from './publicPageSettings.js';
+import { canOpenRoute } from '../../shared/rbac.js';
 
 export const ADMIN_SECTIONS = [
   { id: 'overview', label: 'Overview', icon: 'home', description: 'Use your assistant and catch up on activity.', pages: [{ id: 'overview', label: 'Overview', to: '/admin', icon: 'home' }] },
@@ -34,6 +35,7 @@ export const ADMIN_SECTIONS = [
 export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', description: 'Support admins, manage sales and improve the main site.', adminOnly: true, pages: [
   { id: 'dashboard', label: 'SuperAdmin dashboard', to: '/superadmin', icon: 'chart' },
   { id: 'customers', label: 'Customers', to: '/superadmin/customers', icon: 'users' },
+  { id: 'master', label: 'Master', to: '/superadmin/master', icon: 'shield' },
   { id: 'workspaces', label: 'Workspace operations', to: '/superadmin/workspaces', icon: 'shield' },
   { id: 'sales', label: 'Sales & payments', to: '/superadmin/sales', icon: 'box' },
   { id: 'invites', label: 'Invite links', to: '/superadmin/invites', icon: 'email' },
@@ -44,7 +46,7 @@ export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', descrip
 ] };
 
 export function adminSectionsFor(user) {
-  const sections = user?.webhooksEnabled ? ADMIN_SECTIONS : ADMIN_SECTIONS.map(section => ({ ...section, pages: section.pages.filter(page => page.id !== 'webhooks') }));
+  const sections = ADMIN_SECTIONS.map(section => ({ ...section, pages: section.pages.filter(page => (page.id !== 'webhooks' || user?.webhooksEnabled) && canOpenRoute(user, page.to)) }));
   if (!user?.workspaceEnabled) return sections.map(section => ({
     ...section, pages: section.pages.filter(page => !workspacePages.has(page.id)),
   }));
@@ -56,6 +58,7 @@ export function adminSectionsFor(user) {
 }
 
 export function canOpenAdminPage(user, pathname, search = '') {
+  if (!canOpenRoute(user, pathname + search)) return false;
   const location = adminLocation(pathname, search);
   if (location?.page === 'webhooks' && !user?.webhooksEnabled) return false;
   if (!user?.workspaceEnabled) return !workspacePages.has(location?.page);

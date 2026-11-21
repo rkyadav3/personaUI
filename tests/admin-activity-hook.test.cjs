@@ -19,7 +19,7 @@ function harness() {
     require: name => name === 'react' ? {
       useState: initial => { state = initial; return [state, update => { state = typeof update === 'function' ? update(state) : update; }]; },
       useEffect: effect => { cleanup = effect(); },
-    } : { api: call },
+    } : name.endsWith('/rbac.js') ? require('../shared/rbac.js') : { api: call },
   });
   module.exports.useAdminActivity({ id: 'maya', isSuperAdmin: false }, call);
   return { document, window, requests, get state() { return state; }, heartbeat: () => heartbeat(), idle: () => { now += 6 * 60000; }, close: () => cleanup() };

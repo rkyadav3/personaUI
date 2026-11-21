@@ -88,7 +88,7 @@ test('featured awards keep their identity after reordering and deletion', () => 
 test('legacy product migration updates Home selections atomically', async () => {
   const current = { id: 1, updated_at: 'v1', portfolio: { products: [{ title: 'Legacy' }] }, page: { customization: { homeFeaturedItems: ['product:legacy-0'] } } };
   const db = scriptedDatabase({ table: 'site_settings', data: [current] }, { table: 'site_settings', data: [{ id: 1 }] }, { table: 'site_settings', data: [current] }); db.uid = 'owner';
-  await savePage(db, { portfolioPatch: { brand: 'Updated' }, expectedVersion: 'v1' });
+  await savePage(db, { portfolioPatch: { products: current.portfolio.products }, expectedVersion: 'v1' });
   const patch = step(db.calls.find(call => step(call, 'update')), 'update')[0];
   assert.deepEqual(patch.page.customization.homeFeaturedItems, [`product:${patch.portfolio.products[0].id}`]);
   assert.equal(resolveSite({ page: patch.page, portfolio: patch.portfolio }, 'owner').homeProducts.length, 1);

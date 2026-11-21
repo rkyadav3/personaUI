@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import App from '../../src/App.jsx';
 import { normalizeHomeSettings } from '../../shared/homeSettings.js';
-import { canViewProfile } from '../../shared/governance.js';
+import { canViewProfile, PROFILE_TAGS } from '../../shared/governance.js';
+import { ALL_PERMISSIONS, resolvePermissions, operationPermissions } from '../../shared/rbac.js';
 import '../../src/styles.css';
 
 // Local-only data exercises the real routes, authentication provider and UI. No requests reach live services.
@@ -20,10 +21,12 @@ const redemptions = [{ id: 1, created_by: 'maya', creator_name: 'Maya Patel', cr
 const suggestions = [{ id: 1, owner_id: 'maya', author_name: 'Maya Patel', author_email: 'maya@example.test', kind: 'add', title: 'Search profiles by tags', body: 'Make it easier to discover Hero and Special profiles.', status: 'new', owner_reply: '', created_at: '2026-11-05' }];
 const supportTickets = [{ id: 1, owner_id: 'maya', author_name: 'Maya Patel', author_email: 'maya@example.test', title: 'Payment confirmation', category: 'payments', body: 'My payment confirmation is missing.', status: 'resolved', created_at: '2026-11-13T10:00:00Z', updated_at: '2026-11-13T12:00:00Z' }];
 const supportMessages = [{ id: 1, ticket_id: 1, is_superadmin: true, body: 'Your payment has been confirmed.', status: 'resolved', created_at: '2026-11-13T12:00:00Z' }];
-const tagDefinitions = [{key:'hero',label:'Hero',visibility:'public'},{key:'special',label:'Special',visibility:'public'},{key:'private',label:'Private profile',visibility:'private'}];
+const tagDefinitions = Object.entries(PROFILE_TAGS).map(([key, label]) => ({ key, label, visibility: key === 'private' ? 'private' : 'public', permissions: [...ALL_PERMISSIONS] }));
+if (params.has('restricted')) tagDefinitions.find(tag => tag.key === 'special').permissions = ['profile'];
+if (params.has('content-only')) tagDefinitions.find(tag => tag.key === 'special').permissions = ['content'];
 let homeSettings = normalizeHomeSettings();
 const sales = { counts: { paidSales: 3, freeOrders: 1, pending: 1, failed: 1, refundedOrders: 1 }, currencies: [{ currency: 'INR', gross: 15000, refunds: 5000, net: 10000, paidSales: 2 }, { currency: 'USD', gross: 1000, refunds: 0, net: 1000, paidSales: 1 }], admins: [{ id: 'maya', name: 'Maya Patel', email: 'maya@example.test', accountExists: true, checkoutEnabled: true, paidSales: 2, freeOrders: 1, earnings: [{ currency: 'INR', gross: 15000, refunds: 5000, net: 10000 }] }, { id: 'dev', name: 'Dev Kumar', email: 'dev@example.test', accountExists: true, checkoutEnabled: true, paidSales: 1, freeOrders: 0, earnings: [{ currency: 'USD', gross: 1000, refunds: 0, net: 1000 }] }], products: [{ ownerId: 'maya', adminName: 'Maya Patel', kind: 'product', itemId: 'book', title: 'Design handbook', currency: 'INR', paidSales: 2, freeOrders: 0, gross: 15000, refunds: 5000, net: 10000 }], recent: [{ id: 'order-1', ownerId: 'maya', adminName: 'Maya Patel', title: 'Design handbook', buyerName: 'Sam', amount: 10000, refundedAmount: 0, currency: 'INR', status: 'paid', paymentId: 'pay_test', createdAt: '2026-11-06' }] };
-window.governanceFixture = { failLogout: false, failSupportReply: false, failSupportList: false, delaySupportCreate: false, users, codes, suggestions, supportTickets, supportMessages, sales, get homeSettings() { return homeSettings; }, personalReads: [], resumeCalls: 0, resumeResolvers: [] };
+window.governanceFixture = { failLogout: false, failSupportReply: false, failSupportList: false, delaySupportCreate: false, failMasterSave: false, tagDefinitions, users, codes, suggestions, supportTickets, supportMessages, sales, get homeSettings() { return homeSettings; }, personalReads: [], resumeCalls: 0, resumeResolvers: [] };
 const publicData = account => ({ slug: account.slug, name: account.name, expertise: ['Design', 'Research'], tags: account.tags, portfolio: { projects: [{ title: 'Community workspace', summary: 'Useful tools for communities.' }] } });
 window.fetch = async (url, options = {}) => {
   const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } });
@@ -32,12 +35,16 @@ window.fetch = async (url, options = {}) => {
   if (url === '/api/track') return json({ ok: true });
   if (url !== '/api/admin') throw new Error(`Unexpected fixture request: ${url}`);
   const { op, args = {} } = JSON.parse(options.body || '{}');
-  if (op === 'auth.me') return json({ user: current });
+  if (op === 'auth.me') return json({ user: current ? { ...current, permissions: current.isSuperAdmin ? [] : resolvePermissions(current.tags, tagDefinitions) } : null });
+  if (op === 'account.profileType') { current.profileType = args.type; return json({ profileType: args.type }); }
   if (op === 'auth.logout') { if (window.governanceFixture.failLogout) return json({ error: 'Retry logout' }, 503); current = null; return json({ ok: true }); }
   if (!current) return json({ error: 'Not signed in' }, 401);
+  if (!current.isSuperAdmin && operationPermissions(op).some(key => !resolvePermissions(current.tags, tagDefinitions).includes(key))) return json({ error: 'Feature access denied' }, 403);
   if (op === 'users.list') return json({ users: users.filter(user => !user.isSuperAdmin), tags: tagDefinitions });
   if (op.startsWith('platform.') && !current.isSuperAdmin) return json({ error: 'Owner only' }, 403);
-  if (op === 'platform.tags.create') { const tag={key:'custom-'+args.label.toLowerCase().replace(/[^a-z0-9]+/g,'-'),label:args.label,visibility:args.visibility}; tagDefinitions.push(tag); return json({tag}); }
+  if (op === 'platform.master.get') return json({ tags: tagDefinitions });
+  if (op === 'platform.tags.create') { if (window.governanceFixture.failMasterSave) return json({ error: 'Tags could not be saved. Try again.' }, 503); if (tagDefinitions.some(tag => tag.label.toLowerCase() === args.label.toLowerCase())) return json({ error: 'A tag with that name already exists.' }, 409); const tag={key:'custom-'+args.label.toLowerCase().replace(/[^a-z0-9]+/g,'-'),label:args.label,visibility:args.visibility,permissions:args.permissions || [...ALL_PERMISSIONS]}; tagDefinitions.push(tag); return json({tag}); }
+  if (op === 'platform.tags.update') { if (window.governanceFixture.failMasterSave) return json({ error: 'Tags could not be saved. Try again.' }, 503); const tag = tagDefinitions.find(tag => tag.key === args.key); Object.assign(tag, args); return json({ tag }); }
   if (op === 'activity.resume') {
     window.governanceFixture.resumeCalls++;
     if (params.has('delay-activity')) await new Promise(resolve => window.governanceFixture.resumeResolvers.push(resolve));
@@ -55,6 +62,8 @@ window.fetch = async (url, options = {}) => {
   if (op === 'users.setLock') { users.find(user => user.id === args.id).isLocked = args.locked; return json({ ok: true }); }
   if (op === 'users.resetPassword') return json({ ok: true });
   if (op === 'profile.get') return json({ profile: params.has('no-profile') ? null : { name: current.name, status: 'published', visibility: {} }, contributions: [] });
+  if (op === 'content.get') return json({ version: 'v1', portfolio: { projects: [], talks: [], awards: [], recognition: [], certificates: [], testimonials: [], experience: [], products: [] } });
+  if (op === 'content.save') return json({ version: 'v2', portfolio: { projects: [], talks: [], awards: [], recognition: [], certificates: [], testimonials: [], experience: [], products: [], ...args.portfolioPatch } });
   if (op === 'site.get') return json({ heroUrl: null, portfolio: {}, page: {} });
   if (op === 'enquiries.count') return json({ new: 0 });
   if (op === 'overview') return json({ counts: { files: 0, posts: 0, topics: 0, chunks: 0, embedded: 0 }, recent: [] });

@@ -24,7 +24,7 @@ async page => {
   await page.getByRole('link', { name: 'Content & knowledge', exact: true }).click();
   await page.getByRole('link', { name: 'AI knowledge', exact: true }).click();
   await page.getByRole('combobox', { name: 'Choose a source', exact: true }).selectOption('file:1');
-  await page.getByRole('combobox', { name: 'Audience', exact: true }).selectOption('internal');
+  await page.getByRole('combobox', { name: 'Who can use this information?', exact: true }).selectOption('internal');
   await page.getByRole('button', { name: 'Save source access', exact: true }).click();
   await page.getByText('Source access saved. New persona requests use these rules immediately.').waitFor();
   await page.setViewportSize({ width: 390, height: 844 });

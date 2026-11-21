@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { env } from './config.js';
 import { raw, run } from './supabase.js';
+import { loadPermissions } from './rbac.js';
 
 const COOKIE = 'persona_session', MAX_AGE = 60 * 60 * 24 * 7;
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -72,6 +73,7 @@ export const publicUser = u => ({
   isSuperAdmin: isSuperAdminEmail(u.email),
   role: isSuperAdminEmail(u.email) ? 'superadmin' : 'admin',
   tags: u.tags || [],
+  profileType: u.profile_type || null,
   sessionVersion: Number(u.session_version || 0),
   userIdChangedAt: u.slug_changed_at || null,
   userIdNextChangeAt: u.slug_changed_at ? new Date(Date.parse(u.slug_changed_at) + 14 * 86400000).toISOString() : null,
@@ -146,6 +148,6 @@ export async function sessionUser(req, database) {
     if (Number(payload.sessionVersion || 0) !== Number(u.session_version || 0)) return null;
     const locked = parse(u.locked_until);
     if (locked && locked > now()) return null;
-    return publicUser(u);
+    return await loadPermissions(publicUser(u), database || raw());
   } catch { return null; }
 }

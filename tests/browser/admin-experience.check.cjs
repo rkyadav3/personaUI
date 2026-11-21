@@ -13,11 +13,14 @@ async page => {
   });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(`${base}?role=owner&view=/superadmin/customers`);
+  check(await page.getByRole('button', { name: 'Add new tag', exact: true }).count() === 0, 'Tag creation still appears in Customers');
+  await page.getByRole('link', { name: 'Master', exact: true }).first().click();
   await page.getByRole('button', { name: 'Add new tag', exact: true }).click();
-  await page.getByRole('textbox', { name: 'New tag name', exact: true }).fill('Mentor');
+  await page.getByRole('textbox', { name: 'Tag name', exact: true }).fill('Mentor');
   await page.getByRole('combobox', { name: 'Tag visibility', exact: true }).selectOption('private');
-  await page.getByRole('button', { name: 'Create tag', exact: true }).click();
-  await page.getByText('Mentor · private', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Save tag & permissions', exact: true }).click();
+  await page.getByRole('rowheader', { name: 'Mentor', exact: true }).waitFor();
+  await page.getByRole('link', { name: 'Customers', exact: true }).first().click();
   const customer = page.getByRole('row').filter({ hasText: 'maya@example.test' });
   await customer.getByRole('button', { name: 'Edit & tags', exact: true }).click();
   await page.getByRole('checkbox', { name: /^Mentor/ }).check();

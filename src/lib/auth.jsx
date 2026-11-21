@@ -13,7 +13,8 @@ export function AuthProvider({ children }) {
     let active = true;
     const sync = () => api('auth.me').then(result => { if (active) setUser(result.user); }, () => {});
     window.addEventListener('studio-changed', sync);
-    return () => { active = false; window.removeEventListener('studio-changed', sync); };
+    window.addEventListener('focus', sync);
+    return () => { active = false; window.removeEventListener('studio-changed', sync); window.removeEventListener('focus', sync); };
   }, [user?.id]);
   const logout = async () => { await api('auth.logout'); setUser(null); };
   return <Ctx.Provider value={{ user, setUser, logout }}>{children}</Ctx.Provider>;

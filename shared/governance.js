@@ -1,4 +1,10 @@
-export const PROFILE_TAGS = { hero: 'Hero', special: 'Special', private: 'Private profile' };
+export const PROFILE_TAGS = {
+  university: 'University', hospital: 'Hospital', special: 'Special', hero: 'Hero',
+  contributors: 'Contributors', standard: 'Standard', founders: 'Founders',
+  god: 'God', fraud: 'Fraud', scammer: 'Scammer', 'narration-setter': 'Narration Setter',
+  'gov-departments': 'Gov-Departments', 'commercial-enterprises': 'Commercial/Enterprises',
+  community: 'Community', manufacturer: 'Manufacturer', private: 'Private profile',
+};
 export const SUGGESTION_KINDS = { add: 'Add', remove: 'Remove', update: 'Update' };
 export const SUGGESTION_STATUSES = ['new', 'reviewed', 'planned', 'done', 'declined'];
 
