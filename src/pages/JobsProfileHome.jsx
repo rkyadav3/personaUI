@@ -4,7 +4,8 @@ import { useAuth } from '../lib/auth.jsx';
 import { api } from '../lib/api.js';
 import { Field, Loading, Notice } from '../components/Ui.jsx';
 import JobsProfileView from '../components/JobsProfileView.jsx';
-import { JOBS_PROFILE_SECTIONS, JOBS_PROFILE_KNOWLEDGE, JOBS_PROFILE_AUDIENCES, isJobsProfile, visibleJobsProfile } from '../../shared/jobsProfile.js';
+import JobsProfileAudience from '../components/JobsProfileAudience.jsx';
+import { JOBS_PROFILE_SECTIONS, JOBS_PROFILE_MINDSET, JOBS_PROFILE_AUDIENCES, isJobsProfile, visibleJobsProfile } from '../../shared/jobsProfile.js';
 import '../styles/jobsProfile.css';
 
 const QUESTIONS = {
@@ -52,10 +53,11 @@ function JobsHomeEditor({ user, slug, scope }) {
   const setDrafts = value => setDraftState(previous => { const next = typeof value === 'function' ? value(previous) : value; if (Object.keys(next).length) draftCache.set(cacheKey, next); else draftCache.delete(cacheKey); return next; });
   const tab = params.get('tab') === 'page' ? 'page' : 'profile';
   const enabled = data?.enabledSections || [];
-  const group = ['basics', 'experience', 'knowledge'].includes(params.get('section')) ? params.get('section') : 'basics';
-  const knowledge = JOBS_PROFILE_KNOWLEDGE.filter(key => enabled.includes(key));
-  const requested = group === 'knowledge' ? params.get('topic') : group;
-  const section = group === 'knowledge' ? knowledge.includes(requested) ? requested : knowledge[0] : requested;
+  const requestedGroup = params.get('section') === 'knowledge' ? 'mindset' : params.get('section');
+  const group = ['basics', 'experience', 'knowledgebase', 'mindset'].includes(requestedGroup) ? requestedGroup : 'basics';
+  const mindsetSections = JOBS_PROFILE_MINDSET.filter(key => enabled.includes(key));
+  const requested = group === 'mindset' ? params.get('topic') : group;
+  const section = group === 'mindset' ? mindsetSections.includes(requested) ? requested : mindsetSections[0] : requested;
   const key = tab === 'page' ? 'home' : section;
   const reload = async () => { setError(''); try { setData(await api('jobsProfile.get')); } catch (failure) { setError(failure.message); } };
   useEffect(() => { let active = true; api('jobsProfile.get').then(result => { if (active) setData(result); }, failure => { if (active) setError(failure.message); }); return () => { active = false; }; }, [scope, JSON.stringify(user.jobsProfilePermissions)]);
@@ -81,20 +83,28 @@ function JobsHomeEditor({ user, slug, scope }) {
   return <div className="jobs-home-editor">
     <div className="head"><div><h1>HOME</h1><p className="muted">Your Jobs Profile, experience and interests.</p></div>{data.published && <a className="btn" href={`/p/${slug}`} target="_blank" rel="noreferrer">View Home page</a>}</div>
     <nav className="jobs-profile-tabs" aria-label="HOME pages"><button className={tab === 'profile' ? 'active' : ''} aria-current={tab === 'profile' ? 'page' : undefined} disabled={busy} onClick={() => navigate({ tab: 'profile', section: group })}>Profile</button><button className={tab === 'page' ? 'active' : ''} aria-current={tab === 'page' ? 'page' : undefined} disabled={busy} onClick={() => navigate({ tab: 'page' })}>Public page editor</button></nav>
-    {tab === 'profile' && <><nav className="jobs-profile-tabs is-secondary" aria-label="Profile sections">{[['basics', 'Basic Details'], ['experience', 'Working Experience — Current & Previous'], ['knowledge', 'Knowledgebase']].filter(([id]) => id === 'knowledge' ? knowledge.length : enabled.includes(id)).map(([id, label]) => <button key={id} disabled={busy} className={group === id ? 'active' : ''} aria-current={group === id ? 'page' : undefined} onClick={() => navigate({ tab: 'profile', section: id })}>{label}</button>)}</nav>{group === 'knowledge' && knowledge.length > 0 && <Field label="Knowledgebase topic"><select disabled={busy} value={section} onChange={event => navigate({ tab: 'profile', section: 'knowledge', topic: event.target.value })}>{knowledge.map(id => <option key={id} value={id}>{JOBS_PROFILE_SECTIONS[id]}</option>)}</select></Field>}</>}
+    {tab === 'profile' && <>
+      <nav className="jobs-profile-tabs is-secondary" aria-label="Profile sections">
+        {[['basics', 'Basic Details'], ['experience', 'Working Experience — Current & Previous'], ['knowledgebase', 'Knowledgebase'], ['mindset', 'Be Natural, Be Positive & Mindset']].filter(([id]) => id === 'mindset' ? mindsetSections.length : enabled.includes(id)).map(([id, label]) => <button key={id} disabled={busy} className={group === id ? 'active' : ''} aria-current={group === id ? 'page' : undefined} onClick={() => navigate({ tab: 'profile', section: id })}>{label}</button>)}
+      </nav>
+      {group === 'mindset' && mindsetSections.length > 0 && <nav className="jobs-profile-tabs is-tertiary" aria-label="Mindset topics">{mindsetSections.map(id => <button key={id} disabled={busy} className={section === id ? 'active' : ''} aria-current={section === id ? 'page' : undefined} onClick={() => navigate({ tab: 'profile', section: 'mindset', topic: id })}>{id === 'mindset' ? 'Mindset' : JOBS_PROFILE_SECTIONS[id]}</button>)}</nav>}
+    </>}
     <Notice kind="success">{notice}</Notice><Notice kind="error">{error}</Notice>
     {error && <button className="btn" disabled={busy} onClick={reload}>Reload saved profile (keep drafts)</button>}
     {tab === 'profile' && !enabled.includes(key) ? <Notice>This section is hidden by your role permissions. Superadmin can change section access in Master.</Notice> : <form className="card jobs-profile-editor" onSubmit={save}>
       <fieldset className="admin-form-body" disabled={busy}><h2>{key === 'home' ? 'Home page editor' : JOBS_PROFILE_SECTIONS[key]}</h2>
-        {key !== 'home' && <><Field label="Who can see this section?"><select value={current.audience} onChange={event => update({ audience: event.target.value })}>{Object.entries(JOBS_PROFILE_AUDIENCES).filter(([audience]) => key !== 'nation' || audience !== 'public').map(([audience, label]) => <option key={audience} value={audience}>{label}</option>)}</select></Field><p className="muted">Private sections are visible to you and authorised Superadmin reviewers. Applied jobs only sections are shared with the administrator of a job when you choose to include your Jobs Profile with your application. Change to Private to stop future access.</p></>}
-        {key === 'basics' ? <BasicFields value={current.value} change={change} /> : key === 'experience' ? <ExperienceFields value={current.value} change={change} /> : key === 'home' ? <>
+        {key !== 'home' && <><JobsProfileAudience value={current.audience} section={key} onChange={audience => update({ audience })} /><p className="muted">Private sections are visible to you and authorised Superadmin reviewers. Applied jobs only sections are shared with the administrator of a job when you choose to include your Jobs Profile with your application. Change to Private to stop future access.</p></>}
+        {key === 'basics' ? <BasicFields value={current.value} change={change} /> : key === 'experience' ? <ExperienceFields value={current.value} change={change} /> : key === 'knowledgebase' ? <>
+          <Field label="Knowledgebase"><textarea rows={7} maxLength={6000} value={current.value.knowledge || ''} onChange={event => change({ knowledge: event.target.value })} /></Field>
+          <label className="jobs-profile-publish"><input type="checkbox" checked={current.value.apply_wishlist === true} onChange={event => change({ apply_wishlist: event.target.checked })} />Apply for the wishlist</label>
+        </> : key === 'home' ? <>
           <Input label="Home page title" value={current.value.title} onChange={title => change({ title })} />
           <Field label="Home page introduction"><textarea rows={5} maxLength={3000} value={current.value.introduction || ''} onChange={event => change({ introduction: event.target.value })} /></Field>
           <Input label="Profile photo URL (HTTPS)" type="url" max={1000} value={current.value.photo} onChange={photo => change({ photo })} />
           <div className="jobs-profile-grid"><Field label="Home page theme"><select value={current.value.theme || 'light'} onChange={event => change({ theme: event.target.value })}><option value="light">Light</option><option value="dark">Dark</option></select></Field><Input label="Accent colour" type="color" value={current.value.accent || '#166534'} onChange={accent => change({ accent })} /></div>
           <label className="jobs-profile-publish"><input type="checkbox" checked={current.published} onChange={event => update({ published: event.target.checked })} />Publish Home page</label><p className="muted">The title, introduction and photo appear publicly when published. Only profile sections set to Public appear below them. Private and Applied jobs only sections stay off this page.</p>
         </> : <>{key === 'direction' && <Field label="What are you mostly into?"><select value={current.value.focus || ''} onChange={event => change({ focus: event.target.value })}><option value="">Choose your direction</option>{['Job', 'Family Business', 'Enterprise Development'].map(focus => <option key={focus}>{focus}</option>)}</select></Field>}{key === 'nation' && <p className="muted">Your idea stays off the public page. Use these notes to describe the resources and viability checks you would need.</p>}{(QUESTIONS[key] || []).map(([field, label, prompt]) => <Field key={field} label={label}><span className="jobs-profile-prompt">{prompt}</span><textarea rows={5} maxLength={6000} value={current.value[field] || ''} onChange={event => change({ [field]: event.target.value })} /></Field>)}</>}
-        <div className="row"><button className="btn primary" type="submit">{busy ? 'Saving…' : key === 'home' ? 'Save Home page' : 'Save section'}</button>{drafts[key] && <button className="btn" type="button" onClick={() => setDrafts(previous => { const next = { ...previous }; delete next[key]; return next; })}>Discard section changes</button>}</div>
+        <div className="row"><button className="btn primary" type="submit" disabled={key !== 'home' && !Object.hasOwn(JOBS_PROFILE_AUDIENCES, current.audience)}>{busy ? 'Saving…' : key === 'home' ? 'Save Home page' : 'Save section'}</button>{drafts[key] && <button className="btn" type="button" onClick={() => setDrafts(previous => { const next = { ...previous }; delete next[key]; return next; })}>Discard section changes</button>}</div>
       </fieldset>
     </form>}
     {tab === 'page' && <section className="jobs-home-preview"><h2>Public Home page preview</h2><JobsProfileView data={visibleJobsProfile(previewDocument, 'public', enabled)} preview embedded /></section>}

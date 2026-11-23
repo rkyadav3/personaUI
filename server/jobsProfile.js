@@ -1,7 +1,8 @@
-import { raw, run } from './supabase.js';
+import { raw, run, paged } from './supabase.js';
 import { HttpError } from './http.js';
 import { hasPermission, hasPlatformPermission } from '../shared/rbac.js';
-import { isJobsProfile, normalizeJobsProfileSection, normalizeJobsHome, visibleJobsProfile, resolveJobsProfilePermissions } from '../shared/jobsProfile.js';
+import { isJobsProfile, isJobsProfileAccount, normalizeJobsProfileSection, normalizeJobsHome, visibleJobsProfile, resolveJobsProfilePermissions } from '../shared/jobsProfile.js';
+import { listUsersDetailed } from './invites.js';
 
 const uuid = value => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || '');
 const checked = fn => { try { return fn(); } catch (error) { throw new HttpError(400, error.message); } };
@@ -52,9 +53,18 @@ export async function reviewJobsProfile(user, input, database = raw()) {
   return visibleJobsProfile(document, 'owner', enabled);
 }
 export async function listJobsProfileReviews(user, database = raw()) {
-  if (!hasPlatformPermission(user, 'profiles.review')) throw new HttpError(403, 'Jobs Profile review access is required.');
-  const rows = await run(database.from('jobs_profiles').select('owner_id,account:users!jobs_profiles_owner_id_fkey(id,name,email,slug,profile_type,job_seeker,approval_status)').order('updated_at', { ascending: false }).limit(500));
-  return { profiles: rows.filter(row => row.account?.approval_status === 'approved' && (row.account.job_seeker || row.account.profile_type === 'jobs')).map(row => ({ id: row.owner_id, name: row.account.name, email: row.account.email, slug: row.account.slug })) };
+  const canEdit = hasPlatformPermission(user, 'profiles.edit');
+  if (!canEdit && !hasPlatformPermission(user, 'profiles.review')) throw new HttpError(403, 'Jobs Profile account or review access is required.');
+  const [accounts, tags, documents] = await Promise.all([
+    canEdit ? listUsersDetailed(user, () => database, true) : paged(database, 'users', 'id,name,email,slug,tags,profile_type,job_seeker,approval_status', q => q.order('created_at', { ascending: false }).order('id', { ascending: false })),
+    run(database.from('profile_tags').select('key,label,visibility,permissions,platform_permissions')),
+    paged(database, 'jobs_profiles', 'owner_id'),
+  ]);
+  const saved = new Set(documents.map(document => document.owner_id));
+  return {
+    profiles: accounts.filter(account => (canEdit || isJobsProfileAccount(account, tags)) && !account.isSuperAdmin && (canEdit || account.approval_status === 'approved')).slice(0, 500).map(account => ({ ...(canEdit ? account : { id: account.id, name: account.name, email: account.email, slug: account.slug, approval_status: account.approval_status }), hasDetails: saved.has(account.id) })),
+    tags: canEdit ? tags.filter(tag => user.isSuperAdmin || !tag.platform_permissions?.length).map(({ key, label, visibility }) => ({ key, label, visibility })) : [],
+  };
 }
 export async function applicationJobsProfile(ctx, input, database = raw()) {
   if (!hasPermission(ctx.user, 'enquiries') || ctx.workspace && !['owner', 'admin'].includes(ctx.workspace.role)) throw new HttpError(403, 'Inbox administrator access is required.');

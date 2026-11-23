@@ -27,7 +27,7 @@ export const PLATFORM_OPERATIONS = {
   'platform.tags.create': 'master.manage',
   'platform.tags.update': 'master.manage',
   'platform.jobsProfile.get': 'profiles.review',
-  'platform.jobsProfile.list': 'profiles.review',
+  'platform.jobsProfile.list': ['profiles.edit', 'profiles.review'],
 };
 export function normalizePlatformPermissions(value = []) {
   if (!Array.isArray(value) || value.some(key => !Object.hasOwn(PLATFORM_PERMISSIONS,key))) throw new Error('Choose valid Superadmin feature access.');
@@ -38,7 +38,7 @@ export const hasPlatformAccess = user => Object.keys(PLATFORM_PERMISSIONS).some(
 export function canOpenPlatformRoute(user, path) {
   if (user?.isSuperAdmin) return true;
   if (['/superadmin/profiles', '/superadmin/customers'].includes(path)) return ['profiles.create', 'profiles.edit'].some(key => hasPlatformPermission(user, key));
-  if (path === '/superadmin/job-profiles') return hasPlatformPermission(user, 'profiles.review');
+  if (path === '/superadmin/job-profiles') return ['profiles.edit', 'profiles.review'].some(key => hasPlatformPermission(user, key));
   return path === '/superadmin/master' && hasPlatformPermission(user, 'master.manage');
 }
 export const platformHome = user => user?.isSuperAdmin ? '/superadmin' : hasPlatformPermission(user, 'profiles.create') || hasPlatformPermission(user, 'profiles.edit') ? '/superadmin/profiles' : hasPlatformPermission(user, 'profiles.review') ? '/superadmin/job-profiles' : '/superadmin/master';

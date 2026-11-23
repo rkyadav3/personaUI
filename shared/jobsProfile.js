@@ -2,6 +2,7 @@ export const JOBS_PROFILE_TYPE = 'jobs';
 export const JOBS_PROFILE_SECTIONS = {
   basics: 'Basic Details',
   experience: 'Working Experience',
+  knowledgebase: 'Knowledgebase',
   mindset: 'Be Natural, Be Positive & Mindset',
   direction: 'Job, Family Business & Enterprise Development',
   business: 'Profit Making Business & Understanding',
@@ -10,9 +11,14 @@ export const JOBS_PROFILE_SECTIONS = {
   hustles: 'Side Hustles — Stories & Notes',
   inspiration: 'Inspirational Stories',
 };
-export const JOBS_PROFILE_KNOWLEDGE = Object.keys(JOBS_PROFILE_SECTIONS).filter(key => !['basics', 'experience'].includes(key));
+export const JOBS_PROFILE_MINDSET = ['mindset', 'direction', 'business', 'interests', 'nation', 'hustles', 'inspiration'];
 export const JOBS_PROFILE_AUDIENCES = { private: 'Private', public: 'Public', applied_jobs: 'Applied jobs only' };
 export const isJobsProfile = user => (user?.workspaceType ?? user?.profileType) === JOBS_PROFILE_TYPE || user?.jobSeeker === true || user?.permissions?.includes('job_seeker') === true;
+export function isJobsProfileAccount(account, definitions = []) {
+  if (isJobsProfile(account) || account?.profile_type === JOBS_PROFILE_TYPE || account?.job_seeker === true) return true;
+  const tags = account?.tags?.length ? account.tags : ['standard'];
+  return tags.some(key => definitions.find(tag => tag.key === key)?.permissions?.includes('job_seeker'));
+}
 export function normalizeJobsProfilePermissions(value) {
   if (!Array.isArray(value) || value.some(key => !Object.hasOwn(JOBS_PROFILE_SECTIONS, key))) throw new Error('Choose valid Jobs Profile sections.');
   return Object.keys(JOBS_PROFILE_SECTIONS).filter(key => value.includes(key));
@@ -34,7 +40,8 @@ const rows = (value, fields, limit = 20) => {
 export function normalizeJobsProfileSection(key, input = {}) {
   if (!Object.hasOwn(JOBS_PROFILE_SECTIONS, key)) throw new Error('Choose a valid profile section.');
   const audience = input.audience ?? 'private';
-  if (!Object.hasOwn(JOBS_PROFILE_AUDIENCES, audience) || key === 'nation' && audience === 'public') throw new Error('Nation-growth ideas may be Private or Applied jobs only. Choose a valid audience.');
+  if (!Object.hasOwn(JOBS_PROFILE_AUDIENCES, audience)) throw new Error('Choose one visibility audience.');
+  if (key === 'nation' && audience === 'public') throw new Error('Nation-growth ideas may be Private or Applied jobs only.');
   const value = input.value || {};
   if (key === 'basics') {
     const name = text(value.name, 120);
@@ -44,6 +51,10 @@ export function normalizeJobsProfileSection(key, input = {}) {
     return { audience, value: { name, email, phone: text(value.phone, 40), location: text(value.location, 160), headline: text(value.headline, 160), summary: text(value.summary, 3000), education: rows(value.education, { qualification: 160, institution: 160, year: 40 }), certificates: rows(value.certificates, { title: 160, issuer: 160, year: 40 }), languages: rows(value.languages, { name: 80, proficiency: 80 }) } };
   }
   if (key === 'experience') return { audience, value: { current: rows(value.current, { employer: 160, role: 160, from: 40, description: 3000 }), previous: rows(value.previous, { employer: 160, role: 160, from: 40, to: 40, description: 3000 }) } };
+  if (key === 'knowledgebase') {
+    if (value.apply_wishlist !== undefined && typeof value.apply_wishlist !== 'boolean') throw new Error('Choose a valid wishlist checkbox value.');
+    return { audience, value: { knowledge: text(value.knowledge, 6000), apply_wishlist: value.apply_wishlist === true } };
+  }
   const fields = {
     mindset: ['natural', 'positive', 'mindset'], direction: ['focus', 'development'],
     business: ['thoughts'], interests: ['industry', 'domain', 'scope'],

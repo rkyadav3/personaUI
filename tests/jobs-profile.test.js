@@ -41,6 +41,14 @@ test('structured profile fields validate and discard unexpected data', () => {
   assert.equal(section.value.education[0].secret, undefined);
   assert.throws(() => normalizeJobsProfileSection('basics', { value: { name: 'Candidate', email: 'invalid' } }));
 });
+test('Knowledgebase saves wishlist as a profile preference and rejects an empty visibility choice', () => {
+  const result = normalizeJobsProfileSection('knowledgebase', { audience: 'private', value: { knowledge: 'Product design', apply_wishlist: true, status: 'submitted' } });
+  assert.deepEqual(result, { audience: 'private', value: { knowledge: 'Product design', apply_wishlist: true } });
+  assert.throws(() => normalizeJobsProfileSection('knowledgebase', { audience: '', value: {} }), /audience/i);
+  assert.throws(() => normalizeJobsProfileSection('knowledgebase', { audience: 'private', value: { apply_wishlist: 'yes' } }), /checkbox/i);
+  const document = { sections: { knowledgebase: result } };
+  assert.deepEqual(visibleJobsProfile(document, 'public').sections, {});
+});
 test('Job Seeker toggle is exclusive, opt-in and wins across assigned roles', () => {
   assert.equal(ALL_PERMISSIONS.includes('job_seeker'), false);
   assert.throws(() => normalizePermissions(['job_seeker', 'profile']), /cannot be combined/);
@@ -130,6 +138,12 @@ test('real SQL supports creation, exclusive flags, role revocation, atomic savin
     const created = await db.query('select create_admin_profile($1,true,$2,$3,$4,$5,$6) as result', [owner, 'New Jobs Profile', 'new@example.test', 'new-jobs', 'jobs', '$2b$12$test']);
     const id = created.rows[0].result.id;
     assert.equal((await db.query('select profile_type from profiles where owner_id=$1', [id])).rows[0].profile_type, 'jobs');
+    const knowledgebase = await db.query('select save_jobs_profile($1,$1,$2,$3::jsonb,0,null) as document', [id, 'knowledgebase', JSON.stringify({ audience: 'private', value: { knowledge: 'Engineering', apply_wishlist: true } })]);
+    assert.equal(knowledgebase.rows[0].document.sections.knowledgebase.value.apply_wishlist, true);
+    await db.exec("update profile_tags set jobs_profile_permissions=array_remove(jobs_profile_permissions,'knowledgebase') where key='standard'");
+    await db.exec(await readFile(new URL('../supabase/jobs-profile-home.sql', import.meta.url), 'utf8'));
+    assert.equal((await db.query("select 'knowledgebase'=any(jobs_profile_permissions) as allowed from profile_tags where key='standard'")).rows[0].allowed, false);
+    await assert.rejects(db.query('select save_jobs_profile($1,$1,$2,$3::jsonb,1,null)', [id, 'knowledgebase', JSON.stringify({ audience: 'private', value: { knowledge: 'Denied' } })]), /hidden/);
     await db.exec('set role anon');
     await assert.rejects(db.query('select * from jobs_profiles'), /permission denied/);
     await db.exec('reset role');

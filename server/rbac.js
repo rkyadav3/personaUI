@@ -10,6 +10,10 @@ export function authorizePlatformOperation(user, op) {
   if (user?.isSuperAdmin) return;
   const permission = PLATFORM_OPERATIONS[op];
   if (!permission) throw new HttpError(403, 'Superadmin access is required.');
+  if (Array.isArray(permission)) {
+    if (!permission.some(key => hasPlatformPermission(user, key))) throw new HttpError(403, 'This Superadmin feature has not been enabled for your account.');
+    return;
+  }
   requirePlatformPermission(user, permission);
 }
 

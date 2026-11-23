@@ -112,7 +112,7 @@ test('creator creation hashes passwords, binds actor and cannot grant requested 
   );
 });
 test('creator listing is limited to the actor’s own created profiles', async () => {
-  const db = scriptedDatabase({ table: 'users', data: [] });
+  const db = scriptedDatabase({ table: 'users', data: [] }, { table: 'profile_tags', data: [] });
   await createProfileCreationService(() => db).list(creator);
   assert.ok(hasEq(db.calls[0], 'profile_created_by', id));
 });

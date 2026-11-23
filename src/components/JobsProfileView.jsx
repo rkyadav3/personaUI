@@ -21,7 +21,7 @@ export default function JobsProfileView({ data, preview = false, embedded = fals
           {!!value.education?.length && <><h3>Education & Academics</h3><Entries items={value.education} titleKey="qualification" subtitleKeys={['institution', 'year']} /></>}
           {!!value.certificates?.length && <><h3>Certificates</h3><Entries items={value.certificates} titleKey="title" subtitleKeys={['issuer', 'year']} /></>}
           {!!value.languages?.length && <><h3>Languages Known</h3><p>{value.languages.map(language => [language.name, language.proficiency].filter(Boolean).join(' — ')).join(', ')}</p></>}
-        </> : key === 'experience' ? <>
+        </> : key === 'knowledgebase' ? <>{value.knowledge && <p className="jobs-profile-prose">{value.knowledge}</p>}{value.apply_wishlist === true && <p>Apply for the wishlist: selected</p>}</> : key === 'experience' ? <>
           {!!value.current?.length && <><h3>Current</h3><Entries items={value.current} titleKey="role" subtitleKeys={['employer', 'from']} /></>}
           {!!value.previous?.length && <><h3>Previous</h3><Entries items={value.previous} titleKey="role" subtitleKeys={['employer', 'from', 'to']} /></>}
         </> : <dl className="jobs-profile-answers">{Object.entries(value).filter(([, answer]) => answer).map(([field, answer]) => <div key={field}><dt>{LABELS[field] || field}</dt><dd className="jobs-profile-prose">{answer}</dd></div>)}</dl>}</section>;

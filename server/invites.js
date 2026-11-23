@@ -9,6 +9,7 @@ import { createTagService } from './tags.js';
 import { normalizeTags } from '../shared/governance.js';
 import { normalizePlatformPermissions } from '../shared/rbac.js';
 import { requirePlatformPermission } from './rbac.js';
+import { isJobsProfileAccount } from '../shared/jobsProfile.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no 0/O/1/I
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -66,28 +67,29 @@ export async function validateInvite(code) {
   };
 }
 
-export async function listUsersDetailed(actor, database = raw) {
+export async function listUsersDetailed(actor, database = raw, jobSeekers = false) {
   const db = database();
   if (actor && !actor.isSuperAdmin) {
     requirePlatformPermission(actor, 'profiles.edit');
     const [users, tags] = await Promise.all([
-      paged(db, 'users', 'id,name,email,slug,tags,profile_private,platform_permissions,approval_status,created_at,locked_until', q => q.order('created_at', { ascending: false })),
-      run(db.from('profile_tags').select('key,platform_permissions')),
+      paged(db, 'users', 'id,name,email,slug,tags,profile_type,job_seeker,profile_private,platform_permissions,approval_status,created_at,locked_until', q => q.order('created_at', { ascending: false })),
+      run(db.from('profile_tags').select('key,permissions,platform_permissions')),
     ]);
     const protectedTags = new Set(tags.filter(tag => tag.platform_permissions?.length).map(tag => tag.key));
-    return users.filter(person => !isSuperAdminEmail(person.email) && !person.platform_permissions?.length && !person.tags?.some(tag => protectedTags.has(tag)))
+    return users.filter(person => isJobsProfileAccount(person, tags) === jobSeekers && !isSuperAdminEmail(person.email) && !person.platform_permissions?.length && !person.tags?.some(tag => protectedTags.has(tag)))
       .map(({ platform_permissions, ...person }) => ({ ...person, isAdmin: true, isSuperAdmin: false, isLocked: Boolean(person.locked_until && Date.parse(person.locked_until) > Date.now()) }));
   }
-  const [users, codes, profiles] = await Promise.all([
-    paged(db, 'users', 'id,email,name,slug,tags,profile_private,profile_type,platform_permissions,approval_status,profile_created_by,created_at,invite_code_id,failed_attempts,locked_until', q => q.order('created_at', { ascending: false }).order('id', { ascending: false })),
+  const [users, codes, profiles, tags] = await Promise.all([
+    paged(db, 'users', 'id,email,name,slug,tags,profile_private,profile_type,job_seeker,platform_permissions,approval_status,profile_created_by,created_at,invite_code_id,failed_attempts,locked_until', q => q.order('created_at', { ascending: false }).order('id', { ascending: false })),
     run(db.from('invite_codes').select('id,code,label')),
     run(db.from('profiles').select('owner_id,status,name,designation')).catch(() => []),
+    run(db.from('profile_tags').select('key,permissions')),
   ]);
   const inviteMap = new Map((codes || []).map(c => [c.id, c]));
   const profileMap = new Map((profiles || []).map(p => [p.owner_id, p]));
   const now = new Date();
 
-  return (users || []).map(u => {
+  return (users || []).filter(person => isJobsProfileAccount(person, tags) === jobSeekers).map(u => {
     const inv = u.invite_code_id ? inviteMap.get(u.invite_code_id) : null;
     const p = profileMap.get(u.id);
     const lockedUntil = u.locked_until ? new Date(u.locked_until) : null;

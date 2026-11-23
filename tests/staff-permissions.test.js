@@ -15,7 +15,7 @@ const response = () => ({ setHeader() {}, status(code) { this.code=code; return 
 
 test('internal staff grants accept independent editing and Master capabilities', () => {
   assert.deepEqual(normalizePlatformPermissions(staff.platformPermissions), staff.platformPermissions);
-  assert.deepEqual(platformSectionsFor(staff).map(page=>page.id), ['profiles', 'master']);
+  assert.deepEqual(platformSectionsFor(staff).map(page=>page.id), ['profiles', 'master', 'job-profiles']);
 });
 
 test('staff edit and Master operations follow their saved capabilities', async () => {
@@ -36,7 +36,7 @@ test('staff grants are reloaded from the internal tag and revocation removes acc
     const db=scriptedDatabase({table:'profile_tags',data:[{key:'custom-staff',permissions:[],platform_permissions:grants}]});
     const fresh=await loadPermissions({...staff,platformPermissions:[]},db);
     assert.deepEqual(fresh.platformPermissions,grants);
-    assert.deepEqual(platformSectionsFor(fresh).map(page=>page.id),grants.length?['profiles','master']:[]);
+    assert.deepEqual(platformSectionsFor(fresh).map(page=>page.id),grants.length?['profiles','master','job-profiles']:[]);
   }
 });
 

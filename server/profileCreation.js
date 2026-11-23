@@ -3,6 +3,7 @@ import { raw, run } from './supabase.js';
 import { isSuperAdminEmail } from './auth.js';
 import { hasPlatformPermission, PROFILE_TYPES } from '../shared/rbac.js';
 import { HttpError } from './http.js';
+import { isJobsProfileAccount } from '../shared/jobsProfile.js';
 export function needProfileCreator(user) {
   if (!hasPlatformPermission(user, 'profiles.create'))
     throw new HttpError(403, 'Profile creation access is required.');
@@ -11,13 +12,15 @@ export function createProfileCreationService(database = raw) {
   return {
     async list(user) {
       needProfileCreator(user);
-      let query = database()
+      const db = database();
+      let query = db
         .from('users')
-        .select('id,name,email,slug,profile_type,approval_status,profile_created_by,created_at')
+        .select('id,name,email,slug,tags,profile_type,job_seeker,approval_status,profile_created_by,created_at')
         .order('created_at', { ascending: false })
         .limit(500);
       if (!user.isSuperAdmin) query = query.eq('profile_created_by', user.id);
-      return { users: await run(query) };
+      const [users, tags] = await Promise.all([run(query), run(db.from('profile_tags').select('key,permissions'))]);
+      return { users: users.filter(person => !isJobsProfileAccount(person, tags)) };
     },
     async create(user, input = {}) {
       needProfileCreator(user);

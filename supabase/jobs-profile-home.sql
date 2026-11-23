@@ -12,9 +12,19 @@ alter table users drop constraint if exists users_platform_permissions_check;
 alter table users add constraint users_platform_permissions_check check(platform_permissions <@ array['profiles.create','profiles.edit','master.manage','profiles.review']::text[] and array_position(platform_permissions,null) is null);
 alter table profile_tags drop constraint if exists profile_tags_platform_permissions_check;
 alter table profile_tags add constraint profile_tags_platform_permissions_check check(platform_permissions <@ array['profiles.create','profiles.edit','master.manage','profiles.review']::text[] and array_position(platform_permissions,null) is null);
-alter table profile_tags add column if not exists jobs_profile_permissions text[] not null default array['basics','experience','mindset','direction','business','interests','nation','hustles','inspiration'];
+alter table profile_tags add column if not exists jobs_profile_permissions text[] not null default array['basics','experience','knowledgebase','mindset','direction','business','interests','nation','hustles','inspiration'];
+alter table profile_tags alter column jobs_profile_permissions set default array['basics','experience','knowledgebase','mindset','direction','business','interests','nation','hustles','inspiration'];
 alter table profile_tags drop constraint if exists profile_tags_jobs_profile_permissions_check;
-alter table profile_tags add constraint profile_tags_jobs_profile_permissions_check check(jobs_profile_permissions <@ array['basics','experience','mindset','direction','business','interests','nation','hustles','inspiration']::text[] and array_position(jobs_profile_permissions,null) is null);
+alter table profile_tags add constraint profile_tags_jobs_profile_permissions_check check(jobs_profile_permissions <@ array['basics','experience','knowledgebase','mindset','direction','business','interests','nation','hustles','inspiration']::text[] and array_position(jobs_profile_permissions,null) is null);
+-- Grant the new section once only to roles that previously allowed every profile section.
+do $$ begin
+  if not exists(select 1 from persona_migrations where key='jobs-profile-knowledgebase') then
+    update profile_tags set jobs_profile_permissions=array_append(jobs_profile_permissions,'knowledgebase')
+      where jobs_profile_permissions @> array['basics','experience','mindset','direction','business','interests','nation','hustles','inspiration']::text[]
+        and not 'knowledgebase'=any(jobs_profile_permissions);
+    insert into persona_migrations(key) values('jobs-profile-knowledgebase');
+  end if;
+end $$;
 alter table profile_tags drop constraint if exists profile_tags_key_check;
 alter table profile_tags add constraint profile_tags_key_check check(key in('hero','special','private','university','hospital','contributors','standard','founders','god','fraud','scammer','narration-setter','gov-departments','commercial-enterprises','community','manufacturer','profile-creator') or key ~ '^custom-[a-z0-9]+(-[a-z0-9]+)*$');
 alter table profile_tags drop constraint if exists profile_tags_permissions_check;
@@ -113,7 +123,7 @@ begin
   if target.id is null or not exists(select 1 from users where id=p_owner and approval_status='approved') then raise exception 'Jobs Profile administrator access required'; end if;
   tag_keys:=case when cardinality(actor.tags)>0 then actor.tags else array['standard'] end;
   if exists(select 1 from unnest(tag_keys) k left join profile_tags t on t.key=k where t.key is null or (not actor.job_seeker and not 'profile'=any(t.permissions)) or (p_section<>'home' and not p_section=any(t.jobs_profile_permissions))) then raise exception 'This section is hidden by current role permissions'; end if;
-  if p_section is null or p_section not in('home','basics','experience','mindset','direction','business','interests','nation','hustles','inspiration') or jsonb_typeof(p_value) is distinct from 'object' or octet_length(p_value::text)>150000 then raise exception 'Invalid profile section'; end if;
+  if p_section is null or p_section not in('home','basics','experience','knowledgebase','mindset','direction','business','interests','nation','hustles','inspiration') or jsonb_typeof(p_value) is distinct from 'object' or octet_length(p_value::text)>150000 then raise exception 'Invalid profile section'; end if;
   if p_section<>'home' and (coalesce(p_value->>'audience','') not in('private','public','applied_jobs') or jsonb_typeof(p_value->'value') is distinct from 'object') then raise exception 'Choose a valid audience and section'; end if;
   if p_section='nation' and p_value->>'audience'='public' then raise exception 'Nation-growth ideas cannot be public'; end if;
   if p_published is not null and p_section<>'home' then raise exception 'Publish from the Home editor'; end if;
