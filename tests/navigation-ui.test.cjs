@@ -84,6 +84,16 @@ test('contributors can land after switching but only see content tools and their
   assert.doesNotMatch(html,/Edit portfolio|<span>Settings<\/span>|Team access/);
 });
 
+test('staff editing and permission dialogs expose selected platform tools without owner controls', () => {
+  const PlatformAccess=require('../src/components/PlatformAccess.jsx').default;
+  const {CustomerManager}=require('../src/pages/SuperAdmin.jsx');
+  const permissions=render(PlatformAccess,{value:['profiles.edit','master.manage'],onChange(){}});
+  assert.match(permissions,/Edit profiles &amp; assign tags/);assert.match(permissions,/Manage tags &amp; feature permissions/);
+  const people=render(CustomerManager,{user:{id:'staff',platformPermissions:['profiles.edit']},users:[{id:'member',email:'member@example.test',tags:[],approval_status:'pending'}],reload(){}},'/superadmin/profiles');
+  assert.match(people,/Edit &amp; tags/);
+  assert.doesNotMatch(people,/Create admin profile|Approve profile|Decline|Password<\/button>|Suspend<\/button>|Delete<\/button>/);
+});
+
 test('every secondary admin link selects its own group and privileged tabs stay hidden', async () => {
   const { ADMIN_SECTIONS, adminLocation } = await import('../src/lib/adminNavigation.js');
   for (const section of ADMIN_SECTIONS) for (const page of section.pages) {

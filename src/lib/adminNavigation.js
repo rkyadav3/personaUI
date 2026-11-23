@@ -1,5 +1,5 @@
 import { readSettingsTab } from './publicPageSettings.js';
-import { canOpenRoute, hasPlatformAccess } from '../../shared/rbac.js';
+import { canOpenRoute, canOpenPlatformRoute } from '../../shared/rbac.js';
 
 export const ADMIN_SECTIONS = [
   {id:'jobs',label:'Jobs',icon:'briefcase',description:'Manage job postings and applications.',pages:[{id:'jobs',label:'Jobs',to:'/admin/jobs',icon:'briefcase'}]},
@@ -45,7 +45,7 @@ export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', descrip
   { id: 'settings', label: 'Main site settings', to: '/superadmin/settings', icon: 'template' },
   { id: 'account', label: 'Account settings', to: '/superadmin/settings?tab=account', icon: 'shield' },
 ] };
-export const platformSectionsFor = user => user?.isSuperAdmin ? SUPERADMIN_SECTION.pages : hasPlatformAccess(user) ? SUPERADMIN_SECTION.pages.filter(page=>page.id==='profiles') : [];
+export const platformSectionsFor = user => SUPERADMIN_SECTION.pages.filter(page => canOpenPlatformRoute(user, page.to));
 
 export function adminSectionsFor(user) {
   const sections = ADMIN_SECTIONS.map(section => ({ ...section, pages: section.pages.filter(page => (page.id !== 'webhooks' || user?.webhooksEnabled) && canOpenRoute(user, page.to)) }));

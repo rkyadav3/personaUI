@@ -9,13 +9,32 @@ export const FEATURE_PERMISSIONS = {
 };
 export const ALL_PERMISSIONS = Object.keys(FEATURE_PERMISSIONS);
 export const PROFILE_TYPES = { individual: 'Individual', organisation: 'Organisation' };
-export const PLATFORM_PERMISSIONS = { 'profiles.create':'Create profiles' };
+export const PLATFORM_PERMISSIONS = {
+  'profiles.create': 'Create profiles',
+  'profiles.edit': 'Edit profiles & assign tags',
+  'master.manage': 'Manage tags & feature permissions',
+};
+export const PLATFORM_OPERATIONS = {
+  'platform.profiles.list': 'profiles.create',
+  'platform.profiles.create': 'profiles.create',
+  'users.list': 'profiles.edit',
+  'users.update': 'profiles.edit',
+  'platform.master.get': 'master.manage',
+  'platform.tags.create': 'master.manage',
+  'platform.tags.update': 'master.manage',
+};
 export function normalizePlatformPermissions(value = []) {
   if (!Array.isArray(value) || value.some(key => !Object.hasOwn(PLATFORM_PERMISSIONS,key))) throw new Error('Choose valid Superadmin feature access.');
   return Object.keys(PLATFORM_PERMISSIONS).filter(key => value.includes(key));
 }
 export const hasPlatformPermission = (user,key) => !!user && (user.isSuperAdmin === true || user.platformPermissions?.includes(key) === true);
-export const hasPlatformAccess = user => hasPlatformPermission(user,'profiles.create');
+export const hasPlatformAccess = user => Object.keys(PLATFORM_PERMISSIONS).some(key => hasPlatformPermission(user, key));
+export function canOpenPlatformRoute(user, path) {
+  if (user?.isSuperAdmin) return true;
+  if (['/superadmin/profiles', '/superadmin/customers'].includes(path)) return ['profiles.create', 'profiles.edit'].some(key => hasPlatformPermission(user, key));
+  return path === '/superadmin/master' && hasPlatformPermission(user, 'master.manage');
+}
+export const platformHome = user => user?.isSuperAdmin ? '/superadmin' : hasPlatformPermission(user, 'profiles.create') || hasPlatformPermission(user, 'profiles.edit') ? '/superadmin/profiles' : '/superadmin/master';
 
 export function normalizePermissions(value) {
   if (!Array.isArray(value) || value.some(key => !Object.hasOwn(FEATURE_PERMISSIONS, key))) throw new Error('Choose valid feature permissions.');

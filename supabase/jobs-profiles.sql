@@ -6,7 +6,7 @@ alter table users add column if not exists approval_status text not null default
 alter table users add column if not exists profile_created_by uuid references users(id) on delete set null;
 alter table users add column if not exists profile_approved_by uuid references users(id) on delete set null;
 alter table users drop constraint if exists users_platform_permissions_check;
-alter table users add constraint users_platform_permissions_check check(platform_permissions <@ array['profiles.create']::text[] and array_position(platform_permissions,null) is null);
+alter table users add constraint users_platform_permissions_check check(platform_permissions <@ array['profiles.create','profiles.edit','master.manage']::text[] and array_position(platform_permissions,null) is null);
 alter table profile_tags add column if not exists platform_permissions text[] not null default '{}';
 alter table profile_tags drop constraint if exists profile_tags_visibility_check;
 alter table profile_tags add constraint profile_tags_visibility_check check(visibility in('public','private','internal'));
@@ -15,7 +15,7 @@ alter table profile_tags add constraint profile_tags_key_check check(key in('her
 alter table profile_tags drop constraint if exists profile_tags_permissions_check;
 alter table profile_tags add constraint profile_tags_permissions_check check(permissions <@ array['profile','content','knowledge','commerce','enquiries','community','jobs']::text[] and array_position(permissions,null) is null);
 alter table profile_tags drop constraint if exists profile_tags_platform_permissions_check;
-alter table profile_tags add constraint profile_tags_platform_permissions_check check(platform_permissions <@ array['profiles.create']::text[] and array_position(platform_permissions,null) is null);
+alter table profile_tags add constraint profile_tags_platform_permissions_check check(platform_permissions <@ array['profiles.create','profiles.edit','master.manage']::text[] and array_position(platform_permissions,null) is null);
 -- Apply the initial default grant once. Later edits and reruns must preserve denials.
 create table if not exists persona_migrations(key text primary key, applied_at timestamptz not null default now());
 alter table persona_migrations enable row level security;

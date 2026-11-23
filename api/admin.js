@@ -25,7 +25,7 @@ import { createTagService } from '../server/tags.js';
 import { createActivityService } from '../server/adminActivity.js';
 import { createPlatformService } from '../server/platform.js';
 import { createSupportService } from '../server/platformSupport.js';
-import { loadPermissions, requireOperationPermissions } from '../server/rbac.js';
+import { loadPermissions, requireOperationPermissions, requirePlatformPermission, authorizePlatformOperation } from '../server/rbac.js';
 import { chooseProfileType } from '../server/profileType.js';
 import { createWorkspaceService, scopedWorkspace } from '../server/workspaces.js';
 import { createKnowledgePolicyService, listKnowledgeSources } from '../server/knowledgePolicy.js';
@@ -58,11 +58,11 @@ export function createPlatformOperations({ invitesService = invites, suggestions
     'invites.list': ({ user }) => invitesService.listInviteHistory(user),
     'invites.create': async ({ user }, args) => ({ code: await invitesService.createInvite(user.id, args) }),
     'invites.revoke': async ({ user }, args) => { await invitesService.revokeInvite(args.id, user); return { ok: true }; },
-    'users.list': async ctx => { needSuperAdmin(ctx); return { users: (await invitesService.listUsersDetailed()).filter(user => !user.isSuperAdmin), tags: await tagsService.list(true) }; },
+    'users.list': async ({ user }) => { requirePlatformPermission(user, 'profiles.edit'); return { users: (await invitesService.listUsersDetailed(user)).filter(person => !person.isSuperAdmin), tags: user.isSuperAdmin ? await tagsService.list(true) : await tagsService.assignable(user) }; },
     'platform.profiles.list': ({user})=>profileService.list(user),
     'platform.profiles.create': ({user},args)=>profileService.create(user,args),
     'platform.profiles.approve': ({user},args)=>profileService.approve(user,args),
-    'users.update': (ctx, args) => { needSuperAdmin(ctx); return invitesService.updateUser(args.id, args); },
+    'users.update': ({ user }, args) => { requirePlatformPermission(user, 'profiles.edit'); return invitesService.updateUser(args.id, args, user); },
     'users.setLock': (ctx, args) => { needSuperAdmin(ctx); if (typeof args.locked !== 'boolean') throw new HttpError(400, 'Choose lock or unlock.'); return invitesService.setUserLock(args.id, args.locked, ctx.user.id); },
     'users.resetPassword': (ctx, args) => { needSuperAdmin(ctx); return invitesService.resetUserPassword(args.id, args.password); },
     'users.delete': (ctx, args) => { needSuperAdmin(ctx); return invitesService.deleteUser(args.id, ctx.user.id); },
@@ -255,7 +255,7 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
       const user = await sessionUser(req);
       if (!user) throw new HttpError(401, 'Not signed in.');
-      if (!user.isSuperAdmin && /^(platform\.|users\.)/.test(op) && !op.startsWith('platform.profiles.')) throw new HttpError(403,'Superadmin access is required.');
+      if (/^(platform\.|users\.)/.test(op)) authorizePlatformOperation(user, op);
       const platformOp = op === 'team.accept' || /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.|workspace\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
       requireOperationPermissions(user, op);

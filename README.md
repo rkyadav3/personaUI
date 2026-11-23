@@ -33,7 +33,7 @@ The Streamlit admin and the static chat page are now one React app (Vite) with V
 
 ## Setup
 For the current SuperAdmin dashboard and login server, follow [Platform dashboard setup](docs/platform-governance.md). Apply `supabase/security-hardening.sql` after its prerequisites **before deploying**; sign-in fails closed without the new `finalize_login` function.
-For jobs, scoped Profile Creator access and contributor file isolation, apply `supabase/jobs-profiles.sql` after its prerequisites as described in [Jobs and profile creation](docs/jobs-profiles.md).
+For jobs, scoped staff access and contributor file isolation, apply `supabase/jobs-profiles.sql` and then `supabase/staff-permissions.sql` after their prerequisites as described in [Jobs and profile creation](docs/jobs-profiles.md).
 
 1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql`, `page.sql`, `portfolio.sql`, `engage.sql`, `events-commerce.sql`, `studio-assistant.sql`, and `profile-questions.sql`. If your project already has those tables, compare first and run the migrations it is missing.
 2. **Env vars:** copy `.env.example` to `.env.local` (local) or add them in Vercel. `SESSION_SECRET` is new: any long random string. See [Vercel and Razorpay environment setup](docs/vercel-environment-setup.md) for the exact variable names, value sources and Admin payment settings.

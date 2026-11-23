@@ -2,7 +2,7 @@
 
 ## Installation
 
-Apply `supabase/jobs-profiles.sql` after the existing profile, enquiry, events and platform migrations, including `admin-experience.sql`, `master-rbac.sql`, `hosted-assets.sql`, `workspaces.sql`, `organization-profiles.sql` and `collaboration-webhooks.sql`. This migration is required before deploying the updated API. It creates jobs, résumé metadata and actor-bound file-upload records; adds profile approval and scoped platform capabilities; and extends the existing public submission rate limiter for jobs.
+Apply `supabase/jobs-profiles.sql` after the existing profile, enquiry, events and platform migrations, including `admin-experience.sql`, `master-rbac.sql`, `hosted-assets.sql`, `workspaces.sql`, `organization-profiles.sql` and `collaboration-webhooks.sql`. Then apply `supabase/staff-permissions.sql`. These migrations are required before deploying the updated API. They create jobs, résumé metadata and actor-bound file-upload records; add profile approval, scoped staff capabilities and protected delegated editing; and extend the existing public submission rate limiter for jobs.
 
 The migration preserves edited permissions when rerun. Its initial Jobs grant applies only to tags that previously allowed all six Studio features. Restricted tags retain their restrictions. Profile Creator starts with no Studio permissions and `profiles.create` platform access. A custom tag already named Profile Creator is renamed with a unique custom suffix while preserving its key and assignments.
 
@@ -20,7 +20,9 @@ Applications arrive in Inbox → Enquiries with the job title. Administrators wi
 
 Superadmin → Profiles replaces Customers. Full Superadmin can create an Individual or Organisation administrator account with a name, email, profile ID and initial password. These accounts start approved with a draft profile. Creation does not send an email; share the initial credentials through your existing onboarding process.
 
-Master contains the internal Profile Creator tag. Tag permissions and profile editing both offer specific Superadmin feature access. Currently the only delegated capability is `profiles.create`: it opens Profiles and allows creating new accounts and viewing accounts created by that actor. It does not grant approval, Master, payments or account administration. An actor can have at most 50 pending creations.
+Master contains the internal Profile Creator tag, which starts with only `profiles.create`: it opens Profiles and allows creating new accounts and viewing accounts created by that actor. An actor can have at most 50 pending creations.
+
+Superadmin can also grant `profiles.edit` and `master.manage` independently to internal Staff tags or directly to an account. Staff see and use only enabled tools. Profile editors can change ordinary accounts and assign tags that carry no platform privileges. Master staff can create/edit tags and Studio feature permissions. Platform identities, password resets, suspensions, deletions, profile approval and platform-access grants remain owner-only. Each request reloads staff permissions, and delegated profile updates recheck current grants and protected tags atomically in the database.
 
 Accounts created by a Profile Creator remain pending until full Superadmin chooses Approve profile or Decline in Profiles. Pending and declined accounts cannot sign in or obtain valid sessions. The database also blocks publication until approval.
 

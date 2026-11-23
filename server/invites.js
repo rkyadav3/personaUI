@@ -8,6 +8,7 @@ import { HttpError } from './http.js';
 import { createTagService } from './tags.js';
 import { normalizeTags } from '../shared/governance.js';
 import { normalizePlatformPermissions } from '../shared/rbac.js';
+import { requirePlatformPermission } from './rbac.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no 0/O/1/I
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -65,8 +66,18 @@ export async function validateInvite(code) {
   };
 }
 
-export async function listUsersDetailed() {
-  const db = raw();
+export async function listUsersDetailed(actor, database = raw) {
+  const db = database();
+  if (actor && !actor.isSuperAdmin) {
+    requirePlatformPermission(actor, 'profiles.edit');
+    const [users, tags] = await Promise.all([
+      paged(db, 'users', 'id,name,email,slug,tags,profile_private,platform_permissions,approval_status,created_at,locked_until', q => q.order('created_at', { ascending: false })),
+      run(db.from('profile_tags').select('key,platform_permissions')),
+    ]);
+    const protectedTags = new Set(tags.filter(tag => tag.platform_permissions?.length).map(tag => tag.key));
+    return users.filter(person => !isSuperAdminEmail(person.email) && !person.platform_permissions?.length && !person.tags?.some(tag => protectedTags.has(tag)))
+      .map(({ platform_permissions, ...person }) => ({ ...person, isAdmin: true, isSuperAdmin: false, isLocked: Boolean(person.locked_until && Date.parse(person.locked_until) > Date.now()) }));
+  }
   const [users, codes, profiles] = await Promise.all([
     paged(db, 'users', 'id,email,name,slug,tags,profile_private,profile_type,platform_permissions,approval_status,profile_created_by,created_at,invite_code_id,failed_attempts,locked_until', q => q.order('created_at', { ascending: false }).order('id', { ascending: false })),
     run(db.from('invite_codes').select('id,code,label')),
@@ -101,15 +112,25 @@ export async function listUsersDetailed() {
   });
 }
 
-export async function updateUser(targetUserId, { name, email, slug, tags, platformPermissions }) {
-  const db = raw();
+export async function updateUser(targetUserId, { name, email, slug, tags, platformPermissions }, actor, database = raw) {
+  const delegated = actor && !actor.isSuperAdmin;
+  if (actor) requirePlatformPermission(actor, 'profiles.edit');
+  if (delegated && platformPermissions !== undefined) throw new HttpError(403, 'Only Superadmin can change platform access.');
+  const db = database();
   const [user] = await run(db.from('users').select('*').eq('id', targetUserId));
   if (!user) throw new Error('User not found.');
+
+  let delegatedTags;
+  if (delegated) {
+    delegatedTags = await run(db.from('profile_tags').select('key,label,visibility,platform_permissions'));
+    const protectedTags = new Set(delegatedTags.filter(tag => tag.platform_permissions?.length).map(tag => tag.key));
+    if (isSuperAdminEmail(user.email) || user.platform_permissions?.length || user.tags?.some(tag => protectedTags.has(tag)) || Array.isArray(tags) && tags.some(tag => protectedTags.has(tag))) throw new HttpError(403, 'Only Superadmin can edit platform staff or assign platform access tags.');
+  }
 
   const updates = {};
   if (platformPermissions !== undefined) { try { updates.platform_permissions=normalizePlatformPermissions(platformPermissions); } catch(error) { throw new HttpError(400,error.message); } }
   if (tags !== undefined) {
-    const definitions = await createTagService(() => db).list(true);
+    const definitions = delegatedTags || await createTagService(() => db).list(true);
     try { updates.tags = normalizeTags(tags, definitions); } catch (error) { throw new HttpError(400, error.message); }
   }
   if (name !== undefined) updates.name = (name || '').trim() || null;
@@ -134,7 +155,10 @@ export async function updateUser(targetUserId, { name, email, slug, tags, platfo
   }
 
   if (Object.keys(updates).length > 0) {
-    await run(db.from('users').update(updates).eq('id', targetUserId));
+    if (delegated) {
+      const { error } = await db.rpc('update_staff_profile', { p_actor: actor.id, p_target: targetUserId, p_expected_email: user.email, p_updates: updates });
+      if (error) throw new HttpError(error.code === '23505' ? 409 : 403, error.code === '23505' ? 'This email or profile ID is already in use.' : 'Profile editing access or the profile changed. Refresh and try again.');
+    } else await run(db.from('users').update(updates).eq('id', targetUserId));
   }
   return { ok: true };
 }
