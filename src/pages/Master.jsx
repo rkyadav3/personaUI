@@ -9,6 +9,7 @@ import PlatformAccess from '../components/PlatformAccess.jsx';
 import { PROFILE_TAGS } from '../../shared/governance.js';
 import { ALL_PERMISSIONS, FEATURE_PERMISSIONS, PLATFORM_PERMISSIONS, hasPlatformPermission } from '../../shared/rbac.js';
 import '../styles/governance.css';
+import { JOBS_PROFILE_SECTIONS } from '../../shared/jobsProfile.js';
 
 export default function Master() {
   const { user } = useAuth();
@@ -29,7 +30,7 @@ export function MasterManager({ definitions, reload, canDelegate = false }) {
   const filtered = definitions.filter(tag => tag.label.toLowerCase().includes(query.trim().toLowerCase())).sort((a, b) => a.label.localeCompare(b.label));
   function open(tag) {
     setEditing(tag?.key || null);
-    setForm(tag ? { label: tag.label, visibility: tag.visibility, permissions: [...tag.permissions], platformPermissions: tag.platform_permissions || [] } : { label: '', visibility: 'public', permissions: [...ALL_PERMISSIONS], platformPermissions: [] });
+    setForm(tag ? { label: tag.label, visibility: tag.visibility, permissions: [...tag.permissions], platformPermissions: tag.platform_permissions || [], jobsProfilePermissions: tag.jobs_profile_permissions || [] } : { label: '', visibility: 'public', permissions: [...ALL_PERMISSIONS], platformPermissions: [], jobsProfilePermissions: Object.keys(JOBS_PROFILE_SECTIONS) });
     setError(''); setNotice(null);
   }
   const close = () => { setForm(null); setEditing(null); };
@@ -37,7 +38,7 @@ export function MasterManager({ definitions, reload, canDelegate = false }) {
     event.preventDefault(); setBusy(true); setError('');
     try {
       const { platformPermissions, ...ordinary } = form;
-      const values = { ...(fixed ? { permissions: form.permissions, visibility: form.visibility } : ordinary), ...(canDelegate ? { platformPermissions } : {}) };
+      const values = { ...(fixed ? { permissions: form.permissions, visibility: form.visibility, jobsProfilePermissions: form.jobsProfilePermissions } : ordinary), ...(canDelegate ? { platformPermissions } : {}) };
       await api(editing ? 'platform.tags.update' : 'platform.tags.create', editing ? { key: editing, ...values } : values);
       close(); setNotice({ kind: 'success', text: 'Tag and feature permissions saved.' }); await reload();
     } catch (failure) { setError(failure.message); }
@@ -49,8 +50,9 @@ export function MasterManager({ definitions, reload, canDelegate = false }) {
     <Notice kind={notice?.kind}>{notice?.text}</Notice>
     {form && <FormDialog title={editing ? `Edit ${form.label}` : 'Create profile tag'} busy={busy} onClose={close}><form className="master-editor" onSubmit={save}>
       <div className="row"><Field label="Tag name"><input type="text" required maxLength={40} disabled={fixed || busy} value={form.label} onChange={event => setForm({ ...form, label: event.target.value })} /></Field><Field label="Tag visibility"><select disabled={busy} value={form.visibility} onChange={event => setForm({ ...form, visibility: event.target.value })}><option value="internal">Internal</option><option value="public">Public</option><option value="private">Private profile & knowledge</option></select></Field></div>
-      <fieldset className="governance-tag-editor"><legend>Allowed features</legend><div className="master-permissions">{Object.entries(FEATURE_PERMISSIONS).map(([key, label]) => <label key={key}><input type="checkbox" disabled={busy} checked={form.permissions.includes(key)} onChange={event => setForm({ ...form, permissions: event.target.checked ? [...form.permissions, key] : form.permissions.filter(value => value !== key) })} /><span>{label}</span></label>)}</div></fieldset>
-      {canDelegate && <PlatformAccess value={form.platformPermissions} disabled={busy} onChange={value=>setForm({...form,platformPermissions:value})} />}<p className="muted">Changes apply on the next request. The Studio assistant and combined analytics require all feature permissions. Superadmin manages delegated platform access.</p>
+      <fieldset className="governance-tag-editor"><legend>Allowed features</legend><div className="master-permissions">{Object.entries(FEATURE_PERMISSIONS).map(([key, label]) => <label key={key}><input type="checkbox" disabled={busy || key !== 'job_seeker' && form.permissions.includes('job_seeker') || key === 'job_seeker' && form.platformPermissions.length > 0} checked={form.permissions.includes(key)} onChange={event => setForm({ ...form, permissions: key === 'job_seeker' && event.target.checked ? ['job_seeker'] : event.target.checked ? [...form.permissions, key] : form.permissions.filter(value => value !== key) })} /><span>{label}</span></label>)}</div><p className="muted">Job Seeker replaces the standard Studio with HOME and the Jobs Profile editors. Turning it off leaves feature access disabled until you select the standard features to allow. Disable Superadmin access before enabling Job Seeker.</p></fieldset>
+      <fieldset className="governance-tag-editor"><legend>Job Seeker settings</legend><p className="muted">Show or hide each section for Jobs Profiles assigned this tag. Enable Job Seeker above to switch assigned profiles to the HOME-only experience.</p><div className="master-permissions">{Object.entries(JOBS_PROFILE_SECTIONS).map(([key, label]) => <label key={key}><input type="checkbox" disabled={busy} checked={form.jobsProfilePermissions.includes(key)} onChange={event => setForm({ ...form, jobsProfilePermissions: event.target.checked ? [...form.jobsProfilePermissions, key] : form.jobsProfilePermissions.filter(value => value !== key) })} /><span>{label}</span></label>)}</div></fieldset>
+      {canDelegate && <PlatformAccess value={form.platformPermissions} disabled={busy || form.permissions.includes('job_seeker')} onChange={value=>setForm({...form,platformPermissions:value})} />}<p className="muted">Changes apply on the next request. The Studio assistant and combined analytics require all feature permissions. Superadmin manages delegated platform access.</p>
       <Notice kind="error">{error}</Notice><div className="row"><button className="btn primary" disabled={busy}>{busy ? 'Saving…' : 'Save tag & permissions'}</button><button type="button" className="btn" disabled={busy} onClick={close}>Cancel</button></div>
     </form></FormDialog>}
     <section className="card governance-card" aria-labelledby={`${id}-directory`}><div className="head"><div><h2 id={`${id}-directory`}>Tags & permissions</h2><p className="muted">{definitions.length} tags available.</p></div><button type="button" className="btn" disabled={busy} onClick={reload}>Refresh</button></div>

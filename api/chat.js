@@ -40,9 +40,10 @@ async function rpc(name, body, signal) {
 async function ownerId(slug, viewer) {
   slug = String(slug || process.env.DEFAULT_SLUG || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return null;
-  const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/users?select=id,email,tags,profile_private,locked_until${workspaceEnabled() ? ',workspace_status,workspace_type' : ''}&slug=eq.${slug}&limit=1`, { headers: sbHeaders() });
+  const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/users?select=id,email,tags,job_seeker,profile_type,profile_private,locked_until${workspaceEnabled() ? ',workspace_status,workspace_type' : ''}&slug=eq.${slug}&limit=1`, { headers: sbHeaders() });
   if (!r.ok) throw new Error(`owner lookup ${r.status}`);
   const account = (await r.json())[0];
+  if (account?.job_seeker || account?.profile_type === 'jobs' || account?.workspace_type === 'jobs') return null;
   if (isSuperAdminEmail(account?.email) || !await canViewWorkspaceProfile(account, viewer)) return null;
   const profile = await fetch(`${process.env.SUPABASE_URL}/rest/v1/profiles?select=${workspaceEnabled() ? 'id,name,profile_type,organization,purpose,contact,expertise,visibility' : 'id'}&owner_id=eq.${account.id}&status=eq.published&limit=1`, { headers: sbHeaders() });
   if (!profile.ok) throw new Error('Profile access lookup failed');

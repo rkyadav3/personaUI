@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
+import JobsProfileView from '../components/JobsProfileView.jsx';
 import PortfolioSite from '../components/portfolio/PortfolioSite.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { track } from '../lib/track.js';
@@ -28,5 +29,6 @@ export default function PublicProfile() {
         <Link to="/" style={{ color: '#6d4aff', fontWeight: 600 }}>← Back to the home page</Link></div>
     </div>
   );
+  if (data.profileType === 'jobs') return sub ? <Navigate to={`/p/${data.slug || slug}`} replace /> : <JobsProfileView data={data} />;
   return <PortfolioSite data={data} slug={data.slug || slug} sub={sub} user={auth?.user} />;
 }

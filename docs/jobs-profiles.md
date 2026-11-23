@@ -1,5 +1,7 @@
 # Jobs, profile creation and contributor access
 
+Jobs Profile is a separate HOME-only profile type. See [Jobs Profile and Job Seeker mode](jobs-profile-home.md) and apply `supabase/jobs-profile-home.sql` after the migrations below for this version.
+
 ## Installation
 
 Apply `supabase/jobs-profiles.sql` after the existing profile, enquiry, events and platform migrations, including `admin-experience.sql`, `master-rbac.sql`, `hosted-assets.sql`, `workspaces.sql`, `organization-profiles.sql` and `collaboration-webhooks.sql`. Then apply `supabase/staff-permissions.sql` and `supabase/tag-visibility.sql`. These migrations are required before deploying the updated API. They create jobs, résumé metadata and actor-bound file-upload records; add profile approval, scoped staff capabilities, protected delegated editing and editable tag visibility; and extend the existing public submission rate limiter for jobs.

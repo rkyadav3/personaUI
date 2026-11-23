@@ -35,6 +35,6 @@ export function useAdminActivity(user, call = api) {
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('pointerdown', input); window.addEventListener('keydown', input);
     return () => { active = false; clearInterval(timer); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pointerdown', input); window.removeEventListener('keydown', input); };
-  }, [user?.id, user?.isSuperAdmin, JSON.stringify(user?.permissions), user?.workspaceRole, user?.workspaceEnabled, call]);
+  }, [user?.id, user?.isSuperAdmin, user?.profileType, user?.workspaceType, JSON.stringify(user?.permissions), user?.workspaceRole, user?.workspaceEnabled, call]);
   return state;
 }

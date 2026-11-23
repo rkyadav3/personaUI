@@ -7,6 +7,7 @@ import { LegacyPortfolioRedirect } from './LegacyRedirects.jsx';
 import { useOp } from '../lib/hooks.js';
 import { fmtStamp } from '../lib/when.js';
 import { Confirm, Field, Loading, Notice } from '../components/Ui.jsx';
+import JobsProfileView from '../components/JobsProfileView.jsx';
 
 const LABEL = { new: 'New', read: 'Read', replied: 'Replied', archived: 'Archived' };
 const digits = s => String(s || '').replace(/\D/g, '');
@@ -23,6 +24,7 @@ function exportCsv(rows) {
 function Detail({ r, onChange, onDelete }) {
   const [note, setNote] = useState(r.note || '');
   const [resume, setResume] = useState({ busy: false, url: '', error: '' });
+  const [applicant, setApplicant] = useState({ busy: false, data: null, error: '' });
   const prepareResume = async () => {
     setResume({ busy: true, url: '', error: '' });
     try {
@@ -42,6 +44,11 @@ function Detail({ r, onChange, onDelete }) {
   const wa = digits(r.phone).length >= 8 ? `https://wa.me/${digits(r.phone)}` : '';
   return (
     <div className="card inner enq-detail">
+      {r.hasSharedJobsProfile && <section><button className="btn" disabled={applicant.busy} onClick={async () => {
+        setApplicant({ busy: true, data: null, error: '' });
+        try { setApplicant({ busy: false, data: await api('enquiries.applicant', { id: r.id }), error: '' }); }
+        catch (error) { setApplicant({ busy: false, data: null, error: error.message }); }
+      }}>{applicant.busy ? 'Opening applicant profile…' : 'View shared Jobs Profile'}</button><Notice kind="error">{applicant.error}</Notice>{applicant.data && <JobsProfileView data={applicant.data} embedded />}</section>}
       <div className="enq-msg">{r.message}</div>
       <dl className="enq-dl">{rows.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
       <div className="row">

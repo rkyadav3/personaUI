@@ -9,6 +9,8 @@ TENANT_TABLES.add('assets');
 TENANT_TABLES.add('jobs');
 TENANT_TABLES.add('job_resumes');
 TENANT_TABLES.add('file_uploads');
+TENANT_TABLES.add('jobs_profiles');
+TENANT_RPCS.add('save_jobs_profile');
 TENANT_RPCS.add('save_store_currency');
 
 export function scoped(uid, database = raw, workspace) {

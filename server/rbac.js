@@ -1,6 +1,7 @@
 import { raw, run } from './supabase.js';
 import { HttpError } from './http.js';
 import { resolvePermissions, hasPermission, operationPermissions, FEATURE_PERMISSIONS, normalizePlatformPermissions, hasPlatformPermission, PLATFORM_OPERATIONS } from '../shared/rbac.js';
+import { isJobsProfile, resolveJobsProfilePermissions } from '../shared/jobsProfile.js';
 
 export function requirePlatformPermission(user, permission) {
   if (!hasPlatformPermission(user, permission)) throw new HttpError(403, 'This Superadmin feature has not been enabled for your account.');
@@ -15,13 +16,14 @@ export function authorizePlatformOperation(user, op) {
 export async function loadPermissions(user, database = raw()) {
   if (user.isSuperAdmin) return { ...user, permissions: [] };
   const tags = user.tags || [];
-  const definitions = await run(database.from('profile_tags').select('key,permissions,platform_permissions').in('key', tags.length ? tags : ['standard']));
+  const definitions = await run(database.from('profile_tags').select('key,permissions,platform_permissions,jobs_profile_permissions').in('key', tags.length ? tags : ['standard']));
   const grants = [...(user.platformPermissions || []), ...definitions.flatMap(tag => tag.platform_permissions || [])];
-  return { ...user, permissions: resolvePermissions(tags, definitions), platformPermissions: normalizePlatformPermissions(grants) };
+  return { ...user, permissions: resolvePermissions(tags, definitions), jobsProfilePermissions: resolveJobsProfilePermissions(tags, definitions), platformPermissions: normalizePlatformPermissions(grants) };
 }
 
 export function requireOperationPermissions(user, op) {
   if (user.isSuperAdmin) return;
+  if (isJobsProfile(user) && !/^(jobsProfile\.|workspace\.|platform\.|users\.)/.test(op)) throw new HttpError(403, 'Jobs Profile has only HOME and its Profile and Home page editors.');
   const missing = operationPermissions(op).filter(permission => !hasPermission(user, permission));
   if (missing.length) throw new HttpError(403, `Your profile tags do not allow ${missing.map(key => FEATURE_PERMISSIONS[key]).join(', ')}. Contact platform support to request access.`);
 }

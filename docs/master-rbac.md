@@ -1,5 +1,7 @@
 # Master tags and feature access
 
+Jobs Profile adds a third onboarding/profile-creation type. Master also has an exclusive **Job Seeker** option under Allowed features and role-controlled Job Seeker sections. It is not an assignable tag. Apply `supabase/jobs-profile-home.sql` after all migrations below; see [Jobs Profile and Job Seeker mode](jobs-profile-home.md).
+
 Superadmin → Master creates tags, lists definitions and edits feature permissions. Profiles retains tag assignment and account support, and creates administrator profiles.
 
 Individual and Organisation are chosen during first-time profile setup. Workspace deployments use the existing workspace choice; deployments without workspaces save the account profile type. Users see one choice, and neither type is an assignable tag. University, Hospital, Contributors, Standard, Founders, Special, Hero, God, Fraud, Scammer, Narration Setter, Gov-Departments, Commercial/Enterprises, Community and Manufacturer are independent tags. The existing Private profile tag remains available. Master uses a flat list and opens creation/editing in a popup without parent or built-in labels. Every tag's visibility is editable: Public displays the label, Internal hides the label, and Private hides the assigned profile and knowledge from public visitors. Built-in tag names and keys remain fixed. Changing visibility preserves its permissions.

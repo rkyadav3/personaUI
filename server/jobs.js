@@ -5,6 +5,7 @@ import { ASSET_BUCKET } from '../shared/assets.js';
 import { createPublicRepository } from './publicRepository.js';
 import { HttpError } from './http.js';
 import { normalizeJob, normalizeApplication, resumeSpec } from '../shared/jobs.js';
+import { isJobsProfile } from '../shared/jobsProfile.js';
 const uuid = (value) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || '');
 const checked = (fn) => {
@@ -102,7 +103,8 @@ export function createJobPublicService({
       if (error || !data?.token) throw new HttpError(503, 'Résumé storage is unavailable. Try again.');
       return { id, path, token: data.token, mime: spec.mime, bucket: ASSET_BUCKET };
     },
-    async submit(input, ip) {
+    async submit(input, ip, applicant = null) {
+      if (input.shareProfile && (input.shareProfile !== true || !applicant?.id || !isJobsProfile(applicant))) throw new HttpError(403, 'Sign in to your Jobs Profile to share it with this application.');
       const values = checked(() => normalizeApplication(input)),
         job = await jobFor(input);
       await repository.claim(job.owner_id, 'job', ip);
@@ -128,10 +130,11 @@ export function createJobPublicService({
           throw new HttpError(409, 'The uploaded résumé does not match its size or type. Upload it again.');
       }
       await run(
-        database().rpc('submit_job_application', {
+        database().rpc(input.shareProfile ? 'submit_job_profile_application' : 'submit_job_application', {
           p_job: job.id,
           p_resume: input.resumeId || null,
           p_input: values,
+          ...(input.shareProfile ? { p_applicant: applicant.id } : {}),
         })
       );
       return { ok: true };

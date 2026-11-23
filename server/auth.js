@@ -76,6 +76,7 @@ export const publicUser = u => ({
   platformPermissions: u.platform_permissions || [],
   approvalStatus: u.approval_status || 'approved',
   profileType: u.profile_type || null,
+  jobSeeker: u.job_seeker === true,
   sessionVersion: Number(u.session_version || 0),
   userIdChangedAt: u.slug_changed_at || null,
   userIdNextChangeAt: u.slug_changed_at ? new Date(Date.parse(u.slug_changed_at) + 14 * 86400000).toISOString() : null,

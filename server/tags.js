@@ -4,11 +4,13 @@ import { HttpError } from './http.js';
 import { requirePlatformPermission } from './rbac.js';
 import { ALL_PERMISSIONS, normalizePermissions, normalizePlatformPermissions } from '../shared/rbac.js';
 import { PROFILE_TAGS } from '../shared/governance.js';
+import { JOBS_PROFILE_SECTIONS, normalizeJobsProfilePermissions } from '../shared/jobsProfile.js';
 const columns = 'key,label,visibility';
-const masterColumns = `${columns},permissions,platform_permissions`;
+const masterColumns = `${columns},permissions,platform_permissions,jobs_profile_permissions`;
 async function result(query) {
   const { data, error } = await query;
   if (error?.code === '23505') throw new HttpError(409, 'A tag with that name already exists.');
+  if (error && ['23514', 'P0001'].includes(error.code)) throw new HttpError(409, 'These permissions conflict. Job Seeker cannot be combined with Studio or Superadmin access. Remove the conflicting access and try again.');
   if (error) throw new HttpError(503, 'Profile tags could not be saved or loaded. Apply the master-rbac database migration and try again.');
   return data || [];
 }
@@ -31,8 +33,11 @@ export function createTagService(database = raw) {
       if (!label || label.length > 40 || !['public','private','internal'].includes(input.visibility)) throw new HttpError(400,'Enter a tag name up to 40 characters and choose a visibility.');
       let permissions, platform_permissions;
       try { permissions = normalizePermissions(input.permissions ?? ALL_PERMISSIONS); platform_permissions=normalizePlatformPermissions(input.platformPermissions); } catch (error) { throw new HttpError(400, error.message); }
+      if (permissions.includes('job_seeker') && platform_permissions.length) throw new HttpError(400, 'Job Seeker cannot be combined with Superadmin access.');
       const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48).replace(/-+$/g, '') || randomUUID().slice(0, 8);
-      const [tag] = await result(database().from('profile_tags').insert({ key: `custom-${slug}`, label, visibility: input.visibility, permissions, platform_permissions }).select(masterColumns));
+      let jobs_profile_permissions;
+      try { jobs_profile_permissions = normalizeJobsProfilePermissions(input.jobsProfilePermissions ?? Object.keys(JOBS_PROFILE_SECTIONS)); } catch (error) { throw new HttpError(400, error.message); }
+      const [tag] = await result(database().from('profile_tags').insert({ key: `custom-${slug}`, label, visibility: input.visibility, permissions, platform_permissions, jobs_profile_permissions }).select(masterColumns));
       if (!tag) throw new HttpError(503, 'The new tag could not be confirmed. Reload tags before trying again.');
       return tag;
     },
@@ -41,6 +46,7 @@ export function createTagService(database = raw) {
       if (!user.isSuperAdmin && input.platformPermissions !== undefined) throw new HttpError(403, 'Only Superadmin can grant platform access.');
       if (typeof input.key !== 'string' || input.key.length > 64) throw new HttpError(400, 'Choose a valid tag.');
       const updates = {};
+      if (input.jobsProfilePermissions !== undefined) { try { updates.jobs_profile_permissions = normalizeJobsProfilePermissions(input.jobsProfilePermissions); } catch (error) { throw new HttpError(400, error.message); } }
       if (input.platformPermissions !== undefined) { try { updates.platform_permissions=normalizePlatformPermissions(input.platformPermissions); } catch(error) { throw new HttpError(400,error.message); } }
       if (input.permissions !== undefined) {
         try { updates.permissions = normalizePermissions(input.permissions); } catch (error) { throw new HttpError(400, error.message); }

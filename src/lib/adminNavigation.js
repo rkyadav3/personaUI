@@ -1,5 +1,6 @@
 import { readSettingsTab } from './publicPageSettings.js';
 import { canOpenRoute, canOpenPlatformRoute } from '../../shared/rbac.js';
+import { isJobsProfile } from '../../shared/jobsProfile.js';
 
 export const ADMIN_SECTIONS = [
   {id:'jobs',label:'Jobs',icon:'briefcase',description:'Manage job postings and applications.',pages:[{id:'jobs',label:'Jobs',to:'/admin/jobs',icon:'briefcase'}]},
@@ -37,6 +38,7 @@ export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', descrip
   { id: 'dashboard', label: 'SuperAdmin dashboard', to: '/superadmin', icon: 'chart' },
   { id: 'profiles', label: 'Profiles', to: '/superadmin/profiles', icon: 'users' },
   { id: 'master', label: 'Master', to: '/superadmin/master', icon: 'shield' },
+  { id: 'job-profiles', label: 'Jobs Profiles', to: '/superadmin/job-profiles', icon: 'briefcase' },
   { id: 'workspaces', label: 'Workspace operations', to: '/superadmin/workspaces', icon: 'shield' },
   { id: 'sales', label: 'Sales & payments', to: '/superadmin/sales', icon: 'box' },
   { id: 'invites', label: 'Invite links', to: '/superadmin/invites', icon: 'email' },
@@ -48,6 +50,7 @@ export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', descrip
 export const platformSectionsFor = user => SUPERADMIN_SECTION.pages.filter(page => canOpenPlatformRoute(user, page.to));
 
 export function adminSectionsFor(user) {
+  if (isJobsProfile(user)) return [{ id: 'home', label: 'HOME', icon: 'home', description: 'Manage your Jobs Profile and public Home page.', pages: canOpenRoute(user, '/admin/home') && (!user.workspaceEnabled || ['owner', 'admin'].includes(user.workspaceRole)) ? [{ id: 'home', label: 'Profile', to: '/admin/home', icon: 'users' }] : [] }];
   const sections = ADMIN_SECTIONS.map(section => ({ ...section, pages: section.pages.filter(page => (page.id !== 'webhooks' || user?.webhooksEnabled) && canOpenRoute(user, page.to)) }));
   if (!user?.workspaceEnabled) return sections.map(section => ({
     ...section, pages: section.pages.filter(page => !workspacePages.has(page.id)),
@@ -62,6 +65,7 @@ export function adminSectionsFor(user) {
 
 export function canOpenAdminPage(user, pathname, search = '') {
   if (!canOpenRoute(user, pathname + search)) return false;
+  if (isJobsProfile(user)) return !user.workspaceEnabled || ['owner', 'admin'].includes(user.workspaceRole);
   if (user?.workspaceEnabled && user.workspaceRole === 'contributor' && pathname.replace(/\/$/, '') === '/admin') return true;
   const location = adminLocation(pathname, search);
   if (location?.page === 'webhooks' && !user?.webhooksEnabled) return false;
@@ -84,6 +88,7 @@ export function adminLocation(pathname, search = '') {
   const settingsTab = readSettingsTab(tab);
   const settingsPage = settingsTab === 'account' ? 'account' : settingsTab === 'privacy' ? 'visibility' : settingsTab === 'payments' ? 'payments' : 'editor';
   const routes = {
+    home: ['home', 'home'],
     jobs: ['jobs','jobs'],
     portfolio: ['settings', settingsPage], page: ['settings', 'editor'], profile: tab === 'contrib' ? ['store', 'catalogue'] : tab === 'visibility' ? ['settings', 'visibility'] : ['settings', 'details'],
     writing: ['pipelines', 'content'], templates: ['pipelines', 'content'], topics: ['pipelines', 'content'],

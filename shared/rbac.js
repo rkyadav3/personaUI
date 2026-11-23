@@ -1,3 +1,4 @@
+import { isJobsProfile } from './jobsProfile.js';
 export const FEATURE_PERMISSIONS = {
   profile: 'Profile & public page',
   content: 'Content, files & activity',
@@ -6,13 +7,16 @@ export const FEATURE_PERMISSIONS = {
   enquiries: 'Enquiries',
   community: 'Invites & suggestions',
   jobs: 'Jobs & applications',
+  job_seeker: 'Job Seeker',
 };
-export const ALL_PERMISSIONS = Object.keys(FEATURE_PERMISSIONS);
-export const PROFILE_TYPES = { individual: 'Individual', organisation: 'Organisation' };
+// Job Seeker is an exclusive HOME mode, never part of default Studio grants.
+export const ALL_PERMISSIONS = Object.keys(FEATURE_PERMISSIONS).filter(key => key !== 'job_seeker');
+export const PROFILE_TYPES = { individual: 'Individual', organisation: 'Organisation', jobs: 'Jobs Profile' };
 export const PLATFORM_PERMISSIONS = {
   'profiles.create': 'Create profiles',
   'profiles.edit': 'Edit profiles & assign tags',
   'master.manage': 'Manage tags & feature permissions',
+  'profiles.review': 'Review Jobs Profile details',
 };
 export const PLATFORM_OPERATIONS = {
   'platform.profiles.list': 'profiles.create',
@@ -22,6 +26,8 @@ export const PLATFORM_OPERATIONS = {
   'platform.master.get': 'master.manage',
   'platform.tags.create': 'master.manage',
   'platform.tags.update': 'master.manage',
+  'platform.jobsProfile.get': 'profiles.review',
+  'platform.jobsProfile.list': 'profiles.review',
 };
 export function normalizePlatformPermissions(value = []) {
   if (!Array.isArray(value) || value.some(key => !Object.hasOwn(PLATFORM_PERMISSIONS,key))) throw new Error('Choose valid Superadmin feature access.');
@@ -32,33 +38,39 @@ export const hasPlatformAccess = user => Object.keys(PLATFORM_PERMISSIONS).some(
 export function canOpenPlatformRoute(user, path) {
   if (user?.isSuperAdmin) return true;
   if (['/superadmin/profiles', '/superadmin/customers'].includes(path)) return ['profiles.create', 'profiles.edit'].some(key => hasPlatformPermission(user, key));
+  if (path === '/superadmin/job-profiles') return hasPlatformPermission(user, 'profiles.review');
   return path === '/superadmin/master' && hasPlatformPermission(user, 'master.manage');
 }
-export const platformHome = user => user?.isSuperAdmin ? '/superadmin' : hasPlatformPermission(user, 'profiles.create') || hasPlatformPermission(user, 'profiles.edit') ? '/superadmin/profiles' : '/superadmin/master';
+export const platformHome = user => user?.isSuperAdmin ? '/superadmin' : hasPlatformPermission(user, 'profiles.create') || hasPlatformPermission(user, 'profiles.edit') ? '/superadmin/profiles' : hasPlatformPermission(user, 'profiles.review') ? '/superadmin/job-profiles' : '/superadmin/master';
 
 export function normalizePermissions(value) {
   if (!Array.isArray(value) || value.some(key => !Object.hasOwn(FEATURE_PERMISSIONS, key))) throw new Error('Choose valid feature permissions.');
-  return ALL_PERMISSIONS.filter(key => value.includes(key));
+  if (value.includes('job_seeker') && value.some(key => key !== 'job_seeker')) throw new Error('Job Seeker cannot be combined with the standard Studio features.');
+  return Object.keys(FEATURE_PERMISSIONS).filter(key => value.includes(key));
 }
 
 // Every assigned tag must allow a feature. Missing definitions fail closed.
 export function resolvePermissions(tags, definitions) {
   if (!Array.isArray(tags)) return [];
   const keys = tags.length ? tags : ['standard'];
-  return ALL_PERMISSIONS.filter(permission => keys.every(key => {
+  const permissions = ALL_PERMISSIONS.filter(permission => keys.every(key => {
     const definition = definitions.find(tag => tag.key === key);
     return Array.isArray(definition?.permissions) && definition.permissions.includes(permission);
   }));
+  if (keys.every(key => Array.isArray(definitions.find(tag => tag.key === key)?.permissions)) && keys.some(key => definitions.find(tag => tag.key === key)?.permissions?.includes('job_seeker'))) permissions.push('job_seeker');
+  return permissions;
 }
 
 export function hasPermission(user, permission) {
   if (!user || user.isSuperAdmin) return false;
   // Untagged sessions from before RBAC retain the existing Studio access.
   const permissions = user.permissions ?? (user.tags?.length ? [] : ALL_PERMISSIONS);
+  if (isJobsProfile(user)) return Array.isArray(permissions) && (permission === 'profile' && (permissions.includes('profile') || permissions.includes('job_seeker')) || permission === 'job_seeker' && permissions.includes('job_seeker'));
   return Array.isArray(permissions) && permissions.includes(permission);
 }
 
 export function operationPermissions(op) {
+  if (op.startsWith('jobsProfile.')) return ['profile'];
   if (op === 'jobs.resume') return ['enquiries'];
   if (/^jobs\./.test(op)) return ['jobs'];
   if (op === 'workspace.setup') return ['profile'];
@@ -93,5 +105,6 @@ export function routePermissions(pathname, search = '') {
 
 export const canOpenRoute = (user, to) => {
   const [pathname, search = ''] = to.split('?');
+  if (isJobsProfile(user)) return ['/admin', '/admin/home'].includes(pathname.replace(/\/$/, '')) && hasPermission(user, 'profile');
   return routePermissions(pathname, search).every(permission => hasPermission(user, permission));
 };

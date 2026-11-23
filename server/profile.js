@@ -14,6 +14,7 @@ import { normalizeQuantity } from '../shared/commerce.js';
 import { normalizeOrganizationDraft, organizationMissing, publicOrganization } from '../shared/organization.js';
 import { extractOrganizationProfile } from './organizationProfile.js';
 import { accountColumns, canViewWorkspaceProfile } from './workspaceVisibility.js';
+import { publicJobsProfile } from './jobsProfile.js';
 
 const MAX_TEXT = 6000, MAX_PER_HOUR = 12;
 const str = (v, n = 300) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
@@ -359,8 +360,10 @@ export async function publicProfile(slug, viewer = null, db = raw()) {
   if (!slug) return null;
   const [u] = await run(db.from('users').select(accountColumns('id,email,tags,profile_private,locked_until')).eq('slug', slug).limit(1));
   if (isSuperAdminEmail(u?.email) || !await canViewWorkspaceProfile(u, viewer, () => db)) return null;
+  if (u.job_seeker) return publicJobsProfile(u.id, slug, db);
   const [p] = await run(db.from('profiles').select('*').eq('owner_id', u.id).eq('status', 'published').limit(1));
   if (!p) return null;
+  if (p.profile_type === 'jobs') return publicJobsProfile(u.id, slug, db);
   const [cs, os, site, engage, tagDefinitions] = await Promise.all([
     run(db.from('contributions').select('*').eq('owner_id', u.id).order('id')),
     run(db.from('offerings').select('*').eq('owner_id', u.id).order('id')),
@@ -381,12 +384,12 @@ export async function previewProfile(db, slug) {
 
 /** Legacy offers API: the person's name, whether a public profile exists, and every
  *  offering they have published. Built from buildPublic, so hidden, disabled or inactive things never appear here either. */
-export async function publicOffers(slug, viewer = null) {
+export async function publicOffers(slug, viewer = null, db = raw()) {
   slug = String(slug || process.env.DEFAULT_SLUG || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return null;
-  const db = raw();
   const [u] = await run(db.from('users').select(accountColumns('id,email,slug,tags,profile_private,locked_until')).eq('slug', slug).limit(1));
   if (isSuperAdminEmail(u?.email) || !await canViewWorkspaceProfile(u, viewer, () => db)) return null;
+  if (u.job_seeker || u.profile_type === 'jobs') return { handle: u.slug, profileType: 'jobs', name: null, hasProfile: false, contact: null, offers: [] };
   const [p] = await run(db.from('profiles').select('*').eq('owner_id', u.id).eq('status', 'published').limit(1));
   if (!p) return { handle: u.slug, name: null, hasProfile: false, contact: null, offers: [] };
   const [cs, os] = await Promise.all([run(db.from('contributions').select('*').eq('owner_id', u.id).order('id')), run(db.from('offerings').select('*').eq('owner_id', u.id).order('id'))]);

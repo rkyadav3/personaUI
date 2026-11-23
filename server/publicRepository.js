@@ -23,8 +23,9 @@ export function createPublicRepository(database = raw) {
   async function owner(slug, viewer = null) {
     const user = await accountOwner(slug);
     if (!await canViewWorkspaceProfile(user, viewer, database)) return null;
+    if (user.job_seeker) return null;
     const profile = (await query(database().from('profiles').select('*').eq('owner_id', user.id).eq('status', 'published').limit(1)))[0];
-    return profile ? { ...user, profile } : null;
+    return profile && profile.profile_type !== 'jobs' ? { ...user, profile } : null;
   }
   async function claim(ownerId, kind, ip) {
     const secret = process.env.SESSION_SECRET || process.env.SUPABASE_SERVICE_KEY;

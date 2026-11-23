@@ -12,6 +12,7 @@ import VisibilityEditor from '../components/profile/VisibilityEditor.jsx';
 import Icon from '../components/portfolio/Icon.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { PROFILE_TYPES } from '../../shared/rbac.js';
+import { isJobsProfile } from '../../shared/jobsProfile.js';
 
 const PLACEHOLDER = 'Tell us about yourself, your education, professional experience, expertise, and what you would like to contribute to our platform.';
 
@@ -49,6 +50,7 @@ function Onboarding({ onDone, type = 'individual' }) {
   }
 
   if (!user?.workspaceEnabled && !user?.profileType) return <ProfileTypeChoice busy={busy} error={err} onChoose={choose} />;
+  if (isJobsProfile({ ...user, workspaceType: user?.workspaceEnabled ? type : user?.profileType })) return <Navigate to="/admin/home" replace />;
   if (!res) {
     return (
       <>
@@ -242,4 +244,4 @@ function ProfileContent({ type }) {
   if (!data.profile) return <Onboarding type={type} onDone={d => { setData(d); setNeeds(false); window.dispatchEvent(new Event('studio-changed')); }} />;
   return <ProfileManager data={data} reload={reload} />;
 }
-export default function Profile() { return <WorkspaceSetup>{type => <ProfileContent type={type} />}</WorkspaceSetup>; }
+export default function Profile() { return <WorkspaceSetup>{type => type === 'jobs' ? <Navigate to="/admin/home" replace /> : <ProfileContent type={type} />}</WorkspaceSetup>; }

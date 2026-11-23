@@ -37,6 +37,7 @@ import { createProfileCreationService } from '../server/profileCreation.js';
 import { createTeamService } from '../server/workspaceTeam.js';
 import { createWebhookService } from '../server/webhooks.js';
 import { exportWorkspacePage } from '../server/workspaceData.js';
+import { getJobsProfile, saveJobsProfile, reviewJobsProfile, applicationJobsProfile, listJobsProfileReviews } from '../server/jobsProfile.js';
 
 const workspaces = createWorkspaceService();
 const knowledgePolicies = createKnowledgePolicyService();
@@ -105,6 +106,11 @@ const PUBLIC = {
 // Signed-in ops. `db` is the tenant-scoped client; `s` is the store module bound to it.
 const activityService = createActivityService();
 const OPS = {
+  'jobsProfile.get': ctx => getJobsProfile(ctx),
+  'jobsProfile.save': (ctx, args) => saveJobsProfile(ctx, args),
+  'platform.jobsProfile.get': ({ user }, args) => reviewJobsProfile(user, args),
+  'platform.jobsProfile.list': ({ user }) => listJobsProfileReviews(user),
+  'enquiries.applicant': (ctx, args) => applicationJobsProfile(ctx, args),
   'jobs.list': ({db})=>listJobs(db),
   'jobs.save': ({db},args)=>saveJob(db,args),
   'jobs.delete': ({db},args)=>deleteJob(db,args.id),
@@ -258,18 +264,20 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (/^(platform\.|users\.)/.test(op)) authorizePlatformOperation(user, op);
       const platformOp = op === 'team.accept' || /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.|workspace\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
-      requireOperationPermissions(user, op);
+      requireOperationPermissions(user.workspaceEnabled && !platformOp ? { ...user, workspaceType: 'unselected' } : user, op);
       const workspaceOp = /^(workspace\.|integrations\.|team\.|webhooks\.|platform\.workspaces\.)/.test(op) || ['data.export', 'knowledge.sources', 'knowledge.policy'].includes(op);
       if (workspaceOp && !user.workspaceEnabled) throw new HttpError(503, 'These account tools are not enabled on this deployment yet.');
       if (op.startsWith('webhooks.') && !user.webhooksEnabled) throw new HttpError(503, 'Webhooks are currently disabled.');
       const access = !platformOp && user.workspaceEnabled ? await workspaceService.current(user) : null;
+      const effectiveUser = access ? { ...user, workspaceType: access.workspace.type } : user;
+      if (access) requireOperationPermissions(effectiveUser, op);
       if (access && args.workspaceId && args.workspaceId !== access.workspace.id) throw new HttpError(409, 'Your selected workspace changed. Refresh this page before continuing.');
       if (access) authorizeWorkspaceOperation(access.role, op);
       const baseDb = platformOp ? null : access ? workspaceScope(access) : tenantScope(user.id);
       const db = access?.role==='contributor' ? contributorScope(baseDb,user.id) : baseDb;
       const operationArgs = access ? { ...args } : args;
       if (access) delete operationArgs.workspaceId;
-      const result = await fn({ db, user, workspace: access }, operationArgs);
+      const result = await fn({ db, user: effectiveUser, workspace: access }, operationArgs);
       if (op === 'account.change' && result.user) result.user.permissions = user.permissions;
       if (op === 'account.change' && result.user) result.user.platformPermissions = user.platformPermissions;
       if (op === 'account.change' && result.passwordChanged) auth.endSession(res);

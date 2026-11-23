@@ -1,5 +1,5 @@
 export const workspaceEnabled = () => process.env.WORKSPACES_ENABLED === 'true';
-export const accountColumns = columns => workspaceEnabled() ? `${columns},approval_status,workspace_status,workspace_type` : `${columns},approval_status`;
+export const accountColumns = columns => [columns, ...['approval_status', 'profile_type', 'job_seeker', ...(workspaceEnabled() ? ['workspace_status', 'workspace_type'] : [])].filter(key => !columns.split(',').includes(key))].join(',');
 export async function canViewWorkspaceProfile(account, viewer, database) {
   const { canViewProfile } = await import('../shared/governance.js');
   if (canViewProfile(account, viewer)) return true;

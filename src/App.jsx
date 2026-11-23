@@ -22,6 +22,8 @@ const WorkspaceExport = lazy(() => import('./pages/WorkspaceExport.jsx'));
 const PublicProfile = lazy(() => import('./pages/PublicProfile.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
 const Jobs = lazy(() => import('./pages/Jobs.jsx'));
+const JobsProfileHome = lazy(() => import('./pages/JobsProfileHome.jsx'));
+const JobsProfileReviews = lazy(() => import('./pages/JobsProfileReviews.jsx'));
 const Master = lazy(() => import('./pages/Master.jsx'));
 const Invites = lazy(() => import('./pages/Invites.jsx'));
 const Suggestions = lazy(() => import('./pages/Suggestions.jsx'));
@@ -56,6 +58,7 @@ export default function App() {
       <Route path="/p/:slug/purchases" element={<MyPurchases />} />
       <Route path="/p/:slug/:sub" element={<PublicProfile />} />
       <Route path="/admin" element={<Layout />}>
+        <Route path="home" element={<JobsProfileHome />} />
         <Route path="jobs" element={<Jobs />} />
         <Route index element={<Overview />} />
         <Route path="profile" element={<Profile />} />
@@ -92,6 +95,7 @@ export default function App() {
         <Route path="customers" element={<SuperAdmin />} />
         <Route path="profiles" element={<SuperAdmin />} />
         <Route path="master" element={<Master />} />
+        <Route path="job-profiles" element={<JobsProfileReviews />} />
         <Route path="workspaces" element={<WorkspaceOperations />} />
         <Route path="invites" element={<Invites />} />
         <Route path="suggestions" element={<Suggestions />} />

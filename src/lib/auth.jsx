@@ -16,6 +16,6 @@ export function AuthProvider({ children }) {
     window.addEventListener('focus', sync);
     return () => { active = false; window.removeEventListener('studio-changed', sync); window.removeEventListener('focus', sync); };
   }, [user?.id]);
-  const logout = async () => { await api('auth.logout'); setUser(null); };
+  const logout = async () => { await api('auth.logout'); window.dispatchEvent(new Event('persona-signed-out')); setUser(null); };
   return <Ctx.Provider value={{ user, setUser, logout }}>{children}</Ctx.Provider>;
 }

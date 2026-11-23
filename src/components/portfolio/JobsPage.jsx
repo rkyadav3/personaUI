@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Field, Loading, Notice } from '../Ui.jsx';
 import FormDialog from '../FormDialog.jsx';
 import { uploadToSigned } from '../../lib/storage.js';
+import { useAuth } from '../../lib/auth.jsx';
+import { isJobsProfile } from '../../../shared/jobsProfile.js';
 async function request(input) {
   const response = await fetch('/api/enquiry', {
     method: 'POST',
@@ -13,6 +15,7 @@ async function request(input) {
   return result;
 }
 export default function JobsPage({ ctx }) {
+  const { user } = useAuth();
   const [jobs, setJobs] = useState(null),
     [error, setError] = useState(''),
     [attempt, setAttempt] = useState(0),
@@ -26,6 +29,7 @@ export default function JobsPage({ ctx }) {
       resumeUrl: '',
       message: '',
       consent: false,
+      shareProfile: false,
     }),
     [file, setFile] = useState(null);
   useEffect(() => {
@@ -118,7 +122,7 @@ export default function JobsPage({ ctx }) {
                 await request({ action: 'job.apply', slug: ctx.slug, jobId: selected.id, ...form, resumeId });
                 setSelected(null);
                 setFile(null);
-                setForm({ name: '', email: '', phone: '', resumeUrl: '', message: '', consent: false });
+                setForm({ name: '', email: '', phone: '', resumeUrl: '', message: '', consent: false, shareProfile: false });
                 setNotice('Application sent to the profile’s Inbox.');
               } catch (err) {
                 setError(err.message);
@@ -184,6 +188,7 @@ export default function JobsPage({ ctx }) {
                 />{' '}
                 I consent to sharing my application and résumé with this profile’s administrators.
               </label>
+              {isJobsProfile(user) && <label><input type="checkbox" checked={form.shareProfile} onChange={event => update('shareProfile', event.target.checked)} /> Include my Jobs Profile with this application. The receiving administrator can view Public and Applied jobs only sections; Private sections are never shared.</label>}
               <Notice kind="error">{error}</Notice>
               <button className="btn primary" disabled={busy}>
                 {busy ? 'Sending application…' : 'Send application'}

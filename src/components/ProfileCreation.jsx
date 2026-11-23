@@ -76,6 +76,7 @@ export default function ProfileCreation({ owner = false, onCreated }) {
                 <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                   <option value="individual">Individual</option>
                   <option value="organisation">Organisation</option>
+                  <option value="jobs">Jobs Profile</option>
                 </select>
               </Field>
               <Field label="Initial password">

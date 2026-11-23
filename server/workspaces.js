@@ -3,7 +3,7 @@ import { scoped } from './tenant.js';
 import { HttpError } from './http.js';
 
 export const WORKSPACE_ROLES = ['owner', 'admin', 'contributor', 'viewer'];
-export const WORKSPACE_TYPES = ['individual', 'organization'];
+export const WORKSPACE_TYPES = ['individual', 'organization', 'jobs'];
 const columns = 'user_id,role,status,workspace:workspaces(id,owner_id,name,slug,type,status,created_at,updated_at)';
 
 export function workspaceAccess(user, membership) {
@@ -46,7 +46,7 @@ export function createWorkspaceService({ database = raw } = {}) {
         .map(item => ({ ...item.workspace, role: item.role }));
     },
     async setup(user, input) {
-      if (!WORKSPACE_TYPES.includes(input?.type)) throw new HttpError(400, 'Choose Individual or Organization.');
+      if (!WORKSPACE_TYPES.includes(input?.type)) throw new HttpError(400, 'Choose Individual, Organization or Jobs Profile.');
       const access = await current(user, input.workspaceId);
       if (!['owner', 'admin'].includes(access.role)) throw new HttpError(403, 'Only a workspace administrator can complete setup.');
       return run(database().rpc('setup_workspace_type', {

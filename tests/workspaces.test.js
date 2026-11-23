@@ -68,7 +68,7 @@ test('workspace type setup is an authorized transaction with a trusted actor and
   assert.equal(result.type, 'organization');
   assert.equal(step(db.calls[1], 'rpc')[0].p_user, alice);
   assert.equal(step(db.calls[1], 'rpc')[0].p_workspace, alice);
-  await assert.rejects(service.setup({ id: alice }, { type: 'superadmin' }), /Individual or Organization/);
+  await assert.rejects(service.setup({ id: alice }, { type: 'superadmin' }), /Individual, Organization or Jobs Profile/);
 });
 
 test('default workspace selects an available membership while explicit suspended targets reject', async () => {

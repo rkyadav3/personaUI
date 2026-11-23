@@ -1,11 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
+import { Loading } from '../components/Ui.jsx';
 import { publicRequest } from '../lib/publicActions.js';
 import { PurchaseConfirmation } from '../components/commerce/CheckoutDialog.jsx';
 import '../styles/profileActions.css';
 
 export default function MyPurchases() {
   const { slug } = useParams();
+  const [kind, setKind] = useState(null), [error, setError] = useState(''), [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController(); setKind(null); setError('');
+    fetch(`/api/site?slug=${encodeURIComponent(slug)}`, { signal: controller.signal }).then(async response => { if (!response.ok) throw new Error('Profile could not be checked. Retry opening this page.'); return response.json(); }).then(data => { if (!controller.signal.aborted) setKind(data.profileType || 'standard'); }, failure => { if (!controller.signal.aborted) setError(failure.message); });
+    return () => controller.abort();
+  }, [slug, attempt]);
+  if (!kind) return <><Loading error={error} label="Opening profile…" />{error && <button className="btn" onClick={() => setAttempt(value => value + 1)}>Retry</button>}</>;
+  if (kind === 'jobs') return <Navigate to={`/p/${slug}`} replace />;
   return <PurchaseAccess key={slug} slug={slug} />;
 }
 function PurchaseAccess({ slug }) {

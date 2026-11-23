@@ -149,12 +149,12 @@ export async function saveContent(db, input = {}) {
 }
 
 /** Background-only public API retained for existing integrations. Portfolio reads its settings through /api/profile. */
-export async function publicSettings(slug, viewer = null) {
+export async function publicSettings(slug, viewer = null, db = raw()) {
   slug = String(slug || env('DEFAULT_SLUG', '')).toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!slug) return null;
-  const db = raw();
   const [u] = await run(db.from('users').select(accountColumns('id,email,tags,profile_private,locked_until')).eq('slug', slug).limit(1));
   if (isSuperAdminEmail(u?.email) || !await canViewWorkspaceProfile(u, viewer)) return null;
+  if (u.job_seeker || u.profile_type === 'jobs') return null;
   const [r] = await run(db.from('site_settings').select('bg_path,bg').eq('owner_id', u.id).limit(1));
   return hostedMediaTree(view(r));
 }

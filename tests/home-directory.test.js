@@ -105,12 +105,12 @@ test('home checkout references retain the owner, correct item kind and real pric
 
 test('the public feed loads published owners and their portrait/product settings', async () => {
   const input = source();
-  const db = scriptedDatabase(...[['profiles', input.profiles], ['users', input.users], ['contributions', input.contributions], ['offerings', input.offerings], ['site_settings', input.sites]].map(([table, data]) => ({ table, data })));
+  const db = scriptedDatabase(...[['profiles', input.profiles], ['jobs_profiles', []], ['users', input.users], ['contributions', input.contributions], ['offerings', input.offerings], ['site_settings', input.sites]].map(([table, data]) => ({ table, data })));
   const data = await home.homeFeed(db);
   assert.equal(data.products.length, 3);
   assert.ok(hasEq(db.calls[0], 'status', 'published'));
   assert.match(step(db.calls.find(call => call.table === 'site_settings'), 'select')[0], /hero_path.*page.*portfolio/);
-  assert.deepEqual(await home.homeFeed(scriptedDatabase({ table: 'profiles', data: [] })), { name: process.env.SITE_NAME || 'Persona', mode: 'invite', members: [], offers: [], products: [] });
+  assert.deepEqual(await home.homeFeed(scriptedDatabase({ table: 'profiles', data: [] }, { table: 'jobs_profiles', data: [] })), { name: process.env.SITE_NAME || 'Persona', mode: 'invite', members: [], offers: [], products: [] });
 });
 
 test('feed load failures are propagated rather than pretending the community is empty', async () => {

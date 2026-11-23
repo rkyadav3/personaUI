@@ -1,0 +1,50 @@
+.jobs-home-editor { max-width: 1000px; margin-inline: auto; }
+.jobs-profile-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; border-bottom: 1px solid var(--glass-border, #d1d5db); padding-bottom: 12px; }
+.jobs-profile-tabs button { padding: 10px 14px; border: 1px solid transparent; background: transparent; color: inherit; font: inherit; cursor: pointer; border-radius: 8px; }
+.jobs-profile-tabs button:hover, .jobs-profile-tabs button.active { background: var(--glass-surface, #eef5ef); color: var(--glass-text, #173b24); border-color: var(--glass-border, #d1d5db); }
+.jobs-profile-tabs button:focus-visible, .jobs-profile-view a:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.jobs-profile-tabs button:disabled { opacity: .6; cursor: wait; }
+.jobs-profile-tabs.is-secondary { margin-top: 0; }
+.jobs-profile-editor > fieldset { min-width: 0; }
+.jobs-profile-editor h2 { margin: 0 0 18px; }
+.jobs-profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.jobs-profile-grid .f { min-width: 0; }
+.jobs-profile-editor textarea, .jobs-profile-editor input, .jobs-profile-editor select { max-width: 100%; }
+.jobs-profile-editor input[type=color] { min-height: 42px; padding: 4px; }
+.jobs-profile-repeat { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--glass-border, #d1d5db); }
+.jobs-profile-repeat h3 { margin: 0 0 14px; }
+.jobs-profile-repeat fieldset { min-width: 0; border: 0; margin: 20px 0; padding: 0; }
+.jobs-profile-repeat legend { margin-bottom: 12px; font-weight: 600; }
+.jobs-profile-prompt { display: block; color: var(--glass-text-muted, #4b5563); margin: 4px 0 8px; font-weight: 400; max-width: 70ch; }
+.jobs-profile-publish { display: flex; gap: 10px; align-items: center; margin-block: 16px; }
+.jobs-profile-saved { margin-top: 20px; }
+.jobs-home-preview { margin-top: 32px; }
+.jobs-profile-view { background: #f8faf8; color: #18271e; min-height: 100vh; padding: 48px 24px; }
+.jobs-profile-view.is-dark { background: #15231b; color: #edf4ef; }
+.jobs-profile-view.is-embedded { min-height: auto; padding: 28px; border-radius: 12px; }
+.jobs-profile-view ::selection { background: #bbf7d0; color: #123a22; }
+.jobs-profile-document { max-width: 850px; margin-inline: auto; overflow-wrap: anywhere; }
+.jobs-profile-identity { display: flex; align-items: start; gap: 28px; padding-bottom: 28px; }
+.jobs-profile-identity img { width: 112px; height: 112px; flex-shrink: 0; object-fit: cover; border-radius: 12px; }
+.jobs-profile-identity h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.14; margin: 0 0 16px; letter-spacing: -.025em; text-wrap: balance; }
+.jobs-profile-headline { font-size: 1.15rem; }
+.jobs-profile-section { border-top: 1px solid #b7c8bb; padding-top: 26px; margin-top: 28px; }
+.jobs-profile-view.is-dark .jobs-profile-section { border-color: #52685a; }
+.jobs-profile-section h2 { margin: 0 0 18px; font-size: 1.5rem; }
+.jobs-profile-section h3 { margin: 24px 0 8px; font-size: 1.12rem; }
+.jobs-profile-prose { white-space: pre-wrap; max-width: 70ch; line-height: 1.7; }
+.jobs-profile-facts { display: flex; flex-wrap: wrap; gap: 20px; }
+.jobs-profile-facts dt, .jobs-profile-answers dt { font-weight: 600; }
+.jobs-profile-facts dd, .jobs-profile-answers dd { margin: 5px 0 0; }
+.jobs-profile-answers > div { margin-top: 24px; }
+.jobs-profile-entries article { margin-top: 20px; }
+.jobs-profile-entries article h3 { margin-top: 0; }
+.jobs-profile-entries article p { margin-top: 6px; }
+.jobs-profile-identity { border-bottom: 3px solid var(--jobs-accent); }
+@media (max-width: 640px) {
+  .jobs-profile-grid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .jobs-profile-view { padding: 28px 18px; }
+  .jobs-profile-view.is-embedded { padding: 20px 16px; }
+  .jobs-profile-identity { flex-direction: column; gap: 18px; }
+  .jobs-profile-tabs button { padding: 9px 10px; text-align: left; }
+}

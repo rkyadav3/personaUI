@@ -25,11 +25,11 @@ test('Master lists the requested types and permissions while Customers keeps ass
   assert.match(customers, /Edit &amp; tags/); assert.doesNotMatch(customers, /Add new tag|Create tag|Edit permissions/);
 });
 
-test('first-time profile setup offers only Individual and Organisation', () => {
+test('first-time profile setup offers Individual, Organisation and Jobs Profile', () => {
   const { ProfileTypeChoice } = require('../src/pages/Profile.jsx');
   const html = render(ProfileTypeChoice, {onChoose(){}}, '/admin/profile');
   assert.match(html, />Individual</); assert.match(html, />Organisation</);
-  assert.equal((html.match(/<button/g) || []).length, 2);
+  assert.match(html, />Jobs Profile</); assert.equal((html.match(/<button/g) || []).length, 3);
 });
 
 test('restricted Studio navigation hides unavailable features and retains account and support recovery', () => {

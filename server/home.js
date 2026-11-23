@@ -9,6 +9,7 @@ import { normalizePage } from '../shared/pageSettings.js';
 import { publicPortfolio } from '../shared/portfolio.js';
 import { canViewProfile } from '../shared/governance.js';
 import { accountColumns } from './workspaceVisibility.js';
+import { visibleJobsProfile, resolveJobsProfilePermissions } from '../shared/jobsProfile.js';
 const MAX_MEMBERS = 200,
   MAX_OFFERS = 300;
 const cut = (s, n) => {
@@ -17,9 +18,9 @@ const cut = (s, n) => {
 };
 const ids = rows => rows.map(r => r.owner_id);
 export async function homeFeed(db = raw()) {
-  const profiles = await run(db.from('profiles').select('*').eq('status', 'published').order('confirmed_at', {
+  const [profiles, jobsProfiles] = await Promise.all([run(db.from('profiles').select('*').eq('status', 'published').order('confirmed_at', {
     ascending: false
-  }).limit(MAX_MEMBERS));
+  }).limit(MAX_MEMBERS)), run(db.from('jobs_profiles').select('owner_id,sections,home,published,updated_at').eq('published', true).limit(MAX_MEMBERS))]);
   const base = {
     name: env('SITE_NAME', 'Persona'),
     mode: registrationMode(),
@@ -27,15 +28,17 @@ export async function homeFeed(db = raw()) {
     offers: [],
     products: []
   };
-  if (!profiles.length) return base;
-  const owners = ids(profiles);
-  const [users, cs, os, sites] = await Promise.all([run(db.from('users').select(accountColumns('id,email,slug,tags,profile_private,locked_until')).in('id', owners)), run(db.from('contributions').select('*').in('owner_id', owners).order('id')), run(db.from('offerings').select('*').in('owner_id', owners).order('id')), run(db.from('site_settings').select('owner_id,bg_path,hero_path,page,portfolio').in('owner_id', owners))]);
+  if (!profiles.length && !jobsProfiles.length) return base;
+  const owners = [...new Set([...ids(profiles), ...ids(jobsProfiles)])];
+  const [users, cs, os, sites, tagDefinitions] = await Promise.all([run(db.from('users').select(accountColumns('id,email,slug,tags,profile_type,profile_private,locked_until')).in('id', owners)), run(db.from('contributions').select('*').in('owner_id', owners).order('id')), run(db.from('offerings').select('*').in('owner_id', owners).order('id')), run(db.from('site_settings').select('owner_id,bg_path,hero_path,page,portfolio').in('owner_id', owners)), jobsProfiles.length ? run(db.from('profile_tags').select('key,permissions,jobs_profile_permissions')) : []]);
   return buildHomeFeed({
     profiles,
     users,
     contributions: cs,
     offerings: os,
     sites,
+    jobsProfiles,
+    tagDefinitions,
     name: base.name,
     mode: base.mode
   });
@@ -55,6 +58,8 @@ export function buildHomeFeed({
   contributions = [],
   offerings = [],
   sites = [],
+  jobsProfiles = [],
+  tagDefinitions = [],
   name = 'Persona',
   mode = 'invite'
 } = {}) {
@@ -66,6 +71,7 @@ export function buildHomeFeed({
   for (const p of profiles.filter(profile => profile.status === 'published')) {
     const account = users.find(user => user.id === p.owner_id);
     if (isSuperAdminEmail(account?.email) || !canViewProfile(account)) continue;
+    if (account.job_seeker || p.profile_type === 'jobs') continue;
     const slug = slugOf.get(p.owner_id);
     if (!slug || !p.name) continue;
     const site = settings.get(p.owner_id),
@@ -157,6 +163,15 @@ export function buildHomeFeed({
       photoFocus: { zoom: page.hero.zoom, x: page.hero.x, y: page.hero.y },
       cover: site?.bg_path ? publicUrl(site.bg_path) : null
     });
+  }
+  for (const document of jobsProfiles) {
+    const account = users.find(user => user.id === document.owner_id);
+    if (!document.published || !account?.slug || !canViewProfile(account) || isSuperAdminEmail(account.email) || !(account.job_seeker || account.profile_type === 'jobs')) continue;
+    const sections = resolveJobsProfilePermissions(account.tags, tagDefinitions);
+    const tags = account.tags?.length ? account.tags : ['standard'];
+    if (!account.job_seeker && !tags.every(key => tagDefinitions.find(tag => tag.key === key)?.permissions?.includes('profile'))) continue;
+    const pub = visibleJobsProfile(document, 'public', sections), basics = pub.sections.basics?.value;
+    members.push({ slug: account.slug, tags: account.tags || [], profileType: 'jobs', name: basics?.name || pub.home.title || 'Jobs Profile', designation: basics?.headline || '', purpose: cut(pub.home.introduction, 240), expertise: [], location: basics?.location || null, categories: [], offerCount: 0, views: 0, joined: document.updated_at, ratingAvg: 0, ratingCount: 0, engagements: 0, photo: pub.home.photo || null, photoFocus: { zoom: 1, x: 50, y: 50 }, cover: null });
   }
   offers.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   return {

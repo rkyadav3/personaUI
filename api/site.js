@@ -10,6 +10,6 @@ export default async function handler(req, res) {
     // one round trip gives the persona page everything public: look, offerings, link to the profile, sign-up mode
     const viewer = await sessionUser(req);
     const [s, o] = await Promise.all([publicSettings(req.query?.slug, viewer), publicOffers(req.query?.slug, viewer)]);
-    return res.status(200).json({ ...(s || { imageUrl: null, bg: null }), handle: o?.handle || null, name: o?.name || null, hasProfile: !!o?.hasProfile, contact: o?.contact || null, offers: o?.offers || [], mode: registrationMode() });
+    return res.status(200).json({ ...(s || { imageUrl: null, bg: null }), ...(o?.profileType ? { profileType: o.profileType } : {}), handle: o?.handle || null, name: o?.name || null, hasProfile: !!o?.hasProfile, contact: o?.contact || null, offers: o?.offers || [], mode: registrationMode() });
   } catch (e) { console.error(e); return res.status(200).json({ imageUrl: null, bg: null }); }   // the page works without it
 }

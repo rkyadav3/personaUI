@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { raw, run } from './supabase.js';
 import { isSuperAdminEmail } from './auth.js';
-import { hasPlatformPermission } from '../shared/rbac.js';
+import { hasPlatformPermission, PROFILE_TYPES } from '../shared/rbac.js';
 import { HttpError } from './http.js';
 export function needProfileCreator(user) {
   if (!hasPlatformPermission(user, 'profiles.create'))
@@ -36,7 +36,7 @@ export function createProfileCreationService(database = raw) {
         !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ||
         slug.length < 3 ||
         slug.length > 40 ||
-        !['individual', 'organisation'].includes(input.type)
+        !Object.hasOwn(PROFILE_TYPES, input.type)
       )
         throw new HttpError(400, 'Enter a name, valid email, username and profile type.');
       if (isSuperAdminEmail(email))

@@ -1,6 +1,7 @@
 // Public: POST /api/enquiry { slug, name, email, … } files a visitor's enquiry in that profile owner's admin inbox.
 import { submitEnquiry } from '../server/engage.js';
 import { createJobPublicService } from '../server/jobs.js';
+import { sessionUser } from '../server/auth.js';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -14,7 +15,7 @@ export default async function handler(req, res) {
   try {
     if (body.action==='job.upload' || body.action==='job.apply') {
       const service=createJobPublicService();
-      return res.status(200).json(await (body.action==='job.upload'?service.upload(body,ip):service.submit(body,ip)));
+      return res.status(200).json(await (body.action==='job.upload'?service.upload(body,ip):service.submit(body,ip,body.shareProfile ? await sessionUser(req) : null)));
     }
     const r = await submitEnquiry(body, { ip });
     return res.status(r.ok ? 200 : r.status || 400).json(r.ok ? { ok: true } : { ok: false, error: r.error, errors: r.errors });
