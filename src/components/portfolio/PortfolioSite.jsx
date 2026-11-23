@@ -8,6 +8,7 @@ import { splitSchedule } from '../../../shared/engage.js';
 import { ACTIVITY_SECTIONS, PUBLIC_PAGE_ALIASES, SOCIAL_KINDS } from '../../../shared/portfolio.js';
 import { resolveSite } from '../../lib/portfolioModel.js';
 import EnquiryForm from './EnquiryForm.jsx';
+import JobsPage from './JobsPage.jsx';
 import Icon from './Icon.jsx';
 import { EventRow, UpdateCard } from './Updates.jsx';
 import Events from './Events.jsx';
@@ -450,7 +451,7 @@ export default function PortfolioSite({ data, slug, sub, user, preview = false, 
   const T = page.theme, accent = page.accentHex ? [page.accentHex, `color-mix(in srgb, ${page.accentHex} 55%, #ffffff)`] : (ACCENTS[page.accent] || ACCENTS.violet);
   const dark = page.scheme === 'dark' || page.scheme === 'auto' && systemDark || T.bg === 'color' && luminance(T.bgColor) < 0.45;
   const ctx = { slug, user, pages: m.pages, preview, live: !preview, c, page, email: data.contact?.email || '', enquiry: m.enquiry.enabled, go: setPv, open: setOpenProj };
-  const Body = { store: ProductsPage, contact: ContactPage }[current];
+  const Body = { store: ProductsPage, contact: ContactPage, jobs:JobsPage }[current];
 
   return (
     <GlassProvider value={{ ...page.glass, dark, radius: T.radius }}>

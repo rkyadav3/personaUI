@@ -22,8 +22,19 @@ function exportCsv(rows) {
 
 function Detail({ r, onChange, onDelete }) {
   const [note, setNote] = useState(r.note || '');
+  const [resume, setResume] = useState({ busy: false, url: '', error: '' });
+  const prepareResume = async () => {
+    setResume({ busy: true, url: '', error: '' });
+    try {
+      const result = await api('jobs.resume', { id: r.resumeId });
+      setResume({ busy: false, url: result.url, error: '' });
+    } catch (error) {
+      setResume({ busy: false, url: '', error: error.message || 'The résumé could not be opened. Please retry.' });
+    }
+  };
   const patch = p => api('enquiries.update', { id: r.id, ...p }).then(onChange);
   const rows = [
+    ['Résumé', r.resumeId ? <><button className="btn" disabled={resume.busy} onClick={prepareResume}>{resume.busy ? 'Preparing résumé…' : resume.url ? 'Refresh résumé link' : 'Prepare résumé download'}</button>{resume.url && <p><a href={resume.url} target="_blank" rel="noreferrer">Download résumé (link expires in one minute)</a></p>}<Notice kind="error">{resume.error}</Notice></> : r.resumeUrl && <a href={r.resumeUrl} target="_blank" rel="noreferrer">Open résumé link</a>],
     ['Email', <a key="e" href={`mailto:${r.email}`}>{r.email}</a>], ['Phone', r.phone && <a key="p" href={`tel:${r.phone.replace(/[^\d+]/g, '')}`}>{r.phone}</a>],
     ['Organisation', r.organisation], ['Location', r.location], ['Related offering', r.offeringTitle],
     ['Wants to be reached by', r.prefContact], ['Preferred date', r.prefDate], ['Preferred time', r.prefTime], ['Meeting mode', r.meetingMode], ['Budget', r.budget],

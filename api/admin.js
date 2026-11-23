@@ -31,7 +31,9 @@ import { createWorkspaceService, scopedWorkspace } from '../server/workspaces.js
 import { createKnowledgePolicyService, listKnowledgeSources } from '../server/knowledgePolicy.js';
 import { createIntegrationService } from '../server/integrations.js';
 import { createWorkspaceOperationsService } from '../server/workspaceOperations.js';
-import { authorizeWorkspaceOperation } from '../server/workspacePermissions.js';
+import { authorizeWorkspaceOperation, contributorScope } from '../server/workspacePermissions.js';
+import { listJobs, saveJob, deleteJob, openResume } from '../server/jobs.js';
+import { createProfileCreationService } from '../server/profileCreation.js';
 import { createTeamService } from '../server/workspaceTeam.js';
 import { createWebhookService } from '../server/webhooks.js';
 import { exportWorkspacePage } from '../server/workspaceData.js';
@@ -51,12 +53,15 @@ export function createWorkspaceOperations(service = workspaces) {
   };
 }
 
-export function createPlatformOperations({ invitesService = invites, suggestionsService = createSuggestionService(), platformService = createPlatformService(), tagsService = createTagService(), supportService = createSupportService() } = {}) {
+export function createPlatformOperations({ invitesService = invites, suggestionsService = createSuggestionService(), platformService = createPlatformService(), tagsService = createTagService(), supportService = createSupportService(), profileService = createProfileCreationService() } = {}) {
   return {
     'invites.list': ({ user }) => invitesService.listInviteHistory(user),
     'invites.create': async ({ user }, args) => ({ code: await invitesService.createInvite(user.id, args) }),
     'invites.revoke': async ({ user }, args) => { await invitesService.revokeInvite(args.id, user); return { ok: true }; },
-    'users.list': async ctx => { needSuperAdmin(ctx); return { users: (await invitesService.listUsersDetailed()).filter(user => !user.isSuperAdmin), tags: await tagsService.list() }; },
+    'users.list': async ctx => { needSuperAdmin(ctx); return { users: (await invitesService.listUsersDetailed()).filter(user => !user.isSuperAdmin), tags: await tagsService.list(true) }; },
+    'platform.profiles.list': ({user})=>profileService.list(user),
+    'platform.profiles.create': ({user},args)=>profileService.create(user,args),
+    'platform.profiles.approve': ({user},args)=>profileService.approve(user,args),
     'users.update': (ctx, args) => { needSuperAdmin(ctx); return invitesService.updateUser(args.id, args); },
     'users.setLock': (ctx, args) => { needSuperAdmin(ctx); if (typeof args.locked !== 'boolean') throw new HttpError(400, 'Choose lock or unlock.'); return invitesService.setUserLock(args.id, args.locked, ctx.user.id); },
     'users.resetPassword': (ctx, args) => { needSuperAdmin(ctx); return invitesService.resetUserPassword(args.id, args.password); },
@@ -100,6 +105,10 @@ const PUBLIC = {
 // Signed-in ops. `db` is the tenant-scoped client; `s` is the store module bound to it.
 const activityService = createActivityService();
 const OPS = {
+  'jobs.list': ({db})=>listJobs(db),
+  'jobs.save': ({db},args)=>saveJob(db,args),
+  'jobs.delete': ({db},args)=>deleteJob(db,args.id),
+  'jobs.resume': ({db},args)=>openResume(db,args.id),
   'account.change': ({ user }, args) => changeAccount(user, args),
   'account.profileType': ({ user }, args) => chooseProfileType(user, args),
   'items.list': ({ db }) => catalogue.listItems(db),
@@ -246,6 +255,7 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       if (!fn) throw new HttpError(404, `Unknown operation: ${op}`);
       const user = await sessionUser(req);
       if (!user) throw new HttpError(401, 'Not signed in.');
+      if (!user.isSuperAdmin && /^(platform\.|users\.)/.test(op) && !op.startsWith('platform.profiles.')) throw new HttpError(403,'Superadmin access is required.');
       const platformOp = op === 'team.accept' || /^(users\.|invites\.|suggestions\.|support\.|platform\.|account\.|workspace\.)/.test(op);
       if (user.isSuperAdmin && !platformOp) throw new HttpError(403, 'SuperAdmin accounts manage the platform and do not have a personal Studio.');
       requireOperationPermissions(user, op);
@@ -255,11 +265,13 @@ export function createAdminHandler({ sessionUser = auth.sessionUser, scoped: ten
       const access = !platformOp && user.workspaceEnabled ? await workspaceService.current(user) : null;
       if (access && args.workspaceId && args.workspaceId !== access.workspace.id) throw new HttpError(409, 'Your selected workspace changed. Refresh this page before continuing.');
       if (access) authorizeWorkspaceOperation(access.role, op);
-      const db = platformOp ? null : access ? workspaceScope(access) : tenantScope(user.id);
+      const baseDb = platformOp ? null : access ? workspaceScope(access) : tenantScope(user.id);
+      const db = access?.role==='contributor' ? contributorScope(baseDb,user.id) : baseDb;
       const operationArgs = access ? { ...args } : args;
       if (access) delete operationArgs.workspaceId;
       const result = await fn({ db, user, workspace: access }, operationArgs);
       if (op === 'account.change' && result.user) result.user.permissions = user.permissions;
+      if (op === 'account.change' && result.user) result.user.platformPermissions = user.platformPermissions;
       if (op === 'account.change' && result.passwordChanged) auth.endSession(res);
       return res.status(200).json(result);
     } catch (e) {

@@ -7,6 +7,7 @@ export function createTeamService({database=raw}={}) {
   return {
     async list(access) {
       if(!access?.workspace?.id)throw new HttpError(403,'Workspace membership is required.');
+      if(access.role==='contributor')throw new HttpError(403,'Team details are only available to administrators.');
       const members=await integrationQuery(database().from('workspace_members').select('user_id,role,status,user:users(id,name,email)').eq('workspace_id',access.workspace.id));
       const invitations=['owner','admin'].includes(access.role)?await integrationQuery(database().from('workspace_invitations').select('id,email,role,status,expires_at,created_at').eq('workspace_id',access.workspace.id).order('created_at',{ascending:false}).limit(100)):[];
       return {members,invitations,role:access.role};

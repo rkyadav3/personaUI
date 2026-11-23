@@ -73,6 +73,8 @@ export const publicUser = u => ({
   isSuperAdmin: isSuperAdminEmail(u.email),
   role: isSuperAdminEmail(u.email) ? 'superadmin' : 'admin',
   tags: u.tags || [],
+  platformPermissions: u.platform_permissions || [],
+  approvalStatus: u.approval_status || 'approved',
   profileType: u.profile_type || null,
   sessionVersion: Number(u.session_version || 0),
   userIdChangedAt: u.slug_changed_at || null,
@@ -126,7 +128,8 @@ export async function login({ email, password = '' }, db = raw()) {
   if (error || !data) return { error: 'Sign-in could not be completed. Check the security-hardening database setup and try again.' };
   if (data.status === 'locked') return lockedLogin(data.locked_until);
   if (data.status !== 'authenticated' || !data.user?.id) return { error: 'Wrong email or password.' };
-  return { user: publicUser(data.user) };
+  if (u.approval_status && u.approval_status !== 'approved') return { error:'This profile is awaiting Superadmin approval or has been declined. Contact platform support.' };
+  return { user: publicUser({ ...data.user, platform_permissions:u.platform_permissions, approval_status:u.approval_status }) };
 }
 
 // ---- session cookie ----
@@ -144,7 +147,7 @@ export async function sessionUser(req, database) {
   try {
     const { payload } = await jwtVerify(m[1], secretKey());
     const [u] = await run((database || raw()).from('users').select('*').eq('id', payload.sub));   // re-read so deleted users lose access at once
-    if (!u) return null;
+    if (!u || u.approval_status && u.approval_status !== 'approved') return null;
     if (Number(payload.sessionVersion || 0) !== Number(u.session_version || 0)) return null;
     const locked = parse(u.locked_until);
     if (locked && locked > now()) return null;

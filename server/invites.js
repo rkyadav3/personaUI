@@ -7,6 +7,7 @@ import { raw, run, paged } from './supabase.js';
 import { HttpError } from './http.js';
 import { createTagService } from './tags.js';
 import { normalizeTags } from '../shared/governance.js';
+import { normalizePlatformPermissions } from '../shared/rbac.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no 0/O/1/I
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -67,7 +68,7 @@ export async function validateInvite(code) {
 export async function listUsersDetailed() {
   const db = raw();
   const [users, codes, profiles] = await Promise.all([
-    paged(db, 'users', 'id,email,name,slug,tags,profile_private,profile_type,created_at,invite_code_id,failed_attempts,locked_until', q => q.order('created_at', { ascending: false }).order('id', { ascending: false })),
+    paged(db, 'users', 'id,email,name,slug,tags,profile_private,profile_type,platform_permissions,approval_status,profile_created_by,created_at,invite_code_id,failed_attempts,locked_until', q => q.order('created_at', { ascending: false }).order('id', { ascending: false })),
     run(db.from('invite_codes').select('id,code,label')),
     run(db.from('profiles').select('owner_id,status,name,designation')).catch(() => []),
   ]);
@@ -95,24 +96,26 @@ export async function listUsersDetailed() {
       designation: p?.designation || null,
       isAdmin: !isSuperAdminEmail(u.email),
       isSuperAdmin: isSuperAdminEmail(u.email),
-      tags: u.tags || [], profile_private: u.profile_private, profileType: u.profile_type || null
+      tags: u.tags || [], profile_private: u.profile_private, profileType: u.profile_type || null, platformPermissions:u.platform_permissions || [], approval_status:u.approval_status, profile_created_by:u.profile_created_by
     };
   });
 }
 
-export async function updateUser(targetUserId, { name, email, slug, tags }) {
+export async function updateUser(targetUserId, { name, email, slug, tags, platformPermissions }) {
   const db = raw();
   const [user] = await run(db.from('users').select('*').eq('id', targetUserId));
   if (!user) throw new Error('User not found.');
 
   const updates = {};
+  if (platformPermissions !== undefined) { try { updates.platform_permissions=normalizePlatformPermissions(platformPermissions); } catch(error) { throw new HttpError(400,error.message); } }
   if (tags !== undefined) {
-    const definitions = await createTagService(() => db).list();
+    const definitions = await createTagService(() => db).list(true);
     try { updates.tags = normalizeTags(tags, definitions); } catch (error) { throw new HttpError(400, error.message); }
   }
   if (name !== undefined) updates.name = (name || '').trim() || null;
   if (email !== undefined) {
     const cleanEmail = (email || '').trim().toLowerCase();
+    if (cleanEmail !== user.email && isSuperAdminEmail(cleanEmail)) throw new HttpError(403,'Owner identity cannot be assigned through profile editing.');
     if (!EMAIL_RE.test(cleanEmail)) throw new Error('Invalid email address.');
     if (cleanEmail !== user.email) {
       const existing = await run(db.from('users').select('id').eq('email', cleanEmail));

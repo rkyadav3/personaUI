@@ -26,10 +26,14 @@ The Streamlit admin and the static chat page are now one React app (Vite) with V
 - `/admin`: sign in / create account, then the admin pages. Invite links look like `/admin?invite=CODE`.
 - `/admin/purchases`: that owner's purchases, free claims, buyer details, fulfillment and shared payment settings.
 - `/admin/questions`: the owner's visitor questions, persona replies, sources and dates, with access to older pages of history.
+- `/admin/jobs`: create, publish and close job postings; applications arrive in Inbox → Enquiries.
+- `/p/:slug/jobs`: published job listings and applications with résumé uploads.
+- `/superadmin/profiles`: manage and create administrator profiles, including approval of Profile Creator submissions.
 - `/admin/portfolio`: the single Portfolio editor, with Portfolio content, Look & Store, and Persona settings. Old `/admin/page` and `/admin/settings` links redirect here.
 
 ## Setup
 For the current SuperAdmin dashboard and login server, follow [Platform dashboard setup](docs/platform-governance.md). Apply `supabase/security-hardening.sql` after its prerequisites **before deploying**; sign-in fails closed without the new `finalize_login` function.
+For jobs, scoped Profile Creator access and contributor file isolation, apply `supabase/jobs-profiles.sql` after its prerequisites as described in [Jobs and profile creation](docs/jobs-profiles.md).
 
 1. **Supabase:** SQL Editor → run `supabase/schema.sql`, then `multitenant.sql`, `registration.sql`, `settings.sql`, `home.sql`, `page.sql`, `portfolio.sql`, `engage.sql`, `events-commerce.sql`, `studio-assistant.sql`, and `profile-questions.sql`. If your project already has those tables, compare first and run the migrations it is missing.
 2. **Env vars:** copy `.env.example` to `.env.local` (local) or add them in Vercel. `SESSION_SECRET` is new: any long random string. See [Vercel and Razorpay environment setup](docs/vercel-environment-setup.md) for the exact variable names, value sources and Admin payment settings.

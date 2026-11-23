@@ -4,12 +4,13 @@ import { api } from '../lib/api.js';
 import { useAdminActivity } from '../lib/useAdminActivity.js';
 import { useAuth } from '../lib/auth.jsx';
 import GlassShell from './GlassShell.jsx';
+import WorkspaceSwitcher from './WorkspaceSwitcher.jsx';
 import Icon from './portfolio/Icon.jsx';
 import Login from '../pages/Login.jsx';
 import { Loading, Notice } from './Ui.jsx';
-import { hasPermission, routePermissions } from '../../shared/rbac.js';
+import { hasPermission, routePermissions, hasPlatformAccess } from '../../shared/rbac.js';
 import { AdminSectionTabs } from './AdminNavigation.jsx';
-import { adminSectionsFor, canOpenAdminPage, SUPERADMIN_SECTION, adminLocation } from '../lib/adminNavigation.js';
+import { adminSectionsFor, canOpenAdminPage, platformSectionsFor, adminLocation } from '../lib/adminNavigation.js';
 import '../styles/governance.css';
 import '../styles/studio.css';
 
@@ -17,10 +18,10 @@ function StudioMark() {
   return <svg width="25" height="25" viewBox="0 0 28 28" aria-hidden="true"><path fill="#17ad55" d="M12 4c-4-4-9 1-6 5-5 0-6 6-1 8 4 2 7-3 10-6z" /><path fill="#30c970" d="M17 3c5-2 9 4 5 7-2 2-5 1-6-1z" /><path fill="#57d991" d="M18 13c6-1 8 5 4 8-2 1-4-1-4-3l-3 6c-3 5-8 1-5-3z" /></svg>;
 }
 
-export function StudioSidebar({ user, unread = 0, photo, onLogout, onNavigate, navOpen = false, onToggleNav, logoutError }) {
+export function StudioSidebar({ user, workspace, unread = 0, photo, onLogout, onNavigate, navOpen = false, onToggleNav, logoutError }) {
   const { pathname, search } = useLocation();
   const active = adminLocation(pathname, search);
-  const platform = pathname.startsWith('/superadmin') && user?.isSuperAdmin;
+  const platform = pathname.startsWith('/superadmin') && hasPlatformAccess(user);
   const [badPhoto, setBadPhoto] = useState(false);
   useEffect(() => setBadPhoto(false), [photo]);
   const link = item => {
@@ -30,11 +31,11 @@ export function StudioSidebar({ user, unread = 0, photo, onLogout, onNavigate, n
   return <aside className="studio-sidebar">
     <div className="studio-brand-row"><Link to={platform ? '/superadmin' : '/admin'} className="studio-brand" onClick={onNavigate}><StudioMark />{platform ? 'Platform' : 'Studio'}</Link><button type="button" className="studio-menu-toggle" aria-label={navOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navOpen} aria-controls="studio-navigation" onClick={onToggleNav}><Icon n="menu" /></button></div>
     <nav id="studio-navigation" className="studio-navigation" aria-label={platform ? "Platform" : "Studio"}>
-      <div className="studio-primary-nav">{platform ? SUPERADMIN_SECTION.pages.map(page => <Link key={page.id} to={page.to} className={`studio-nav${active?.page === page.id ? ' active' : ''}`} aria-current={active?.page === page.id ? 'page' : undefined} onClick={onNavigate}><Icon n={page.icon} size={19} /><span>{page.label}</span></Link>) : adminSectionsFor(user).filter(section => section.pages.length).map(section => link({ ...section, to: section.pages[0].to }))}</div>
-      {platform && <div className="studio-community-nav"><Link className="studio-nav" to="/" onClick={onNavigate}><Icon n="home" size={19} /><span>Main site</span></Link></div>}
+      <div className="studio-primary-nav">{platform ? platformSectionsFor(user).map(page => <Link key={page.id} to={page.to} className={`studio-nav${active?.page === page.id ? ' active' : ''}`} aria-current={active?.page === page.id ? 'page' : undefined} onClick={onNavigate}><Icon n={page.icon} size={19} /><span>{page.label}</span></Link>) : adminSectionsFor(user).filter(section => section.pages.length).map(section => link({ ...section, to: section.pages[0].to }))}</div>
+      {platform && user.isSuperAdmin && <div className="studio-community-nav"><Link className="studio-nav" to="/" onClick={onNavigate}><Icon n="home" size={19} /><span>Main site</span></Link></div>}
     </nav>
     <details className="studio-account"><summary><span className="studio-account-avatar">{photo && !badPhoto ? <img src={photo} alt="" onError={() => setBadPhoto(true)} /> : String(user.name || user.email || 'S').slice(0, 1).toUpperCase()}</span><span className="studio-account-name"><strong>{user.name || user.email}</strong><small>{user.isSuperAdmin ? 'SuperAdmin' : user.workspaceRole || 'Admin'}</small></span><Icon n="chevron" size={14} /></summary>
-      <div className="studio-account-menu">{platform ? <Link to="/superadmin/settings" onClick={onNavigate}>Main site settings</Link> : <>{user.slug && <a href={`/p/${user.slug}`} target="_blank" rel="noreferrer">View live portfolio ↗</a>}{canOpenAdminPage(user, '/admin/settings') && <Link to="/admin/settings?tab=hero" onClick={onNavigate}>Edit portfolio</Link>}</>}</div>
+      <div className="studio-account-menu">{platform ? user.isSuperAdmin && <Link to="/superadmin/settings" onClick={onNavigate}>Main site settings</Link> : <>{user.slug && <a href={`/p/${user.slug}`} target="_blank" rel="noreferrer">View live portfolio ↗</a>}{workspace?.workspaces?.length>1 && <WorkspaceSwitcher data={workspace} />}{canOpenAdminPage(user, '/admin/settings') && <Link to="/admin/settings?tab=hero" onClick={onNavigate}>Edit portfolio</Link>}</>}</div>
     </details>
     <div className="studio-logout"><button type="button" className="studio-nav" onClick={onLogout}><Icon n="logout" size={19} /><span>Logout</span></button>{logoutError && <p role="alert">{logoutError}</p>}</div>
   </aside>;
@@ -62,13 +63,13 @@ function Inner({ superadmin }) {
     if (!user || superadmin || user.isSuperAdmin) return undefined;
     let active = true; setPhoto(null); setNeeds(null);
     const load = () => {
-      if (!hasPermission(user, 'profile')) { setNeeds(false); return; }
+      if (user.workspaceEnabled && (!workspace || workspace.role==='contributor') || !hasPermission(user, 'profile')) { setNeeds(false); return; }
       api('profile.get').then(result => { if (active) setNeeds(!result.profile); }, () => { if (active) setNeeds(false); });
       api('site.get').then(result => { if (active) setPhoto(result.heroUrl); }, () => {});
     };
     load(); window.addEventListener('studio-changed', load);
     return () => { active = false; window.removeEventListener('studio-changed', load); };
-  }, [user?.id, user?.isSuperAdmin, JSON.stringify(user?.permissions), superadmin]);
+  }, [user?.id, user?.isSuperAdmin, JSON.stringify(user?.permissions), workspace?.role, superadmin]);
   useEffect(() => {
     if (!user || superadmin || user.isSuperAdmin || !hasPermission(user, 'enquiries')) { setUnread(0); return undefined; }
     let active = true;
@@ -83,8 +84,8 @@ function Inner({ superadmin }) {
   }, [navigate, user?.isSuperAdmin]);
   if (user === undefined) return <Loading label="Loading Studio…" />;
   if (!user) return <Login />;
-  if (!superadmin && user.isSuperAdmin) return <Navigate to="/superadmin" replace />;
-  if (superadmin && !user.isSuperAdmin) return <Navigate to="/admin" replace />;
+  if (!superadmin && hasPlatformAccess(user)) return <Navigate to="/superadmin" replace />;
+  if (superadmin && !hasPlatformAccess(user)) return <Navigate to="/admin" replace />;
   if (!superadmin && user.workspaceEnabled && webhookRoute && !user.webhooksEnabled) return <Navigate to="/admin/settings?tab=account" replace />;
   if (!superadmin && user.workspaceEnabled && pathname === '/admin/team' && new URLSearchParams(search).get('invite')?.startsWith('wi_')) return <main className="studio-main"><Outlet /></main>;
   const recoveryPage = pathname === '/admin/settings' && new URLSearchParams(search).get('tab') === 'account' || pathname === '/admin/support' || pathname.startsWith('/admin/support/');
@@ -92,12 +93,13 @@ function Inner({ superadmin }) {
   if (!superadmin && user.workspaceEnabled && !workspace) return <><Loading error={workspaceError} label="Opening your profile…" />{workspaceError && <button className="btn" onClick={() => setWorkspaceAttempt(value => value + 1)}>Try opening profile again</button>}</>;
   const denied = !superadmin && routePermissions(pathname, search).some(permission => !hasPermission(user, permission));
   if (!superadmin && needs === null) return <Loading label="Opening your profile…" />;
+  if (superadmin && !user.isSuperAdmin && !['/superadmin/profiles','/superadmin/customers'].includes(pathname)) return <Navigate to="/superadmin/profiles" replace />;
   const supportPage = pathname === '/admin/support' || pathname.startsWith('/admin/support/');
   if (!superadmin && needs && (!user.workspaceEnabled || ['owner', 'admin'].includes(workspace?.role)) && !supportPage && !(pathname === '/admin/settings' && new URLSearchParams(search).get('tab') === 'account') && !['/admin/profile', '/admin/team', '/admin/superadmin', '/admin/users', '/admin/invites', '/admin/suggestions'].includes(pathname)) return <Navigate to="/admin/profile" replace />;
   const overview = pathname.replace(/\/$/, '') === '/admin';
   return <div className={`studio-shell${navOpen ? ' nav-open' : ''}`}>
     <a className="studio-skip" href="#studio-main">Skip to content</a>
-    <StudioSidebar user={scopedUser} unread={unread} photo={photo} navOpen={navOpen} onToggleNav={() => setNavOpen(value => !value)} onNavigate={() => setNavOpen(false)} onLogout={async () => { try { await logout(); } catch { setLogoutError('Could not sign out. Please try again.'); } }} logoutError={logoutError} />
+    <StudioSidebar user={scopedUser} workspace={workspace} unread={unread} photo={photo} navOpen={navOpen} onToggleNav={() => setNavOpen(value => !value)} onNavigate={() => setNavOpen(false)} onLogout={async () => { try { await logout(); } catch { setLogoutError('Could not sign out. Please try again.'); } }} logoutError={logoutError} />
     <div className={`studio-stage${overview ? ' is-overview' : ''}`}>
       {overview && <svg className="studio-scenery" viewBox="0 0 1000 800" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0H360C224 100 208 141 114 180C72 200 31 210 0 215Z" fill="#18bd61" opacity=".08" /><path d="M0 0H210C117 110 78 161 0 172Z" fill="#8de5b3" opacity=".12" /><path d="M378 800C670 774 644 627 831 566C902 536 955 530 1000 525V800Z" fill="#19b960" opacity=".07" /><path d="M463 800C738 773 725 640 886 619C932 611 970 607 1000 607V800Z" fill="#27cf72" opacity=".09" /></svg>}
       <header className="studio-toolbar">{superadmin ? <Link to="/" className="studio-tool" aria-label="Public directory" title="Public directory"><Icon n="home" size={21} /></Link> : <><Link to="/admin?focus=command" className="studio-tool" aria-label="Search studio tools" title="Search studio tools (Ctrl/⌘ K)"><Icon n="search" size={21} /></Link>{canOpenAdminPage(scopedUser, '/admin/enquiries') && <Link to="/admin/enquiries" className="studio-tool" aria-label={unread ? `${unread} new enquiries` : 'Open enquiries'} title="Enquiries"><Icon n="bell" size={21} />{unread > 0 && <span className="studio-notification-dot" />}</Link>}</>}</header>
