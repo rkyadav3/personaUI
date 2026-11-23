@@ -1,28 +1,32 @@
+import { useState } from 'react';
+import { PLATFORM_PERMISSIONS } from '../../shared/rbac.js';
+
 export default function PlatformAccess({ value = [], onChange, disabled = false }) {
+  const [opened, setOpened] = useState(value.length > 0);
+  const enabled = opened || value.length > 0;
   return (
     <fieldset className="governance-tag-editor" disabled={disabled}>
       <legend>Superadmin feature access</legend>
       <label>
         <input
           type="checkbox"
-          checked={value.length > 0}
-          onChange={(event) => onChange(event.target.checked ? ['profiles.create'] : [])}
+          checked={enabled}
+          onChange={(event) => { setOpened(event.target.checked); if (!event.target.checked) onChange([]); }}
         />
         <span>Enable specific Superadmin features</span>
       </label>
-      {value.length > 0 && (
-        <label>
+      {enabled && Object.entries(PLATFORM_PERMISSIONS).map(([key, label]) => (
+        <label key={key}>
           <input
             type="checkbox"
-            checked={value.includes('profiles.create')}
-            onChange={(event) => onChange(event.target.checked ? ['profiles.create'] : [])}
+            checked={value.includes(key)}
+            onChange={(event) => onChange(event.target.checked ? [...value, key] : value.filter(permission => permission !== key))}
           />
-          <span>Create profiles</span>
+          <span>{label}</span>
         </label>
-      )}
+      ))}
       <p className="muted">
-        This grants only the Profiles tab. Approval, Master, payments and other platform controls remain with
-        Superadmin.
+        Staff receive only the selected tools. Profile approval and granting platform access remain with Superadmin.
       </p>
     </fieldset>
   );

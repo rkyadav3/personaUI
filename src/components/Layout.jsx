@@ -8,7 +8,7 @@ import WorkspaceSwitcher from './WorkspaceSwitcher.jsx';
 import Icon from './portfolio/Icon.jsx';
 import Login from '../pages/Login.jsx';
 import { Loading, Notice } from './Ui.jsx';
-import { hasPermission, routePermissions, hasPlatformAccess } from '../../shared/rbac.js';
+import { hasPermission, routePermissions, hasPlatformAccess, canOpenPlatformRoute, platformHome } from '../../shared/rbac.js';
 import { AdminSectionTabs } from './AdminNavigation.jsx';
 import { adminSectionsFor, canOpenAdminPage, platformSectionsFor, adminLocation } from '../lib/adminNavigation.js';
 import '../styles/governance.css';
@@ -93,7 +93,7 @@ function Inner({ superadmin }) {
   if (!superadmin && user.workspaceEnabled && !workspace) return <><Loading error={workspaceError} label="Opening your profile…" />{workspaceError && <button className="btn" onClick={() => setWorkspaceAttempt(value => value + 1)}>Try opening profile again</button>}</>;
   const denied = !superadmin && routePermissions(pathname, search).some(permission => !hasPermission(user, permission));
   if (!superadmin && needs === null) return <Loading label="Opening your profile…" />;
-  if (superadmin && !user.isSuperAdmin && !['/superadmin/profiles','/superadmin/customers'].includes(pathname)) return <Navigate to="/superadmin/profiles" replace />;
+  if (superadmin && !canOpenPlatformRoute(user, pathname)) return <Navigate to={platformHome(user)} replace />;
   const supportPage = pathname === '/admin/support' || pathname.startsWith('/admin/support/');
   if (!superadmin && needs && (!user.workspaceEnabled || ['owner', 'admin'].includes(workspace?.role)) && !supportPage && !(pathname === '/admin/settings' && new URLSearchParams(search).get('tab') === 'account') && !['/admin/profile', '/admin/team', '/admin/superadmin', '/admin/users', '/admin/invites', '/admin/suggestions'].includes(pathname)) return <Navigate to="/admin/profile" replace />;
   const overview = pathname.replace(/\/$/, '') === '/admin';

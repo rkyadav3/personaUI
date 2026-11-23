@@ -1,6 +1,16 @@
 import { raw, run } from './supabase.js';
 import { HttpError } from './http.js';
-import { resolvePermissions, hasPermission, operationPermissions, FEATURE_PERMISSIONS, normalizePlatformPermissions } from '../shared/rbac.js';
+import { resolvePermissions, hasPermission, operationPermissions, FEATURE_PERMISSIONS, normalizePlatformPermissions, hasPlatformPermission, PLATFORM_OPERATIONS } from '../shared/rbac.js';
+
+export function requirePlatformPermission(user, permission) {
+  if (!hasPlatformPermission(user, permission)) throw new HttpError(403, 'This Superadmin feature has not been enabled for your account.');
+}
+export function authorizePlatformOperation(user, op) {
+  if (user?.isSuperAdmin) return;
+  const permission = PLATFORM_OPERATIONS[op];
+  if (!permission) throw new HttpError(403, 'Superadmin access is required.');
+  requirePlatformPermission(user, permission);
+}
 
 export async function loadPermissions(user, database = raw()) {
   if (user.isSuperAdmin) return { ...user, permissions: [] };

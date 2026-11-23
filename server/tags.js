@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { raw } from './supabase.js';
 import { HttpError } from './http.js';
-import { needSuperAdmin } from './governance.js';
+import { requirePlatformPermission } from './rbac.js';
 import { ALL_PERMISSIONS, normalizePermissions, normalizePlatformPermissions } from '../shared/rbac.js';
 import { PROFILE_TAGS } from '../shared/governance.js';
 const columns = 'key,label,visibility';
@@ -15,12 +15,18 @@ async function result(query) {
 export function createTagService(database = raw) {
   return {
     list: (internal = false) => result(internal ? database().from('profile_tags').select(columns).order('label') : database().from('profile_tags').select(columns).in('visibility',['public','private']).order('label')),
+    async assignable(user) {
+      requirePlatformPermission(user, 'profiles.edit');
+      const tags = await result(database().from('profile_tags').select(masterColumns).order('label'));
+      return user.isSuperAdmin ? tags : tags.filter(tag => !(tag.platform_permissions?.length)).map(({ key, label, visibility }) => ({ key, label, visibility }));
+    },
     async master(user) {
-      needSuperAdmin({ user });
+      requirePlatformPermission(user, 'master.manage');
       return result(database().from('profile_tags').select(masterColumns).order('label'));
     },
     async create(user, input = {}) {
-      needSuperAdmin({ user });
+      requirePlatformPermission(user, 'master.manage');
+      if (!user.isSuperAdmin && input.platformPermissions !== undefined) throw new HttpError(403, 'Only Superadmin can grant platform access.');
       const label = typeof input.label === 'string' ? input.label.trim() : '';
       if (!label || label.length > 40 || !['public','private','internal'].includes(input.visibility)) throw new HttpError(400,'Enter a tag name up to 40 characters and choose a visibility.');
       let permissions, platform_permissions;
@@ -31,7 +37,8 @@ export function createTagService(database = raw) {
       return tag;
     },
     async update(user, input = {}) {
-      needSuperAdmin({ user });
+      requirePlatformPermission(user, 'master.manage');
+      if (!user.isSuperAdmin && input.platformPermissions !== undefined) throw new HttpError(403, 'Only Superadmin can grant platform access.');
       if (typeof input.key !== 'string' || input.key.length > 64) throw new HttpError(400, 'Choose a valid tag.');
       const updates = {};
       if (input.platformPermissions !== undefined) { try { updates.platform_permissions=normalizePlatformPermissions(input.platformPermissions); } catch(error) { throw new HttpError(400,error.message); } }
