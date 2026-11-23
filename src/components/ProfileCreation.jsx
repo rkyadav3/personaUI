@@ -62,7 +62,7 @@ export default function ProfileCreation({ owner = false, onCreated }) {
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
               </Field>
-              <Field label="Profile ID">
+              <Field label="Username">
                 <input
                   required
                   minLength={3}

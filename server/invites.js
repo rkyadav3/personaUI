@@ -146,10 +146,10 @@ export async function updateUser(targetUserId, { name, email, slug, tags, platfo
   }
   if (slug !== undefined) {
     const cleanSlug = (slug || '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
-    if (!cleanSlug) throw new Error('Slug cannot be empty.');
+    if (!cleanSlug) throw new Error('Username cannot be empty.');
     if (cleanSlug !== user.slug) {
       const existing = await run(db.from('users').select('id').eq('slug', cleanSlug));
-      if (existing.length) throw new Error('A user with that slug already exists.');
+      if (existing.length) throw new Error('A user with that username already exists.');
       updates.slug = cleanSlug;
     }
   }
@@ -157,7 +157,7 @@ export async function updateUser(targetUserId, { name, email, slug, tags, platfo
   if (Object.keys(updates).length > 0) {
     if (delegated) {
       const { error } = await db.rpc('update_staff_profile', { p_actor: actor.id, p_target: targetUserId, p_expected_email: user.email, p_updates: updates });
-      if (error) throw new HttpError(error.code === '23505' ? 409 : 403, error.code === '23505' ? 'This email or profile ID is already in use.' : 'Profile editing access or the profile changed. Refresh and try again.');
+      if (error) throw new HttpError(error.code === '23505' ? 409 : 403, error.code === '23505' ? 'This email or username is already in use.' : 'Profile editing access or the profile changed. Refresh and try again.');
     } else await run(db.from('users').update(updates).eq('id', targetUserId));
   }
   return { ok: true };

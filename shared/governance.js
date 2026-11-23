@@ -11,8 +11,11 @@ export const SUGGESTION_STATUSES = ['new', 'reviewed', 'planned', 'done', 'decli
 
 export const customTagKey = tag => typeof tag === 'string' && tag.length <= 64 && /^custom-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tag);
 export const tagLabel = (key, definitions = []) => definitions.find(tag => tag.key === key)?.label || PROFILE_TAGS[key] || key.replace(/^custom-/, '').replace(/-/g, ' ');
-export const publicTags = (tags = [], definitions = []) => tags.filter(key => key !== 'profile-creator' && (Object.hasOwn(PROFILE_TAGS,key) || definitions.some(tag => tag.key===key && tag.visibility!=='internal')));
-export const isPrivateProfile = account => account?.profile_private === true || account?.tags?.includes('private');
+export const publicTags = (tags = [], definitions = []) => tags.filter(key => {
+  const definition = definitions.find(tag => tag.key === key);
+  return definition ? definition.visibility !== 'internal' : key !== 'profile-creator' && Object.hasOwn(PROFILE_TAGS, key);
+});
+export const isPrivateProfile = account => typeof account?.profile_private === 'boolean' ? account.profile_private : account?.tags?.includes('private');
 
 export function normalizeTags(tags = [], definitions = []) {
   if (!Array.isArray(tags)) throw new Error('Tags must be an array.');

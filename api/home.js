@@ -7,6 +7,6 @@ import { publicTags } from '../shared/governance.js';
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
-  try { const [feed, settings, tagDefinitions] = await Promise.all([homeFeed(), createPlatformService().home(), createTagService().list()]); return res.status(200).json({ ...feed, members:feed.members.map(member=>({...member,tags:publicTags(member.tags,tagDefinitions)})), name: settings.siteName || feed.name, settings, tagDefinitions }); }
+  try { const [feed, settings, tagDefinitions] = await Promise.all([homeFeed(), createPlatformService().home(), createTagService().list(true)]); return res.status(200).json({ ...feed, members:feed.members.map(member=>({...member,tags:publicTags(member.tags,tagDefinitions)})), name: settings.siteName || feed.name, settings, tagDefinitions:tagDefinitions.filter(tag=>tag.visibility!=='internal') }); }
   catch (e) { console.error(e); return res.status(500).json({ error: 'Could not load the members right now.' }); }
 }

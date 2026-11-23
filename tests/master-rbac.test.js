@@ -176,7 +176,8 @@ test('actual SQL upgrade seeds types, preserves privacy and restricts browser wr
     await db.exec(sql);
     assert.deepEqual((await db.query("select permissions from profile_tags where key='hero'")).rows[0].permissions, ['profile']);
     await assert.rejects(db.exec("update profile_tags set permissions=array['superadmin'] where key='hero'"), /check constraint/);
-    await assert.rejects(db.exec("update profile_tags set visibility='public' where key='private'"), /Protected/);
+    await db.exec("update profile_tags set visibility='public' where key='private'");
+    await assert.rejects(db.exec("update profile_tags set label='Renamed' where key='private'"), /Protected/);
     await db.exec("update users set tags=array['university','hospital','god','fraud','scammer']");
     await assert.rejects(db.exec("set role anon; update profile_tags set permissions='{}' where key='hero'"), /permission denied/);
   } finally { await db.close(); }

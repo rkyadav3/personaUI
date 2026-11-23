@@ -38,7 +38,7 @@ export function createProfileCreationService(database = raw) {
         slug.length > 40 ||
         !['individual', 'organisation'].includes(input.type)
       )
-        throw new HttpError(400, 'Enter a name, valid email, profile ID and profile type.');
+        throw new HttpError(400, 'Enter a name, valid email, username and profile type.');
       if (isSuperAdminEmail(email))
         throw new HttpError(403, 'Platform owner accounts cannot be created here.');
       if (
@@ -61,7 +61,7 @@ export function createProfileCreationService(database = raw) {
         throw new HttpError(
           error.code === '23505' ? 409 : 400,
           error.code === '23505'
-            ? 'This email or profile ID is already in use.'
+            ? 'This email or username is already in use.'
             : 'Profile creation failed. Check your access and the profile creation migration.'
         );
       return data;

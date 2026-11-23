@@ -45,10 +45,14 @@ export function createTagService(database = raw) {
       if (input.permissions !== undefined) {
         try { updates.permissions = normalizePermissions(input.permissions); } catch (error) { throw new HttpError(400, error.message); }
       }
-      if (input.label !== undefined || input.visibility !== undefined) {
-        if (Object.hasOwn(PROFILE_TAGS, input.key)) throw new HttpError(400, 'This tag’s name and visibility are fixed. Its feature permissions can be changed.');
-        if (typeof input.label !== 'string' || !input.label.trim() || input.label.trim().length > 40 || !['public','private','internal'].includes(input.visibility)) throw new HttpError(400, 'Enter a name up to 40 characters and choose a valid visibility.');
-        Object.assign(updates, { label: input.label.trim(), visibility: input.visibility });
+      if (input.label !== undefined) {
+        if (Object.hasOwn(PROFILE_TAGS, input.key)) throw new HttpError(400, 'This tag’s name is fixed. Its visibility and feature permissions can be changed.');
+        if (typeof input.label !== 'string' || !input.label.trim() || input.label.trim().length > 40) throw new HttpError(400, 'Enter a tag name up to 40 characters.');
+        updates.label = input.label.trim();
+      }
+      if (input.visibility !== undefined) {
+        if (!['public','private','internal'].includes(input.visibility)) throw new HttpError(400, 'Choose a valid tag visibility.');
+        updates.visibility = input.visibility;
       }
       if (!Object.keys(updates).length) throw new HttpError(400, 'Choose changes to save.');
       const [tag] = await result(database().from('profile_tags').update(updates).eq('key', input.key).select(masterColumns));

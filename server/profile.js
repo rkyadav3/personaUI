@@ -366,9 +366,9 @@ export async function publicProfile(slug, viewer = null, db = raw()) {
     run(db.from('offerings').select('*').eq('owner_id', u.id).order('id')),
     run(db.from('site_settings').select('*').eq('owner_id', u.id).limit(1)).catch(() => []),
     publicEngage(u.id, db),
-    u.tags?.some(tag => tag.startsWith('custom-')) ? run(db.from('profile_tags').select('key,label,visibility').in('key', u.tags)) : [],
+    u.tags?.length ? run(db.from('profile_tags').select('key,label,visibility').in('key', u.tags)) : [],
   ]);
-  return { ...decorate(buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) }))), slug, site[0], engage), tags: publicTags(u.tags || [],tagDefinitions), tagDefinitions: tagDefinitions.filter(tag => tag.visibility !== 'internal' && tag.key !== 'profile-creator') };
+  return { ...decorate(buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) }))), slug, site[0], engage), tags: publicTags(u.tags || [],tagDefinitions), tagDefinitions: tagDefinitions.filter(tag => tag.visibility !== 'internal') };
 }
 
 /** Same data as publicProfile, for the owner's live preview in the editor (works while the profile is still a draft). */
