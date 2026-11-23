@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerFile, signUploads, createTextFile, signedUrl, saveFile, deleteFile } from '../server/store.js';
-import { scriptedDatabase, step } from './support/database.js';
+import { scriptedDatabase, step, hasEq } from './support/database.js';
+import { contributorScope } from '../server/workspacePermissions.js';
 
 test('upload registration rejects paths that can escape tenant storage before any request', async () => {
   const db = scriptedDatabase(); db.uid = 'owner';
@@ -15,10 +16,10 @@ test('upload registration rejects paths that can escape tenant storage before an
 
 test('a valid signed upload registers its text under the original tenant object', async () => {
   const path = 'owner/11111111-1111-4111-8111-111111111111.txt';
-  const db = scriptedDatabase({ table: 'files', data: [{ id: 1 }] }); db.uid = 'owner';
+  const db = scriptedDatabase({ table: 'file_uploads', data: [{storage_path:path,name:'notes.txt'}] }, { table: 'files', data: [{ id: 1 }] }); db.uid = 'owner';
   const storage = { download: async value => { assert.equal(value, path); return { data: new Blob(['My knowledge']) }; } };
   await registerFile(db, { path, name: 'notes.txt' }, storage);
-  const row = step(db.calls[0], 'insert')[0];
+  const row = step(db.calls[1], 'insert')[0];
   assert.equal(row.storage_path, path); assert.equal(row.text_content, 'My knowledge');
 });
 
@@ -39,12 +40,31 @@ test('safe display names generate single objects for the signed-in owner', async
     createSignedUploadUrl: async path => { paths.push(path); return { data: { token: 'test' } }; },
     upload: async path => { paths.push(path); return {}; },
   };
-  const db = scriptedDatabase({ table: 'files', data: [{ id: 1 }] }); db.uid = 'owner';
+  const db = scriptedDatabase(...Array.from({length:3},()=>({table:'file_uploads'})), { table: 'files', data: [{ id: 1 }] }); db.uid = 'owner';
   const names = ['100% complete.TXT', 'ज्ञान.md', 'README'];
   const signed = await signUploads(db, names, storage);
   assert.deepEqual(signed.map(row => row.name), names);
   await createTextFile(db, { name: 'Draft.txt', body: 'My text', status: 'draft' }, storage);
   for (const path of paths) assert.match(path, /^owner\/[0-9a-f-]{36}(?:\.[a-z0-9]+)?$/);
+});
+
+test('contributors cannot register owner paths or replay a consumed upload before storage is read', async () => {
+  const path = 'owner/11111111-1111-4111-8111-111111111111.txt';
+  for (const actor of ['contributor', 'owner']) {
+    const base = scriptedDatabase({table:'file_uploads',data:[]}); base.uid='owner'; base.actorId=actor;
+    const db = actor==='contributor' ? contributorScope(base,actor) : base;
+    await assert.rejects(registerFile(db,{path,name:'private.txt'},{download(){throw new Error('Must not read private storage');}}),/own account/);
+    assert.ok(hasEq(base.calls[0],'created_by',actor));
+    assert.ok(hasEq(base.calls[0],'consumed',false));
+    assert.equal(base.calls.length,1);
+  }
+});
+
+test('signed uploads bind their fresh path to the uploading contributor', async () => {
+  const base=scriptedDatabase({table:'file_uploads'}); base.uid='owner';base.actorId='contributor';
+  const [upload]=await signUploads(contributorScope(base,'contributor'),['notes.txt'],{createSignedUploadUrl:async()=>({data:{token:'token'}})});
+  const record=step(base.calls[0],'insert')[0];
+  assert.equal(record.created_by,'contributor');assert.equal(record.storage_path,upload.path);
 });
 
 test('legacy invalid stored paths cannot be signed, overwritten or deleted', async () => {

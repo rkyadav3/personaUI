@@ -79,6 +79,7 @@ export async function signUploads(db, names, storageOverride) {
     const path = paths[index];
     const { data, error } = await (storageOverride || raw().storage.from(BUCKET)).createSignedUploadUrl(path);
     if (error) throw new Error(error.message);
+    await run(db.from('file_uploads').insert({ storage_path: path, name, created_by: db.actorId || db.uid }));
     return { path, token: data.token, name };
   }));
 }
@@ -86,6 +87,10 @@ export async function signUploads(db, names, storageOverride) {
 /** Step 2: the file is in storage; extract its text and create the row. */
 export async function registerFile(db, { path, name, folderId, folderParts = [], topicId, status = 'published', size }, storageOverride) {
   ownedStoragePath(db, path);
+  const [upload] = await run(db.from('file_uploads').update({ consumed: true })
+    .eq('storage_path', path).eq('created_by', db.actorId || db.uid).eq('consumed', false)
+    .gt('expires_at', nowIso()).select('storage_path,name'));
+  if (!upload || upload.name !== name) throw new Error('Upload this file again using your own account.');
   const dl = await (storageOverride || raw().storage.from(BUCKET)).download(path);
   if (dl.error) throw new Error(`Upload not found: ${dl.error.message}`);
   const buf = Buffer.from(await dl.data.arrayBuffer());

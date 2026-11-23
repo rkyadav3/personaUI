@@ -41,8 +41,10 @@ export function OverviewContent({ user, data, error, hour = new Date().getHours(
 
 export default function Overview() {
   const { user } = useAuth();
+  const {workspace}=useOutletContext() || {};
+  if(workspace?.role==='contributor') return <section className="card"><h1>Add information</h1><p>You can add files and articles. Profile settings and private details are available to administrators.</p><div className="row"><Link className="btn" to="/admin/files">Files & notes</Link><Link className="btn" to="/admin/writing">Add articles</Link></div></section>;
   const fullAccess = ALL_PERMISSIONS.every(key => hasPermission(user, key));
-  return fullAccess ? <FullOverview /> : <><h1>Your workspace</h1><Notice kind="info">Your profile tags control which features you can use. Open an available feature from the navigation, or <Link to="/admin/support">contact platform support</Link> to request access. The Studio assistant and combined analytics require all six feature permissions.</Notice></>;
+  return fullAccess ? <FullOverview /> : <><h1>Your workspace</h1><Notice kind="info">Your profile tags control which features you can use. Open an available feature from the navigation, or <Link to="/admin/support">contact platform support</Link> to request access. The Studio assistant and combined analytics require all feature permissions.</Notice></>;
 }
 
 function FullOverview() {

@@ -1,4 +1,5 @@
 export const PROFILE_TAGS = {
+  'profile-creator': 'Profile Creator',
   university: 'University', hospital: 'Hospital', special: 'Special', hero: 'Hero',
   contributors: 'Contributors', standard: 'Standard', founders: 'Founders',
   god: 'God', fraud: 'Fraud', scammer: 'Scammer', 'narration-setter': 'Narration Setter',
@@ -10,6 +11,7 @@ export const SUGGESTION_STATUSES = ['new', 'reviewed', 'planned', 'done', 'decli
 
 export const customTagKey = tag => typeof tag === 'string' && tag.length <= 64 && /^custom-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tag);
 export const tagLabel = (key, definitions = []) => definitions.find(tag => tag.key === key)?.label || PROFILE_TAGS[key] || key.replace(/^custom-/, '').replace(/-/g, ' ');
+export const publicTags = (tags = [], definitions = []) => tags.filter(key => key !== 'profile-creator' && (Object.hasOwn(PROFILE_TAGS,key) || definitions.some(tag => tag.key===key && tag.visibility!=='internal')));
 export const isPrivateProfile = account => account?.profile_private === true || account?.tags?.includes('private');
 
 export function normalizeTags(tags = [], definitions = []) {
@@ -20,6 +22,7 @@ export function normalizeTags(tags = [], definitions = []) {
 }
 
 export function canViewProfile(account, viewer = null) {
+  if (account?.approval_status && account.approval_status !== 'approved') return false;
   if (account?.workspace_status && account.workspace_status !== 'active') return false;
   if (!account || (account.locked_until && new Date(account.locked_until) > new Date())) return false;
   // Unknown or malformed tag data fails closed.

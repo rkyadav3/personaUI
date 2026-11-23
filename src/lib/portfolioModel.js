@@ -74,6 +74,7 @@ export function resolveSite(data, slug, heroOverride) {
   const aboutBody = p.about.body || about;
 
   const pages = page.customization.navOrder.filter(key => PUBLIC_NAV_PAGES.includes(key)).map(key => ({ key }));
+  pages.splice(Math.min(3,pages.length),0,{key:'jobs'});
   const homeProducts = page.customization.homeFeaturedItems.length ? page.customization.homeFeaturedItems.map(id => products.find(item => `${item.kind}:${item.id}` === id)).filter(Boolean) : products;
   const homeAwards = page.customization.homeAwards.length ? resolveHomeAwards(p, page.customization.homeAwards) : p.awards;
 

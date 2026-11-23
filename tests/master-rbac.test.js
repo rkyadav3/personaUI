@@ -161,7 +161,7 @@ test('actual SQL upgrade seeds types, preserves privacy and restricts browser wr
     await db.exec("insert into profile_tags values('custom-group','Group','public'),('custom-university','University','private'); insert into users(id,tags) values('11111111-1111-4111-8111-111111111111',array['custom-group']),('22222222-2222-4222-8222-222222222222',array['custom-university']);");
     const sql = await readFile(new URL('../supabase/master-rbac.sql', import.meta.url), 'utf8');
     await db.exec(sql);
-    assert.equal((await db.query('select count(*)::int as count from profile_tags')).rows[0].count, Object.keys(PROFILE_TAGS).length + 2);
+    assert.equal((await db.query('select count(*)::int as count from profile_tags')).rows[0].count, Object.keys(PROFILE_TAGS).filter(key => key !== 'profile-creator').length + 2);
     assert.equal((await db.query("select label from profile_tags where key='custom-university'")).rows[0].label, 'University (custom)');
     assert.equal((await db.query("select profile_private from users where id='22222222-2222-4222-8222-222222222222'")).rows[0].profile_private, true);
     assert.equal((await db.query("select count(*)::int as count from profile_tags where key in ('organisation','individual-profile')")).rows[0].count, 0);

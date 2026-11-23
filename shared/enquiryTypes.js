@@ -1,5 +1,6 @@
 // The choices on the enquiry form. Shared by the form, the server check and the admin inbox.
 export const ENQUIRY_TYPES = {
+  job: 'Job application',
   general: 'General question',
   offering: 'About a book, course or offering',
   booking: 'Book a session or consultation',

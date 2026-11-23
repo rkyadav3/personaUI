@@ -10,11 +10,11 @@ const { renderToStaticMarkup } = require('react-dom/server');
 const { MemoryRouter } = require('react-router-dom');
 const render = (Component, props, path = '/') => renderToStaticMarkup(React.createElement(MemoryRouter, { initialEntries: [path] }, React.createElement(Component, props)));
 
-test('public navigation has exactly Home, Activity, Store, Chat and Contact in order', () => {
+test('public navigation has Home, Activity, Store, Jobs, Chat and Contact in order', () => {
   const PortfolioSite = require('../src/components/portfolio/PortfolioSite.jsx').default;
   const html = render(PortfolioSite, { data: { name: 'Owner' }, slug: 'owner', preview: true });
   const nav = html.match(/<nav class="pf-nav"[^>]*>([\s\S]*?)<\/nav>/)[1];
-  assert.deepEqual([...nav.matchAll(/<button[^>]*>([^<]+)<\/button>/g)].map(match => match[1]), ['Home', 'Activity', 'Store', 'Chat', 'Contact']);
+  assert.deepEqual([...nav.matchAll(/<button[^>]*>([^<]+)<\/button>/g)].map(match => match[1]), ['Home', 'Activity', 'Store', 'Jobs', 'Chat', 'Contact']);
 });
 
 test('each Activity section renders its published records without extra primary menu entries', () => {
@@ -55,8 +55,8 @@ test('admin has clear primary groups including Invite and a separate Logout acti
   const { StudioSidebar } = require('../src/components/Layout.jsx');
   const html = render(StudioSidebar, { user: { name: 'Owner', isAdmin: false }, onLogout() {}, logoutError: 'Please retry logout' }, '/admin');
   const nav = html.match(/<div class="studio-primary-nav">([\s\S]*?)<\/div>/)[1];
-  assert.equal([...nav.matchAll(/<a\b/g)].length, 7);
-  for (const label of ['Overview', 'Store', 'Activity', 'Inbox', 'Content &amp; knowledge', 'Invite', 'Settings']) assert.ok(nav.includes(label), label);
+  assert.equal([...nav.matchAll(/<a\b/g)].length, 8);
+  for (const label of ['Overview', 'Store', 'Jobs', 'Activity', 'Inbox', 'Content &amp; knowledge', 'Invite', 'Settings']) assert.ok(nav.includes(label), label);
   assert.doesNotMatch(nav, /Logout/);
   assert.match(html, /studio-logout[\s\S]*Logout[\s\S]*role="alert"[\s\S]*Please retry logout/);
 });
@@ -69,6 +69,19 @@ test('the sidebar has no current organization or individual profile selector', (
     assert.doesNotMatch(html, /Current organization|Current profile|<select/);
     assert.match(html, /Settings/);
   }
+});
+
+test('contributors can land after switching but only see content tools and their profile switcher', () => {
+  const { StudioSidebar } = require('../src/components/Layout.jsx');
+  const { canOpenAdminPage } = require('../src/lib/adminNavigation.js');
+  const user={name:'Contributor',workspaceEnabled:true,workspaceRole:'contributor',permissions:['content'],slug:'shared-profile'};
+  const current={id:'shared',name:'Shared profile',type:'individual'};
+  const html=render(StudioSidebar,{user,workspace:{workspace:current,workspaces:[current,{id:'personal',name:'Personal profile'}],role:'contributor'},onLogout(){}},'/admin');
+  assert.equal(canOpenAdminPage(user,'/admin'),true);
+  assert.equal(canOpenAdminPage(user,'/admin/settings','?tab=account'),false);
+  assert.equal(canOpenAdminPage(user,'/admin/files'),true);
+  assert.match(html,/Content &amp; knowledge/);assert.match(html,/Current profile/);
+  assert.doesNotMatch(html,/Edit portfolio|<span>Settings<\/span>|Team access/);
 });
 
 test('every secondary admin link selects its own group and privileged tabs stay hidden', async () => {

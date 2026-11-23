@@ -1,12 +1,13 @@
 import { raw, run } from './supabase.js';
 import { HttpError } from './http.js';
-import { resolvePermissions, hasPermission, operationPermissions, FEATURE_PERMISSIONS } from '../shared/rbac.js';
+import { resolvePermissions, hasPermission, operationPermissions, FEATURE_PERMISSIONS, normalizePlatformPermissions } from '../shared/rbac.js';
 
 export async function loadPermissions(user, database = raw()) {
   if (user.isSuperAdmin) return { ...user, permissions: [] };
   const tags = user.tags || [];
-  const definitions = await run(database.from('profile_tags').select('key,permissions').in('key', tags.length ? tags : ['standard']));
-  return { ...user, permissions: resolvePermissions(tags, definitions) };
+  const definitions = await run(database.from('profile_tags').select('key,permissions,platform_permissions').in('key', tags.length ? tags : ['standard']));
+  const grants = [...(user.platformPermissions || []), ...definitions.flatMap(tag => tag.platform_permissions || [])];
+  return { ...user, permissions: resolvePermissions(tags, definitions), platformPermissions: normalizePlatformPermissions(grants) };
 }
 
 export function requireOperationPermissions(user, op) {

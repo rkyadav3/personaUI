@@ -5,9 +5,17 @@ export const FEATURE_PERMISSIONS = {
   commerce: 'Store, orders & payments',
   enquiries: 'Enquiries',
   community: 'Invites & suggestions',
+  jobs: 'Jobs & applications',
 };
 export const ALL_PERMISSIONS = Object.keys(FEATURE_PERMISSIONS);
 export const PROFILE_TYPES = { individual: 'Individual', organisation: 'Organisation' };
+export const PLATFORM_PERMISSIONS = { 'profiles.create':'Create profiles' };
+export function normalizePlatformPermissions(value = []) {
+  if (!Array.isArray(value) || value.some(key => !Object.hasOwn(PLATFORM_PERMISSIONS,key))) throw new Error('Choose valid Superadmin feature access.');
+  return Object.keys(PLATFORM_PERMISSIONS).filter(key => value.includes(key));
+}
+export const hasPlatformPermission = (user,key) => !!user && (user.isSuperAdmin === true || user.platformPermissions?.includes(key) === true);
+export const hasPlatformAccess = user => hasPlatformPermission(user,'profiles.create');
 
 export function normalizePermissions(value) {
   if (!Array.isArray(value) || value.some(key => !Object.hasOwn(FEATURE_PERMISSIONS, key))) throw new Error('Choose valid feature permissions.');
@@ -32,6 +40,8 @@ export function hasPermission(user, permission) {
 }
 
 export function operationPermissions(op) {
+  if (op === 'jobs.resume') return ['enquiries'];
+  if (/^jobs\./.test(op)) return ['jobs'];
   if (op === 'workspace.setup') return ['profile'];
   if (/^(profile\.|site\.|page\.)/.test(op)) return ['profile'];
   if (/^(content\.|files\.|folders\.|topics\.|posts\.|templates\.|updates\.|events\.)/.test(op)) return ['content'];
@@ -57,6 +67,7 @@ export function routePermissions(pathname, search = '') {
     knowledge: ['knowledge'], questions: ['knowledge'], enquiries: ['enquiries'],
     invites: ['community'], suggestions: ['community'], team: ['community'],
     integrations: ['knowledge'], webhooks: ALL_PERMISSIONS, export: ALL_PERMISSIONS,
+    jobs: ['jobs'],
   };
   return permissions[route] || [];
 }

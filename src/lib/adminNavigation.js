@@ -1,7 +1,8 @@
 import { readSettingsTab } from './publicPageSettings.js';
-import { canOpenRoute } from '../../shared/rbac.js';
+import { canOpenRoute, hasPlatformAccess } from '../../shared/rbac.js';
 
 export const ADMIN_SECTIONS = [
+  {id:'jobs',label:'Jobs',icon:'briefcase',description:'Manage job postings and applications.',pages:[{id:'jobs',label:'Jobs',to:'/admin/jobs',icon:'briefcase'}]},
   { id: 'overview', label: 'Overview', icon: 'home', description: 'Use your assistant and catch up on activity.', pages: [{ id: 'overview', label: 'Overview', to: '/admin', icon: 'home' }] },
   { id: 'store', label: 'Store', icon: 'box', description: 'Manage all products, offerings and categories.', pages: [{ id: 'catalogue', label: 'Store', to: '/admin/store', icon: 'box' }] },
   { id: 'activity', label: 'Activity', icon: 'calendar', description: 'Manage your public work and milestones.', pages: [{ id: 'records', label: 'Activity', to: '/admin/activity', icon: 'calendar' }] },
@@ -34,7 +35,7 @@ export const ADMIN_SECTIONS = [
 ];
 export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', description: 'Support admins, manage sales and improve the main site.', adminOnly: true, pages: [
   { id: 'dashboard', label: 'SuperAdmin dashboard', to: '/superadmin', icon: 'chart' },
-  { id: 'customers', label: 'Customers', to: '/superadmin/customers', icon: 'users' },
+  { id: 'profiles', label: 'Profiles', to: '/superadmin/profiles', icon: 'users' },
   { id: 'master', label: 'Master', to: '/superadmin/master', icon: 'shield' },
   { id: 'workspaces', label: 'Workspace operations', to: '/superadmin/workspaces', icon: 'shield' },
   { id: 'sales', label: 'Sales & payments', to: '/superadmin/sales', icon: 'box' },
@@ -44,6 +45,7 @@ export const SUPERADMIN_SECTION = { id: 'platform', label: 'SuperAdmin', descrip
   { id: 'settings', label: 'Main site settings', to: '/superadmin/settings', icon: 'template' },
   { id: 'account', label: 'Account settings', to: '/superadmin/settings?tab=account', icon: 'shield' },
 ] };
+export const platformSectionsFor = user => user?.isSuperAdmin ? SUPERADMIN_SECTION.pages : hasPlatformAccess(user) ? SUPERADMIN_SECTION.pages.filter(page=>page.id==='profiles') : [];
 
 export function adminSectionsFor(user) {
   const sections = ADMIN_SECTIONS.map(section => ({ ...section, pages: section.pages.filter(page => (page.id !== 'webhooks' || user?.webhooksEnabled) && canOpenRoute(user, page.to)) }));
@@ -51,6 +53,7 @@ export function adminSectionsFor(user) {
     ...section, pages: section.pages.filter(page => !workspacePages.has(page.id)),
   }));
   if (['owner', 'admin'].includes(user.workspaceRole)) return sections;
+  if (user.workspaceRole==='contributor') return sections.filter(section=>section.id==='pipelines').map(section=>({...section,pages:section.pages.filter(page=>['content','files'].includes(page.id))}));
   return sections.filter(section => ['overview', 'pipelines', 'settings'].includes(section.id)).map(section => ({
     ...section,
     pages: section.pages.filter(page => section.id === 'pipelines' ? user.workspaceRole === 'contributor' || ['files', 'knowledge'].includes(page.id) : section.id !== 'settings' || ['account', 'team', 'support', 'suggestions'].includes(page.id)),
@@ -59,6 +62,7 @@ export function adminSectionsFor(user) {
 
 export function canOpenAdminPage(user, pathname, search = '') {
   if (!canOpenRoute(user, pathname + search)) return false;
+  if (user?.workspaceEnabled && user.workspaceRole === 'contributor' && pathname.replace(/\/$/, '') === '/admin') return true;
   const location = adminLocation(pathname, search);
   if (location?.page === 'webhooks' && !user?.webhooksEnabled) return false;
   if (!user?.workspaceEnabled) return !workspacePages.has(location?.page);
@@ -80,6 +84,7 @@ export function adminLocation(pathname, search = '') {
   const settingsTab = readSettingsTab(tab);
   const settingsPage = settingsTab === 'account' ? 'account' : settingsTab === 'privacy' ? 'visibility' : settingsTab === 'payments' ? 'payments' : 'editor';
   const routes = {
+    jobs: ['jobs','jobs'],
     portfolio: ['settings', settingsPage], page: ['settings', 'editor'], profile: tab === 'contrib' ? ['store', 'catalogue'] : tab === 'visibility' ? ['settings', 'visibility'] : ['settings', 'details'],
     writing: ['pipelines', 'content'], templates: ['pipelines', 'content'], topics: ['pipelines', 'content'],
     files: ['pipelines', 'files'], add: ['pipelines', 'files'], knowledge: ['pipelines', 'knowledge'],

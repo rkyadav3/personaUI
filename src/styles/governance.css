@@ -61,3 +61,7 @@
 .studio-community-nav { margin-top: 16px; padding-top: 14px; border-top: 1px solid #deeee3; }
 @media (max-width: 800px) { .governance-shortcuts { grid-template-columns: 1fr; } .governance-invite-form { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 480px) { .governance-invite-form { grid-template-columns: 1fr; } .governance-form .row { flex-direction: column; align-items: stretch; } .governance-form .row > .f:first-child { flex-basis: auto; } }
+/* Job descriptions preserve author paragraphs without allowing markup. */
+.job-prose { white-space: pre-wrap; overflow-wrap: anywhere; }
+.job-record { padding: 1.25rem 0; border-bottom: 1px solid var(--border); }
+.job-record:last-child { border-bottom: 0; }

@@ -9,7 +9,7 @@ import { normalizeBg } from '../shared/siteSettings.js';
 import { previewEngage, publicEngage } from './engage.js';
 import { publicUrl, hostedMediaTree } from './site.js';
 import { raw, run } from './supabase.js';
-import { canViewProfile } from '../shared/governance.js';
+import { canViewProfile, publicTags } from '../shared/governance.js';
 import { normalizeQuantity } from '../shared/commerce.js';
 import { normalizeOrganizationDraft, organizationMissing, publicOrganization } from '../shared/organization.js';
 import { extractOrganizationProfile } from './organizationProfile.js';
@@ -368,7 +368,7 @@ export async function publicProfile(slug, viewer = null, db = raw()) {
     publicEngage(u.id, db),
     u.tags?.some(tag => tag.startsWith('custom-')) ? run(db.from('profile_tags').select('key,label,visibility').in('key', u.tags)) : [],
   ]);
-  return { ...decorate(buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) }))), slug, site[0], engage), tags: u.tags || [], tagDefinitions };
+  return { ...decorate(buildPublic(p, cs.map(c => ({ ...c, offerings: os.filter(o => o.contribution_id === c.id) }))), slug, site[0], engage), tags: publicTags(u.tags || [],tagDefinitions), tagDefinitions: tagDefinitions.filter(tag => tag.visibility !== 'internal' && tag.key !== 'profile-creator') };
 }
 
 /** Same data as publicProfile, for the owner's live preview in the editor (works while the profile is still a draft). */

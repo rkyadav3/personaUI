@@ -56,6 +56,7 @@ const enquiryView = r => ({
   kind: r.kind, offeringId: r.offering_id, offeringTitle: r.offering_title, subject: r.subject, message: r.message,
   prefDate: r.pref_date, prefTime: r.pref_time, prefContact: r.pref_contact, meetingMode: r.meeting_mode, budget: r.budget,
   status: r.status, note: r.admin_note, createdAt: r.created_at,
+  jobId:r.job_id, resumeId:r.resume_id, resumeUrl:r.resume_url,
 });
 
 export const listEnquiries = guard(async db => {

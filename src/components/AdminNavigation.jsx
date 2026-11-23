@@ -6,6 +6,7 @@ import { canOpenRoute } from '../../shared/rbac.js';
 export function AdminSectionTabs({ user, unread = 0 }) {
   const { pathname, search } = useLocation();
   const active = adminLocation(pathname, search);
+  if(pathname.startsWith('/superadmin') && !user?.isSuperAdmin) return null;
   const section = [...adminSectionsFor(user), SUPERADMIN_SECTION].find(item => item.id === active?.group);
   if (!section || section.pages.length === 1 || (section.adminOnly && !user?.isSuperAdmin)) return null;
   return <section className="admin-section-header">

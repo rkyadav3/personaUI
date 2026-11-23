@@ -6,8 +6,8 @@ import { ENQUIRY_TYPES } from './enquiryTypes.js';
 import { normalizeQuantity } from './commerce.js';
 
 export const PUBLIC_NAV_PAGES = ['home', 'activity', 'store', 'chat', 'contact'];
-export const PORTFOLIO_PAGES = [...PUBLIC_NAV_PAGES, 'work', 'products', 'experience', 'talks', 'updates', 'about'];
-export const PAGE_LABELS = { home: 'Home', activity: 'Activity', store: 'Store', work: 'Projects', products: 'Store', experience: 'Experience', talks: 'Talks', updates: 'Events & updates', about: 'About', chat: 'Chat', contact: 'Contact' };
+export const PORTFOLIO_PAGES = [...PUBLIC_NAV_PAGES, 'jobs', 'work', 'products', 'experience', 'talks', 'updates', 'about'];
+export const PAGE_LABELS = { jobs: 'Jobs', home: 'Home', activity: 'Activity', store: 'Store', work: 'Projects', products: 'Store', experience: 'Experience', talks: 'Talks', updates: 'Events & updates', about: 'About', chat: 'Chat', contact: 'Contact' };
 export const ACTIVITY_SECTIONS = { projects: 'Projects', events: 'Events & updates', talks: 'Talks', recognition: 'Recognition', awards: 'Awards', certificates: 'Certificates', testimonials: 'Testimonials', experience: 'Experience' };
 export const PUBLIC_PAGE_ALIASES = { work: { page: 'activity', section: 'projects' }, updates: { page: 'activity', section: 'events' }, talks: { page: 'activity', section: 'talks' }, experience: { page: 'activity', section: 'experience' }, products: { page: 'store' }, about: { page: 'home' } };
 export const SOCIAL_KINDS = { github: 'GitHub', linkedin: 'LinkedIn', x: 'X (Twitter)', instagram: 'Instagram', youtube: 'YouTube', email: 'Email', website: 'Website' };
